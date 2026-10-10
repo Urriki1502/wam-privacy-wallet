@@ -20,13 +20,13 @@ _PINNED_PATHS = (
     "src/wam/chainparams.cpp",
     "scripts/patch_upstream.py",
 )
-_HEX40 = re.compile(r"[0-9a-f]{40}\\Z", re.ASCII)
-_HEX64 = re.compile(r"[0-9a-f]{64}\\Z", re.ASCII)
+_HEX40 = re.compile(r"[0-9a-f]{40}\Z", re.ASCII)
+_HEX64 = re.compile(r"[0-9a-f]{64}\Z", re.ASCII)
 _PORT_RE = re.compile(
-    r"static\\s+constexpr\\s+int\\s+WAM_(MAINNET|TESTNET|REGTEST)_(P2P|RPC)_PORT\\s*=\\s*(\\d+)\\s*;"
+    r"static\s+constexpr\s+int\s+WAM_(MAINNET|TESTNET|REGTEST)_(P2P|RPC)_PORT\s*=\s*(\d+)\s*;"
 )
 _GENESIS_RE = re.compile(
-    r'assert\\(consensus\\.hashGenesisBlock\\s*==\\s*uint256S\\("0x([0-9a-f]{64})"\\)\\);'
+    r'assert\(consensus\.hashGenesisBlock\s*==\s*uint256S\("0x([0-9a-f]{64})"\)\);'
 )
 _REGTEST_RPC_PATCH = 'replacement=\'return std::make_unique<CBaseChainParams>("regtest", 29554);\''
 
@@ -38,7 +38,7 @@ class CoreSourceContractError(RuntimeError):
 def git_blob_sha1(raw: bytes) -> str:
     if type(raw) is not bytes:
         raise CoreSourceContractError("CORE_SOURCE_INVALID_BYTES")
-    return hashlib.sha1(b"blob " + str(len(raw)).encode("ascii") + b"\\0" + raw).hexdigest()
+    return hashlib.sha1(b"blob " + str(len(raw)).encode("ascii") + b"\0" + raw).hexdigest()
 
 
 def load_core_manifest(path: Path) -> dict:
