@@ -155,7 +155,6 @@ class CoreProvenanceIntakeTests(unittest.TestCase):
                 intake_core_artifact(p)
 
 
-
     def test_forged_record_status_or_approval_cannot_be_constructed(self):
         """Frozen output must not accept claimed verification in direct init."""
         base = intake_core_artifact(candidate())
@@ -194,7 +193,6 @@ class CoreProvenanceIntakeTests(unittest.TestCase):
                 ProvenanceIntakeError, "^G1_PROVENANCE_SCHEMA_REJECTED$"
             ):
                 intake_core_artifact(p)
-
 
 
 if __name__ == "__main__":
