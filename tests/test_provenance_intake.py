@@ -176,9 +176,10 @@ class CoreProvenanceIntakeTests(unittest.TestCase):
                     CoreArtifactCandidate(**from_dataclass, **{name: forged})
                 with self.assertRaises(ValueError):
                     replace(base, **{name: forged})
-                self.assertIs(getattr(base, name), False) if name != "status" else self.assertEqual(
-                    base.status, "UNTRUSTED_CANDIDATE_REVIEW_ONLY"
-                )
+                if name == "status":
+                    self.assertEqual(base.status, "UNTRUSTED_CANDIDATE_REVIEW_ONLY")
+                else:
+                    self.assertIs(getattr(base, name), False)
 
     def test_equal_valued_string_subclass_dict_keys_are_denied(self):
         """Dictionary field names themselves must be exact built-in strings."""
