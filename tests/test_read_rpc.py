@@ -63,6 +63,15 @@ class LocalReadOnlyRpcTests(unittest.TestCase):
         self.assertEqual(self.rpc.call('getblockcount'), 'a' * 64)
         self.assertEqual(self.rpc.call('getbestblockhash', []), 'a' * 64)
 
+    def test_blockchain_info_read_only_rpc_method(self):
+        self.server.reply = b'{"result":{"chain":"regtest","blocks":0,"headers":0,"bestblockhash":"' + b"a" * 64 + b'","pruned":false},"error":null,"id":1}'
+        info = self.rpc.call("getblockchaininfo")
+        self.assertEqual(info["chain"], "regtest")
+        self.assertEqual(self.server.observed[-1][0], "/")
+        self.assertEqual(json.loads(self.server.observed[-1][2])["method"], "getblockchaininfo")
+        with self.assertRaisesRegex(LocalRpcError, "^WAM_RPC_INVALID_PARAMS$"):
+            self.rpc.call("getblockchaininfo", [0])
+
     def test_write_methods_rejected_before_socket(self):
         for method in ('sendrawtransaction', 'getwalletinfo', 'stop', 'getblock', 'getrawtransaction', '', None, True):
             with self.subTest(method=method):

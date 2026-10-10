@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 from .endpoint import LocalRegtestEndpoint
 
-_READ_METHODS = frozenset({"getblockhash", "getblockcount", "getbestblockhash"})
+_READ_METHODS = frozenset({"getblockhash", "getblockcount", "getbestblockhash", "getblockchaininfo"})
 _MAX_RESPONSE_BYTES = 1_048_576
 _MAX_BLOCK_HEIGHT = 100_000_000
 
