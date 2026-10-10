@@ -162,12 +162,28 @@ class LocalRegtestGatewayTests(unittest.TestCase):
         with self.assertRaisesRegex(RegtestIdentityError, "^WAM_NODE_PROBE_TRANSPORT_ERROR$"):
             self.gateway().probe_identity()
 
-    def test_unavailable_rpc_fails_closed(self) -> None:
-        # A reserved-port assumption is unsafe; binding a temporary socket
-        # and closing it is still subject to races. Instead inject an HTTP
-        # status failure in the synthetic server's credential path.
-        with self.assertRaisesRegex(RegtestIdentityError, "^WAM_NODE_PROBE_TRANSPORT_ERROR$"):
-            self.gateway(ExplicitRpcAuth("bad-user", "mock-pass")).probe_identity()
+    def test_connection_refused_fails_closed_without_leaking_details(self) -> None:
+        # Inject a transport-level refusal instead of racing for an unused
+        # TCP port. No real network request is issued by this negative test.
+        from unittest.mock import patch
+
+        with patch(
+            "wam_privacy_wallet.node.read_rpc.http.client.HTTPConnection",
+            autospec=True,
+        ) as connection_cls:
+            connection_cls.return_value.request.side_effect = ConnectionRefusedError(
+                "sensitive-local-error"
+            )
+            with self.assertRaises(RegtestIdentityError) as caught:
+                self.gateway().probe_identity()
+            self.assertEqual(
+                str(caught.exception), "WAM_NODE_PROBE_TRANSPORT_ERROR"
+            )
+            connection_cls.assert_called_once_with(
+                "127.0.0.1", self.node.server_port, timeout=2.0
+            )
+            connection_cls.return_value.close.assert_called_once()
+        self.assertEqual(self.node.calls, [])
 
     def test_every_probe_is_fresh_and_never_grants_persistent_approval(self) -> None:
         gate = self.gateway()
