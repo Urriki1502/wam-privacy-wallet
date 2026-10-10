@@ -1,0 +1,8 @@
+# Ownership and review routing. Enforcement also requires repository rulesets.
+* @Urriki1502
+/src/ @Urriki1502
+/tests/ @Urriki1502
+/.github/workflows/ @Urriki1502
+/SECURITY.md @Urriki1502
+/LICENSE @Urriki1502
+/docs/RELEASE_POLICY.md @Urriki1502

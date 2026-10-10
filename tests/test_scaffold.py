@@ -27,8 +27,16 @@ class ScaffoldContractTests(unittest.TestCase):
             with self.subTest(path=relative):
                 self.assertTrue((ROOT / relative).is_file())
 
-    def test_no_license_selected(self):
-        self.assertFalse((ROOT / "LICENSE").exists())
+    def test_mit_license_selected_and_complete(self):
+        license_path = ROOT / "LICENSE"
+        self.assertTrue(license_path.is_file())
+        license_text = license_path.read_text(encoding="utf-8")
+        self.assertTrue(license_text.startswith("MIT License\n"))
+        self.assertIn("Copyright (c) 2026 Urriki1502 and contributors", license_text)
+        self.assertIn("Permission is hereby granted, free of charge", license_text)
+        self.assertIn("The above copyright notice and this permission notice", license_text)
+        self.assertIn('THE SOFTWARE IS PROVIDED "AS IS"', license_text)
+        self.assertIn("IN NO EVENT SHALL THE", license_text)
         self.assertFalse((ROOT / "LICENSE.md").exists())
 
     def test_no_runtime_dependency_imported(self):
