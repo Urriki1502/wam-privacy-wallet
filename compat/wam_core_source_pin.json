@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "repository": "wamcoin-core-dev/wam-coin",
+  "inspected_commit": "260bc468e5adffea7ce68d8f97fac3e27e4c50b2",
+  "wsp1_reference_core_commit": "8a3f4fe4f1d804c378f795d4cc281ec5125f75f3",
+  "source_blobs": {
+    "src/wam/wam-params.h": "d798155e1964adbdb3ccc48b44dd48fcde3b1602",
+    "src/wam/chainparams.cpp": "6e7eebfec5483f99ed13849a9b22cd502781364f",
+    "scripts/patch_upstream.py": "ba933c2353a4eb5672c8cf384182e223620a9952"
+  },
+  "network_ports": {
+    "mainnet": {
+      "p2p": 9555,
+      "rpc": 9554
+    },
+    "testnet": {
+      "p2p": 19555,
+      "rpc": 19554
+    },
+    "regtest": {
+      "p2p": 29555,
+      "rpc": 29554
+    }
+  },
+  "regtest_genesis": "b88f3d262f285e38e184f50bf3eea1c8e615486ae67d3d9eaf0976fbd6d3d30d"
+}
