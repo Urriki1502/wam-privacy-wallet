@@ -1,30 +1,45 @@
-# Development plan
+# Development plan — current public repository
 
-## Foundation (this commit)
+**Visibility:** Public (2026-10-10). **Licensing:** MIT on the open-source documentation PR pending merge. **Release status:** experimental, no production wallet.
 
-- Private repository, deferred license.
-- README, .gitignore, initial module placeholder, docs.
-- Dependency-free scaffold CI: Windows/macOS/Linux Python 3.12.
-- **No production code, no GUI, no wallet functionality.**
+This document replaces the original foundation-era plan; for the live milestone and residual-risk list see [ROADMAP](ROADMAP.md), [THREAT_MODEL](THREAT_MODEL.md) and [RELEASE_POLICY](RELEASE_POLICY.md).
 
-## Phase 001 — GUI shell (in review, not merged)
+## Existing repository phases
 
-- Optional PySide6 GUI, six static pages and offline-only status labels.
-- Cross-platform widget smoke tests; no wallet APIs or filesystem/network calls.
-- New GUI CI must pass on Windows/macOS/Ubuntu before merge.
-- Phase 001 does not qualify signing, protocol integrations or release packages.
+- Phase 001 — offline GUI shell: **merged**.
+- Phase 002 — local regtest endpoint contract: **merged**.
+- Phase 003 — pinned WSP-1 adapter provenance/public API: **OPEN DRAFT PR #3**, not merged.
+- Phase 004 — read-only WAM regtest chain identity: **merged**.
+- Phase 005 — bounded loopback-only read RPC: **merged**.
+- Phase 006 — local read-only regtest gateway: **merged**.
+- Phase 007 — opt-in verified WAM Core regtest harness: **merged**.
+- Phase 008 — Core regtest profile gate: **merged**.
+- Phase 009 — WAM Core source pin/drift gate: **merged**.
 
-## Remaining sequential gates (not started)
+Merged means accepted into repository history, **not** ready for real wallets or mainnet.
 
-1. Formalize API boundaries, version pins and WSP network-profile assumptions.
-2. Review platform-specific GUI packaging and accessibility independently.
-3. WSP-1 adapter + local node-only scanner; Windows locking fixes.
-4. Signing, wallet-state, backup/recovery and crash tests.
-5. Coin selection and wallet privacy policy.
-6. PayJoin, network privacy and selective disclosure, each review-gated.
-7. Independent security integration and end-to-end tests.
-8. Platform packaging, supply-chain verification and external review.
+## Immediate open-source work
 
-**Merge rule:** One narrow PR at a time; CI tied to exact commit; no merge on missing/failed mandatory checks. A passing unit test never substitutes for cross-module or external assurance. If multiple CI jobs are queued, only independent changes may proceed before predecessor qualification is complete.
+1. Ship MIT LICENSE and maintainer/contributor documentation through a reviewed PR.
+2. Complete full history/branches/artifacts secret audit; rotate compromised material if anything is found. Public visibility happened before this review, so do not claim it is already completed.
+3. Establish enforceable branch rulesets, private vulnerability reporting, dependency scanning and CI/fork permissions.
+4. Revalidate exact-head Actions checks, cross-platform runner coverage and license detection after merge.
+5. Announce the repository to WAM developers with an explicit non-production warning.
 
-No shielded/Halo2 or consensus work is part of this release plan.
+## Subsequent engineering gates
+
+1. Formalize pinned WSP-1 API/network-profile and local scanner dependency contracts.
+2. Verify functional Windows locking, scanning/signer separation and recovery, including crash/restart.
+3. Implement wallet storage, PSBT safety and trusted UI user-approval boundaries only after tests and security review.
+4. Add reviewed wallet privacy/PayJoin/network privacy/disclosure features with negative tests.
+5. Reproduce full-source tests across Windows/macOS/Linux and verified WAM Core testnet/regtest conditions.
+6. Complete independent audit, signed builds and release qualification before any real-funds claims.
+
+## Immutable boundaries
+
+- No consensus/WAM Core modifications from this repo.
+- No shielded/Halo2 CORE-003 consensus integration in V1.
+- No automatic merges of Phase 003, frozen research or sensitive signer code.
+- No reduction in existing required security checks merely to produce a green CI.
+
+**Merge rule:** Each PR requires an exact-head CI record, review of changes and explicit maintainer approval. If a runner is unavailable, record the unavailable coverage as a blocker rather than silently omitting it.
