@@ -20,15 +20,32 @@ immutable and never authorizes network, scanner, signer or real funds.
 
 ## Acceptance
 
-Ten adversarial tests cover valid canonical plans, false or forged inputs,
+Thirteen adversarial tests cover valid canonical plans, false or forged inputs,
 port ranges/collisions, remote/DNS hosts, peer rebinding, injection of unsafe
 config lines, removed/reordered lines, authorization escalation, immutability,
 and proof of no I/O. Register as mandatory suite **#15** on the stacked branch;
-expected **126 collected test cases** in each of 4 offline architecture legs
-(14 prior suites / 116 cases from PR #27 + 10 newly added cases). GUI tests
+expected **129 collected test cases** in each of 4 offline architecture legs
+(14 prior suites / 116 cases from PR #27 + 13 newly added cases). GUI tests
 on macOS/Linux/Windows x64, pinned Core source GET-only check and both CodeQL
 checks remain mandatory.
 
 `PYTHONPATH=src python -m unittest discover -s tests -p test_two_node_policy.py -v`
 
 Do not merge stacked G1-03 to main without separate G1-01 review and rebase.
+
+## Strict dataclass field types (G1-03 hardening)
+
+An earlier version relied on `candidate == canonical` after validating the
+four RPC/P2P ports, but Python dataclass equality treated values like
+`False == 0 == 0.0` as equivalent. It also accepted a numeric-equivalent
+`peer_p2p_port` and `str` subclasses as exact strings. These are **schema
+violations** even when an ordinary equality check returns True.
+
+The policy gate now requires exact `bool` types for every plan authority
+field, exact built-in `int` for all node ports, and exact built-in `str`
+for all node strings and the top-level status **before** comparing to the
+canonical proposal. Missing dataclass slots fail closed with the original
+redacted `G1_POLICY_PLAN_INVALID` code. Three regression tests cover all
+five authority flags and coercion cases; the mandatory suite minimum increases
+from 10 to 13. This does **not** attest to actual WAM Core daemon flags or
+make real-regtest safe to execute.

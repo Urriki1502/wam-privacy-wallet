@@ -76,6 +76,59 @@ class TwoNodePolicyAuditTests(unittest.TestCase):
             with self.subTest(changes=changes), self.assertRaises(TwoNodePolicyError):
                 audit_two_node_policy(replace(self.plan, **changes))
 
+    def test_numerically_equal_false_flags_cannot_impersonate_bool(self):
+        # Python dataclass equality alone considers False == 0 == 0.0.
+        # Exact type validation must reject every such forged field.
+        fields = (
+            "real_regtest_qualified", "publisher_identity_verified",
+            "scanner_enabled", "signing_enabled", "release_allowed",
+        )
+        for field in fields:
+            for wrong in (0, 0.0, -0.0):
+                forged = replace(self.plan, **{field: wrong})
+                with self.subTest(field=field, wrong=repr(wrong)):
+                    self.assertEqual(forged, self.plan)
+                    with self.assertRaisesRegex(
+                        TwoNodePolicyError, "^G1_POLICY_PLAN_INVALID$"
+                    ):
+                        audit_two_node_policy(forged)
+
+    def test_numeric_peer_port_coercion_and_subclassed_int_are_denied(self):
+        # Other ports are already type-checked by the canonical planner;
+        # peer_p2p_port was vulnerable to equality with float/int subclasses.
+        a, b = self.plan.nodes
+        class IntAlias(int):
+            pass
+        for wrong in (float(a.peer_p2p_port), IntAlias(a.peer_p2p_port)):
+            forged = replace(self.plan, nodes=(replace(a, peer_p2p_port=wrong), b))
+            with self.subTest(wrong=repr(wrong)):
+                self.assertEqual(forged, self.plan)
+                with self.assertRaisesRegex(
+                    TwoNodePolicyError, "^G1_POLICY_PLAN_INVALID$"
+                ):
+                    audit_two_node_policy(forged)
+
+    def test_equal_string_subclasses_and_missing_slots_fail_closed(self):
+        class TextAlias(str):
+            pass
+        a, b = self.plan.nodes
+        for attr in ("label", "rpc_host", "p2p_host", "config_preview"):
+            forged_node = replace(a, **{attr: TextAlias(getattr(a, attr))})
+            forged = replace(self.plan, nodes=(forged_node, b))
+            with self.subTest(node_field=attr):
+                self.assertEqual(forged, self.plan)
+                with self.assertRaisesRegex(
+                    TwoNodePolicyError, "^G1_POLICY_PLAN_INVALID$"
+                ):
+                    audit_two_node_policy(forged)
+        forged_status = replace(self.plan, status=TextAlias(self.plan.status))
+        with self.assertRaisesRegex(TwoNodePolicyError, "^G1_POLICY_PLAN_INVALID$"):
+            audit_two_node_policy(forged_status)
+        # A deliberately uninitialized instance must not leak AttributeError.
+        from wam_privacy_wallet.node.two_node_topology import TwoNodePlan
+        with self.assertRaisesRegex(TwoNodePolicyError, "^G1_POLICY_PLAN_INVALID$"):
+            audit_two_node_policy(object.__new__(TwoNodePlan))
+
     def test_evidence_frozen_and_non_authorizing(self):
         value = audit_two_node_policy(self.plan)
         for field in ("external_network_allowed", "scanner_enabled", "signer_enabled",
