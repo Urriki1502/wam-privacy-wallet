@@ -1,7 +1,7 @@
 """G1-02 provenance intake: offline adversarial tests (no binary/network)."""
 from __future__ import annotations
 
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, replace
 from pathlib import Path
 import socket
 import subprocess
@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 from wam_privacy_wallet.node.core_source_pin import load_core_manifest
 from wam_privacy_wallet.node.provenance_intake import (
-    ProvenanceIntakeError, REVIEWED_SOURCE_COMMIT, SOURCE_REPOSITORY,
+    CoreArtifactCandidate, ProvenanceIntakeError, REVIEWED_SOURCE_COMMIT, SOURCE_REPOSITORY,
     intake_core_artifact,
 )
 
@@ -152,6 +152,46 @@ class CoreProvenanceIntakeTests(unittest.TestCase):
             p = candidate()
             p[field] = Alias(p[field])
             with self.subTest(field=field), self.assertRaises(ProvenanceIntakeError):
+                intake_core_artifact(p)
+
+
+
+    def test_forged_record_status_or_approval_cannot_be_constructed(self):
+        """Frozen output must not accept claimed verification in direct init."""
+        base = intake_core_artifact(candidate())
+        from_dataclass = {
+            "repository": base.repository,
+            "reviewed_source_commit": base.reviewed_source_commit,
+            "claimed_release": base.claimed_release,
+            "platform": base.platform,
+            "binary_sha256": base.binary_sha256,
+        }
+        for name in ("status", "publisher_identity_verified",
+                     "binary_source_equivalence_verified",
+                     "real_regtest_qualified", "execution_allowed",
+                     "release_allowed"):
+            forged = "PUBLISHER_VERIFIED" if name == "status" else True
+            with self.subTest(field=name):
+                with self.assertRaises(TypeError):
+                    CoreArtifactCandidate(**from_dataclass, **{name: forged})
+                with self.assertRaises(ValueError):
+                    replace(base, **{name: forged})
+                self.assertIs(getattr(base, name), False) if name != "status" else self.assertEqual(
+                    base.status, "UNTRUSTED_CANDIDATE_REVIEW_ONLY"
+                )
+
+    def test_equal_valued_string_subclass_dict_keys_are_denied(self):
+        """Dictionary field names themselves must be exact built-in strings."""
+        class Alias(str):
+            pass
+
+        for name in tuple(candidate()):
+            p = candidate()
+            value = p.pop(name)
+            p[Alias(name)] = value
+            with self.subTest(field=name), self.assertRaisesRegex(
+                ProvenanceIntakeError, "^G1_PROVENANCE_SCHEMA_REJECTED$"
+            ):
                 intake_core_artifact(p)
 
 
