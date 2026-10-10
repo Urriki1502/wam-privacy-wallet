@@ -1,6 +1,7 @@
 """G1-03: adversarial policy checks against the immutable topology candidate."""
 from __future__ import annotations
 from dataclasses import FrozenInstanceError, replace
+import random
 import socket
 import subprocess
 import unittest
@@ -128,6 +129,106 @@ class TwoNodePolicyAuditTests(unittest.TestCase):
         from wam_privacy_wallet.node.two_node_topology import TwoNodePlan
         with self.assertRaisesRegex(TwoNodePolicyError, "^G1_POLICY_PLAN_INVALID$"):
             audit_two_node_policy(object.__new__(TwoNodePlan))
+
+    def test_seeded_property_valid_plans_are_deterministic_and_review_only(self):
+        """Fixed-seed generated valid port tuples preserve G1-01 policy."""
+        rng = random.Random(0x6A103A)
+        for index in range(96):
+            ports = tuple(rng.sample(range(20000, 51000), 4))
+            plan = plan_two_node_topology(ports)
+            with self.subTest(index=index, ports=ports):
+                self.assertEqual(plan, plan_two_node_topology(ports))
+                evidence = audit_two_node_policy(plan)
+                self.assertEqual(evidence.status, "OFFLINE_CANDIDATE_SHAPE_ONLY")
+                self.assertFalse(evidence.release_allowed)
+                self.assertFalse(evidence.real_regtest_qualified)
+
+    def test_seeded_property_numeric_equivalence_forgery_is_denied(self):
+        """Numeric aliases compare equal to the expected dataclass but fail policy."""
+        rng = random.Random(0x6A103B)
+        flags = ("release_allowed", "signing_enabled", "scanner_enabled",
+                 "publisher_identity_verified", "real_regtest_qualified")
+        for index in range(125):
+            field = rng.choice(flags)
+            fake = rng.choice((0, 0.0, -0.0))
+            forged = replace(self.plan, **{field: fake})
+            with self.subTest(index=index, field=field, fake=repr(fake)):
+                self.assertEqual(forged, self.plan)
+                with self.assertRaisesRegex(TwoNodePolicyError,
+                                            "^G1_POLICY_PLAN_INVALID$"):
+                    audit_two_node_policy(forged)
+
+    def test_seeded_property_node_type_aliases_are_denied(self):
+        """Type-coercible ports and string subclasses remain invalid."""
+        rng = random.Random(0x6A103C)
+        class IntAlias(int):
+            pass
+        class TextAlias(str):
+            pass
+        int_fields = ("rpc_port", "p2p_port", "peer_p2p_port")
+        text_fields = ("label", "rpc_host", "p2p_host", "config_preview")
+        for index in range(144):
+            which = rng.randrange(2)
+            original = self.plan.nodes[which]
+            field = rng.choice(int_fields + text_fields)
+            raw = getattr(original, field)
+            replacement = rng.choice((float(raw), IntAlias(raw))) if field in int_fields else TextAlias(raw)
+            mutant = replace(original, **{field: replacement})
+            nodes = list(self.plan.nodes)
+            nodes[which] = mutant
+            forged = replace(self.plan, nodes=tuple(nodes))
+            with self.subTest(index=index, field=field, node=which):
+                self.assertEqual(forged, self.plan)
+                with self.assertRaisesRegex(TwoNodePolicyError,
+                                            "^G1_POLICY_PLAN_INVALID$"):
+                    audit_two_node_policy(forged)
+
+    def test_seeded_property_single_config_line_mutation_is_denied(self):
+        """Remove/reorder/duplicate/change one line; never silently normalize."""
+        rng = random.Random(0x6A103D)
+        for index in range(112):
+            which = rng.randrange(2)
+            node = self.plan.nodes[which]
+            lines = node.config_preview.splitlines()
+            operation = rng.choice(("remove", "duplicate", "replace", "reverse"))
+            if operation == "reverse":
+                mutated = list(reversed(lines))
+            else:
+                mutated = lines[:]
+                position = rng.randrange(len(mutated))
+                if operation == "remove":
+                    del mutated[position]
+                elif operation == "duplicate":
+                    mutated.insert(position, mutated[position])
+                else:
+                    mutated[position] = "rpcbind=0.0.0.0"
+            preview = "\n".join(mutated) + "\n"
+            nodes = list(self.plan.nodes)
+            nodes[which] = replace(node, config_preview=preview)
+            forged = replace(self.plan, nodes=tuple(nodes))
+            with self.subTest(index=index, operation=operation):
+                self.assertNotEqual(forged, self.plan)
+                with self.assertRaisesRegex(TwoNodePolicyError,
+                                            "^G1_POLICY_PLAN_INVALID$"):
+                    audit_two_node_policy(forged)
+
+    def test_seeded_property_peer_redirect_and_port_mutation_are_denied(self):
+        """Reject changing a single peer/port without matching canonical plan."""
+        rng = random.Random(0x6A103E)
+        for index in range(120):
+            which = rng.randrange(2)
+            original = self.plan.nodes[which]
+            field = rng.choice(("rpc_port", "p2p_port", "peer_p2p_port"))
+            current = getattr(original, field)
+            value = rng.choice((current + 1, current - 1, 0, 65536, None, True))
+            changed = replace(original, **{field: value})
+            nodes = list(self.plan.nodes)
+            nodes[which] = changed
+            forged = replace(self.plan, nodes=tuple(nodes))
+            with self.subTest(index=index, field=field, mutated=repr(value)):
+                with self.assertRaisesRegex(TwoNodePolicyError,
+                                            "^G1_POLICY_PLAN_INVALID$"):
+                    audit_two_node_policy(forged)
 
     def test_evidence_frozen_and_non_authorizing(self):
         value = audit_two_node_policy(self.plan)
