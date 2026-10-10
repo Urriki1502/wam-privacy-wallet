@@ -60,13 +60,14 @@ jobs:
       # Execute each old contract target in a separate process and report ALL
       # failing targets, rather than stopping the rest at the first failure.
       # Keep contracts dependency-free exactly as in the original dedicated workflows.
-      - name: Run all eight original offline contract test suites
+      - name: Run all 12 mandatory offline qualification suites
         shell: python
         env:
           PYTHONPATH: src
         run: |
           import subprocess
           import sys
+          from pathlib import Path
           patterns = [
               'test_scaffold.py',
               'test_core_profile.py',
@@ -76,9 +77,17 @@ jobs:
               'test_real_regtest_harness.py',
               'test_regtest_attestation.py',
               'test_regtest_gateway.py',
+              'test_reuse_manifest.py',
+              'test_app_diagnostic_boundary.py',
+              'test_security_gate_ledger.py',
+              'test_regtest_artifact_preflight.py',
           ]
           failures = []
           for pattern in patterns:
+              if not Path("tests", pattern).is_file():
+                  print("MISSING_REQUIRED_TEST_MODULE: " + pattern, flush=True)
+                  failures.append(pattern)
+                  continue
               print(f'::group::Offline contract: {pattern}', flush=True)
               outcome = subprocess.run(
                   [sys.executable, '-m', 'unittest', 'discover',

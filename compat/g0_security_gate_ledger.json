@@ -1,0 +1,79 @@
+{
+  "schema": "wam-wallet-security-gates/v1",
+  "scope": "G0_B4_REVIEW_ONLY",
+  "release_allowed": false,
+  "mainnet_allowed": false,
+  "operational_wallet_enabled": false,
+  "gates": [
+    {
+      "id": "CORE-REAL-E2E",
+      "priority": "P0",
+      "status": "BLOCKED",
+      "requirement": "Real two-node WAM Core regtest, independently verified binary SHA-256, auth and chain identity",
+      "evidence": "https://github.com/Urriki1502/wam-privacy-wallet/issues/9"
+    },
+    {
+      "id": "WSP-DEPENDENCY-REVIEW",
+      "priority": "P0",
+      "status": "BLOCKED",
+      "requirement": "Review WSP-1 pin and cross-platform exclusive scanner locking before adoption",
+      "evidence": "https://github.com/Urriki1502/wam-privacy-wallet/pull/3"
+    },
+    {
+      "id": "SCANNER-RPC-BRIDGE",
+      "priority": "P0",
+      "status": "BLOCKED",
+      "requirement": "Local-only scanner transport, fresh attestation, bounded getblock/mempool and fail-closed race handling",
+      "evidence": "https://github.com/Urriki1502/wam-privacy-wallet/issues/15"
+    },
+    {
+      "id": "SCAN-SPEND-SEPARATION",
+      "priority": "P0",
+      "status": "BLOCKED",
+      "requirement": "Scanner can never receive spend key or broadcast authority; enforce independent signer boundary",
+      "evidence": "docs/THREAT_MODEL.md"
+    },
+    {
+      "id": "WALLET-STATE-RECOVERY",
+      "priority": "P0",
+      "status": "BLOCKED",
+      "requirement": "Durable exclusive storage writer, crash/restart/reorg rollback and full restore-rescan proof",
+      "evidence": "docs/RELEASE_POLICY.md"
+    },
+    {
+      "id": "SIGNER-APPROVAL",
+      "priority": "P0",
+      "status": "BLOCKED",
+      "requirement": "PSBT output/amount/fee approval binding, replay and rollback protection, review",
+      "evidence": "docs/RELEASE_POLICY.md"
+    },
+    {
+      "id": "WIN32-RELEASE-QUALIFICATION",
+      "priority": "P1",
+      "status": "BLOCKED",
+      "requirement": "32-bit GUI/cryptographic packaging and native end-to-end verification",
+      "evidence": "https://github.com/Urriki1502/wam-privacy-wallet/issues/5"
+    },
+    {
+      "id": "PR-BRANCH-GOVERNANCE",
+      "priority": "P1",
+      "status": "REVIEW_REQUIRED",
+      "requirement": "Require maintained PR review and CI checks before merge; active ruleset observed only deletion/non-fast-forward",
+      "evidence": "docs/OPEN_SOURCE_CHECKLIST.md"
+    },
+    {
+      "id": "DEPENDENCY-RELEASE-SUPPLYCHAIN",
+      "priority": "P1",
+      "status": "BLOCKED",
+      "requirement": "All-refs secret history review, transitive licenses, signed provenance and review",
+      "evidence": "docs/OPEN_SOURCE_CHECKLIST.md"
+    },
+    {
+      "id": "PRIVACY-POLICY-REVIEW",
+      "priority": "P1",
+      "status": "BLOCKED",
+      "requirement": "No hosted scanner, network first-hop observations, PayJoin and disclosure review",
+      "evidence": "docs/THREAT_MODEL.md"
+    }
+  ]
+}
