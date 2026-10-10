@@ -49,3 +49,22 @@ redacted `G1_POLICY_PLAN_INVALID` code. Three regression tests cover all
 five authority flags and coercion cases; the mandatory suite minimum increases
 from 10 to 13. This does **not** attest to actual WAM Core daemon flags or
 make real-regtest safe to execute.
+
+## G1-03 seeded mutation/property follow-up (Draft; test-only)
+
+Five new `unittest` test methods use fixed `random.Random` seeds to create
+hundreds of reproducible configurations and mutations: randomized valid
+noncolliding port tuples, numerically-equal false authority flags, float/int
+subclasses for peer/RPC/P2P ports, string subclasses, single-line config
+reordering/removal/duplication/replacement, and unauthorized peer redirects.
+
+- Baseline G1-03 now expects **18 tests**, stacked required suite count
+  **15 suites / 134 collected cases per architecture**.
+- This is **seeded deterministic property-style/mutation testing**, **not**
+  exhaustive fuzzing, Hypothesis coverage, actual Core execution or a security
+  audit. No extra dependency was introduced.
+- Reproducible fixed seeds make failures stable across Windows x86/x64,
+  macOS x64, and Linux x64. All candidates remain non-authorizing.
+- The reviewed G1-03 source policy is **unchanged**; only tests, mandatory
+  CI minimum and this document change.
+- G1-01 and G1-03 Drafts remain untouched, and this follow-up stays Draft.
