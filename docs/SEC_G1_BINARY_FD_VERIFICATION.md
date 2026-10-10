@@ -21,22 +21,27 @@ The SHA verifier now:
 1. Requires an exact-form SHA256 expected digest, lstat of a regular file.
 2. Uses one `os.open` file descriptor for all hashing (with O_NOFOLLOW where
    available and binary mode on Windows).
-3. Checks descriptor mode, device, inode, size, mtime and ctime against
-   pathname metadata before bytes are read.
+3. Checks descriptor mode, device, inode, size and mtime against pathname
+   metadata before bytes are read. Checks ctime additionally on POSIX.
+   Native Windows CRT fstat may expose different ctime semantics than lstat;
+   this field is NOT a cross-API Windows identity guarantee.
 4. Streams the hash and total byte count through that descriptor only.
 5. Rechecks descriptor metadata and the pathname before returning, denying
    detected file swaps or in-place modifications with `CORE_BINARY_CHANGED`.
 6. Does not disclose file bytes or paths in errors. Leaves the original
    mismatched SHA detection and no-launch-on-mismatch contract unchanged.
 
-Three new synthetic tests check a pre-open path replacement, a simulated
-mid-hash metadata change and the absence of `Path.open` during hashing.
+Four initial synthetic tests check pre-open path replacement, simulated
+mid-hash metadata change, pathname reopens and repeated native stat/fstat
+consistency. Two new regressions model Windows ctime disagreement while still
+denying inode, device, size and mtime mutation.
 The earlier cookie and all other regression tests are preserved.
 
 When tested together with the stacked PR #50, required gates increase from
-**19 suites / 196 tests** to **19 suites / 199 tests per native platform**,
-with the existing harness minimum raised from 12 to 15. The two source PRs
-still require dependency-aware review and integration.
+**19 suites / 196 tests** to **19 suites / at least 198 tests per native platform** (based on observed
+pre-fix 196 collected cases for a 16-case harness), with the mandatory
+harness minimum raised from 16 to 18. No existing suites are reduced. The two source PRs still require dependency-aware review and integration.
+Do not treat a temporary main-target CodeQL vehicle (#52) as a merge candidate.
 
 ## Critical security boundary not solved
 
@@ -56,3 +61,12 @@ approve signer/scanner, or claim production readiness from this patch.
 The reviewer must not conflate the PR #50 cookie fix with this NEW binary
 hash-read fix.** Live execution remains forbidden under existing project
 restrictions.
+
+## DEV WAM handoff boundary (project owner confirmed 2026-10-11)
+
+Our scope is to build and hand over a reviewed, deterministic offline/synthetic
+regtest baseline only. Actual execution against a real WAM Core daemon,
+source-to-binary validation in a real environment, Core integration and any
+live/production decision are entirely for DEV WAM after their independent
+review and authorization. Nothing in this PR authorizes our team to run real
+WAM Core. Required tests must use synthetic files, mocks and offline evidence.
