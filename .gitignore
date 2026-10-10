@@ -1,0 +1,43 @@
+# Python caches/build artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Local machine and IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Secrets, wallet state, credentials (never commit)
+.env
+.env.*
+!.env.example
+.cookie
+*.cookie
+wallet.db
+wallet.db-*
+keys.wsp
+*.wspbak
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+private/
+
+# Generated local output
+logs/
+reports/local/
