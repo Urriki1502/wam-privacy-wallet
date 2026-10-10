@@ -86,8 +86,8 @@ class HarnessTests(unittest.TestCase):
                 os.close(fd)
             current = self.binary.lstat()
             diffs = [
-                name for name in ("st_dev", "st_ino", "st_size",
-                                  "st_mtime_ns", "st_ctime_ns")
+                name for name in ("st_dev", "st_ino", "st_size", "st_mtime_ns")
+                + (() if os.name == "nt" else ("st_ctime_ns",))
                 if (getattr(before, name) != getattr(opened, name)
                     or getattr(opened, name) != getattr(current, name))
             ]
@@ -95,6 +95,51 @@ class HarnessTests(unittest.TestCase):
                              + str(attempt) + ": " + ", ".join(diffs))
             self.assertEqual(verify_binary(self.binary, self.digest),
                              self.binary.resolve())
+
+    def test_windows_ctime_disagreement_does_not_reject_matching_digest(self):
+        """Exercise CRT fstat/path lstat ctime divergence without a Windows host."""
+        real_fstat = os.fstat
+
+        def ctime_variant(fd):
+            value = real_fstat(fd)
+            return SimpleNamespace(
+                st_mode=value.st_mode, st_dev=value.st_dev, st_ino=value.st_ino,
+                st_size=value.st_size, st_mtime_ns=value.st_mtime_ns,
+                st_ctime_ns=value.st_ctime_ns + 123456789,
+            )
+
+        with patch("wam_privacy_wallet.node.real_regtest.os.fstat",
+                   side_effect=ctime_variant):
+            with patch("wam_privacy_wallet.node.real_regtest._WINDOWS", True):
+                self.assertEqual(verify_binary(self.binary, self.digest),
+                                 self.binary.resolve())
+            with patch("wam_privacy_wallet.node.real_regtest._WINDOWS", False):
+                with self.assertRaisesRegex(RealRegtestError, "^CORE_BINARY_CHANGED$"):
+                    verify_binary(self.binary, self.digest)
+
+    def test_windows_ctime_tolerance_still_denies_size_and_mtime_changes(self):
+        """Platform metadata exception cannot bypass integrity fields."""
+        real_fstat = os.fstat
+        for attribute in ("st_size", "st_mtime_ns", "st_dev", "st_ino"):
+            def corrupt(fd):
+                value = real_fstat(fd)
+                fields = {
+                    "st_mode": value.st_mode, "st_dev": value.st_dev,
+                    "st_ino": value.st_ino, "st_size": value.st_size,
+                    "st_mtime_ns": value.st_mtime_ns,
+                    "st_ctime_ns": value.st_ctime_ns,
+                }
+                fields[attribute] += 1
+                return SimpleNamespace(**fields)
+
+            with self.subTest(field=attribute):
+                with patch("wam_privacy_wallet.node.real_regtest._WINDOWS", True):
+                    with patch("wam_privacy_wallet.node.real_regtest.os.fstat",
+                               side_effect=corrupt):
+                        with self.assertRaisesRegex(
+                            RealRegtestError, "^CORE_BINARY_CHANGED$"
+                        ):
+                            verify_binary(self.binary, self.digest)
 
     def test_no_symlinks_or_missing_binaries(self):
         with self.assertRaisesRegex(RealRegtestError, "CORE_BINARY_UNAVAILABLE"):
