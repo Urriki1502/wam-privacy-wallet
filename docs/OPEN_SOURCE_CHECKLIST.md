@@ -9,7 +9,7 @@
 - Public source history found: multiple phase branches and merges; no baseline rewriting performed.
 - Existing workflows reviewed at a high level: typical `pull_request` triggers and `contents: read` permissions with standard Linux/macOS/Windows runners.
 - Existing `.gitignore` excludes common `.env`, key, wallet DB and secret file patterns, but **cannot prove historical safety**.
-- A few basic secret-pattern searches yielded no confirmed leaks; this is **not** complete branch/blob/history/artifact scanning.
+- Initial read-only inspection covered **28 commits returned by repository commit search** and their available patches, checking common GitHub/AWS/Google/Slack token or PEM private-key signatures and obvious sensitive filenames; no matches were detected in that limited sample. This is **not** a complete full-object, branch, tag or artifact secret audit, and is not evidence that the public history contains no credentials.
 
 ## Still required: security/provenance verification
 
