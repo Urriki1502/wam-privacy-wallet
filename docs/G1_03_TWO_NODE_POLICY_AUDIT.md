@@ -68,3 +68,32 @@ reordering/removal/duplication/replacement, and unauthorized peer redirects.
 - The reviewed G1-03 source policy is **unchanged**; only tests, mandatory
   CI minimum and this document change.
 - G1-01 and G1-03 Drafts remain untouched, and this follow-up stays Draft.
+
+## Parallel versioned schema v1 — additional stacked Draft
+
+`two_node_schema.py` introduces frozen typed `StructuredTwoNodeV1`,
+`StructuredNodeV1` and ordered `ConfigOptionV1` data. Legacy G1-01
+`TwoNodePlan` and `config_preview` remain the sole canonical source:
+`build_structured_two_node_v1` requires the existing G1-03 offline policy
+audit before deriving schema v1. `audit_parallel_two_node_v1` enforces exact
+types, fixed version 1, full equality and byte-for-byte legacy reserialization
+on both nodes; any mismatch fails closed with `G1_SCHEMA_INVALID`.
+
+This **is not two competing independently executable config files**. It is
+two simultaneous offline representations of one auditable canonical proposal.
+No network or file I/O, no Core execution or release authority. Neither view
+normalizes a configuration that differs from G1-01.
+
+The new `test_two_node_schema.py` adds **16 deterministic test methods**,
+including hundreds of fixed-seed valid ports / hostile mutations, duplicate
+keys, section ambiguity, alias types and exact serializer parity. Mandatory
+offline CI changes from 15 suites/134 cases to **16 suites/150 cases** on the
+PR #38 stack (assuming original floors). Existing floors remain intact.
+Platform CI/CodeQL must be checked at this branch's exact final SHA; earlier
+PR evidence does not qualify it.
+
+The pinned source-only option intake `docs/G1_03_CORE_OPTION_MATRIX.md`
+identifies a **potential top-level `rpcbind` placement defect**: upstream
+installer scopes `rpcbind` to `[regtest]`, while G1-01 leaves it global.
+This proposal deliberately does not modify the frozen legacy preview.
+Do not present the current config as Core-compatible or run real nodes.
