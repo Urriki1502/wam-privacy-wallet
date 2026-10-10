@@ -38,15 +38,32 @@ class RegtestBinaryArtifactPreflightTests(unittest.TestCase):
             result.release_allowed = True
 
     def test_wrong_hash_and_malformed_hash_are_denied(self):
-        for digest in ("0" * 64, "bad", "A" * 64, "", None, True):
+        cases = (
+            ("0" * 64, "G1_CORE_SHA256_MISMATCH"),
+            ("bad", "G1_CORE_SHA256_INVALID"),
+            ("A" * 64, "G1_CORE_SHA256_INVALID"),
+            ("", "G1_CORE_SHA256_INVALID"),
+            (None, "G1_SHA256_REQUIRED"),
+            (True, "G1_SHA256_REQUIRED"),
+        )
+        for digest, expected in cases:
             with self.subTest(digest=digest):
-                with self.assertRaises(ArtifactPreflightError):
+                with self.assertRaisesRegex(ArtifactPreflightError, "^" + expected + "$"):
                     evaluate_local_binary(self.binary, digest)
 
     def test_path_is_explicit_absolute_and_no_auto_discovery(self):
-        for value in ("./wamd", "wamd", "", None, 17, True, b"/bin/wamd"):
+        cases = (
+            ("./wamd", "G1_ABSOLUTE_PATH_REQUIRED"),
+            ("wamd", "G1_ABSOLUTE_PATH_REQUIRED"),
+            ("", "G1_BINARY_PATH_REQUIRED"),
+            (None, "G1_BINARY_PATH_REQUIRED"),
+            (17, "G1_BINARY_PATH_REQUIRED"),
+            (True, "G1_BINARY_PATH_REQUIRED"),
+            (b"/bin/wamd", "G1_BINARY_PATH_REQUIRED"),
+        )
+        for value, expected in cases:
             with self.subTest(path=repr(value)):
-                with self.assertRaises(ArtifactPreflightError):
+                with self.assertRaisesRegex(ArtifactPreflightError, "^" + expected + "$"):
                     evaluate_local_binary(value, self.digest)
 
     def test_directories_and_missing_files_are_rejected(self):

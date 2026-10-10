@@ -40,7 +40,7 @@ def evaluate_local_binary(binary: object, expected_sha256: object) -> LocalHashE
     This does not prove that the file is WAM Core; an independently verified
     publisher-provided digest and separate live regtest remain mandatory.
     """
-    if type(binary) not in (str, Path) or not str(binary):
+    if not (type(binary) is str or isinstance(binary, Path)) or not str(binary):
         raise ArtifactPreflightError("G1_BINARY_PATH_REQUIRED")
     path = Path(binary)
     if not path.is_absolute():
