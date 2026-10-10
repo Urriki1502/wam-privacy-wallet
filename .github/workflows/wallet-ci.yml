@@ -60,38 +60,10 @@ jobs:
       # Execute each old contract target in a separate process and report ALL
       # failing targets, rather than stopping the rest at the first failure.
       # Keep contracts dependency-free exactly as in the original dedicated workflows.
-      - name: Run original offline suites and G0-B2 application diagnostic contract
-        shell: python
+      - name: Run mandatory suites with fail-closed discovery
         env:
           PYTHONPATH: src
-        run: |
-          import subprocess
-          import sys
-          patterns = [
-              'test_scaffold.py',
-              'test_core_profile.py',
-              'test_core_source_pin.py',
-              'test_node_contract.py',
-              'test_read_rpc.py',
-              'test_real_regtest_harness.py',
-              'test_regtest_attestation.py',
-              'test_regtest_gateway.py',
-              'test_app_diagnostic_boundary.py',
-          ]
-          failures = []
-          for pattern in patterns:
-              print(f'::group::Offline contract: {pattern}', flush=True)
-              outcome = subprocess.run(
-                  [sys.executable, '-m', 'unittest', 'discover',
-                   '-s', 'tests', '-p', pattern, '-v'],
-                  check=False,
-              )
-              print('::endgroup::', flush=True)
-              if outcome.returncode:
-                  failures.append(pattern)
-          if failures:
-              print('FAILED CONTRACT SUITES: ' + ', '.join(failures), flush=True)
-              sys.exit(1)
+        run: python -m tools.ci_contract_gate
 
 
   gui-tests:
