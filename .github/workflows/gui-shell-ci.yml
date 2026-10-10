@@ -46,5 +46,8 @@ jobs:
       - name: Check Python syntax
         run: python -m compileall -q src tests
 
-      - name: Run all scaffold and GUI tests
-        run: python -m unittest discover -s tests -v
+      - name: Run GUI smoke tests
+        run: python -m unittest discover -s tests -p test_gui_shell.py -v
+
+      - name: Run baseline scaffold contracts
+        run: python -m unittest discover -s tests -p test_scaffold.py -v

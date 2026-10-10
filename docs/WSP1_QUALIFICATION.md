@@ -57,3 +57,17 @@ Review the WSP-1 source and license, establish a separate wallet permission
 model, implement Windows scanner locking, validate current-Core RPC/genesis
 compatibility, and complete regtest-only node tests. No dependency update
 may bypass this qualification by selecting an unreviewed commit.
+
+## Two distinct CI guarantees
+
+- `wsp1-qualification-ci.yml` installs the source-pinned WSP engine and
+  exercises its provenance, API and denial tests independently.
+- `gui-shell-ci.yml` runs **GUI + scaffold only**, so it cannot pass/fail
+  for reasons unrelated to its installed dependencies.
+- `integration-matrix-ci.yml` installs **both** GUI and the pinned WSP engine
+  and runs the **entire** suite on Windows, macOS and Ubuntu. This catches
+  cross-module imports and packaging interactions, rather than just isolated
+  test success.
+
+All required jobs must pass at the exact commit before merge. A passing
+integration test remains a non-production qualification, not a wallet audit.
