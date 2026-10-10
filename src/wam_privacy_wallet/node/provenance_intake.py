@@ -6,7 +6,7 @@ It never fetches artifacts, reads local files, runs Core or issues permission.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import re
 from typing import Literal
 
@@ -31,17 +31,21 @@ class ProvenanceIntakeError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class CoreArtifactCandidate:
+    """Non-authoritative metadata; status/approval fields are not init arguments."""
+
     repository: Literal["wamcoin-core-dev/wam-coin"]
     reviewed_source_commit: str
     claimed_release: str
     platform: str
     binary_sha256: str
-    status: Literal["UNTRUSTED_CANDIDATE_REVIEW_ONLY"] = "UNTRUSTED_CANDIDATE_REVIEW_ONLY"
-    publisher_identity_verified: bool = False
-    binary_source_equivalence_verified: bool = False
-    real_regtest_qualified: bool = False
-    execution_allowed: bool = False
-    release_allowed: bool = False
+    status: Literal["UNTRUSTED_CANDIDATE_REVIEW_ONLY"] = field(
+        default="UNTRUSTED_CANDIDATE_REVIEW_ONLY", init=False
+    )
+    publisher_identity_verified: bool = field(default=False, init=False)
+    binary_source_equivalence_verified: bool = field(default=False, init=False)
+    real_regtest_qualified: bool = field(default=False, init=False)
+    execution_allowed: bool = field(default=False, init=False)
+    release_allowed: bool = field(default=False, init=False)
 
 
 def intake_core_artifact(payload: object) -> CoreArtifactCandidate:
@@ -50,7 +54,9 @@ def intake_core_artifact(payload: object) -> CoreArtifactCandidate:
     Pinned inspected *source* does not prove any provided binary was built
     from those bytes. Even a matching binary hash isn't a signed attestation.
     """
-    if type(payload) is not dict or set(payload) != _FIELDS:
+    if (type(payload) is not dict
+            or any(type(key) is not str for key in payload)
+            or set(payload) != _FIELDS):
         raise ProvenanceIntakeError("G1_PROVENANCE_SCHEMA_REJECTED")
     if (
         type(payload["schema"]) is not str
