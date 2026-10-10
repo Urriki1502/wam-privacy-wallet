@@ -202,5 +202,47 @@ class ParallelTwoNodeSchemaTests(unittest.TestCase):
         self.assertEqual(evidence.status, "OFFLINE_PARITY_ONLY")
 
 
+    def test_schema_places_both_bind_options_under_regtest(self):
+        for node in self.schema.nodes:
+            with self.subTest(node=node.label):
+                pairs = [(opt.section, opt.key) for opt in node.options]
+                self.assertEqual(pairs.count(("regtest", "bind")), 1)
+                self.assertEqual(pairs.count(("regtest", "rpcbind")), 1)
+                self.assertNotIn(("global", "bind"), pairs)
+                self.assertNotIn(("global", "rpcbind"), pairs)
+                self.assertEqual(
+                    tuple(opt.key for opt in node.options if opt.section == "regtest"),
+                    ("bind", "rpcbind", "rpcport", "port", "connect"),
+                )
+                legacy = self.legacy.nodes[0 if node.label == "node-a" else 1]
+                self.assertEqual(serialize_legacy_preview(node), legacy.config_preview)
+
+    def test_global_network_only_option_relocation_fails_closed(self):
+        from wam_privacy_wallet.node.two_node_schema import _parse_legacy
+        for wrong_key in ("bind", "rpcbind", "rpcport", "port", "connect"):
+            for index, node in enumerate(self.schema.nodes):
+                changed = tuple(
+                    replace(opt, section="global") if opt.key == wrong_key else opt
+                    for opt in node.options
+                )
+                nodes = list(self.schema.nodes)
+                nodes[index] = replace(node, options=changed)
+                with self.subTest(node=index, key=wrong_key):
+                    with self.assertRaisesRegex(TwoNodeSchemaError, DENIAL):
+                        serialize_legacy_preview(nodes[index])
+                    self.assertDenied(replace(self.schema, nodes=tuple(nodes)))
+                    original = self.legacy.nodes[index].config_preview
+                    raw = next(opt.value for opt in node.options if opt.key == wrong_key)
+                    option_line = f"{wrong_key}={raw}\n"
+                    # Construct the old incorrect global-option layout, not
+                    # merely a malformed missing-line candidate.
+                    moved = original.replace(option_line, "", 1).replace(
+                        "[regtest]\n", option_line + "[regtest]\n", 1
+                    )
+                    self.assertNotEqual(moved, original)
+                    with self.assertRaisesRegex(TwoNodeSchemaError, DENIAL):
+                        _parse_legacy(moved)
+
+
 if __name__ == "__main__":
     unittest.main()

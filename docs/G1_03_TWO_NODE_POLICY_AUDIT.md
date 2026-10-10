@@ -97,3 +97,19 @@ identifies a **potential top-level `rpcbind` placement defect**: upstream
 installer scopes `rpcbind` to `[regtest]`, while G1-01 leaves it global.
 This proposal deliberately does not modify the frozen legacy preview.
 Do not present the current config as Core-compatible or run real nodes.
+
+## Section-binding hardening review (new stacked follow-up)
+
+The historical source-review finding about top-level `rpcbind` in PR #40
+is superseded **only on this newer stack**: both `bind` and `rpcbind`
+now reside under `[regtest]` in G1-01's in-memory candidate.
+G1-03's type/equality policy is otherwise unchanged; a test explicitly
+denies the former global layout. Structured schema v1 must serialize back
+to these newly reviewed G1-01 bytes without moving or losing options.
+There is no fallback to the old or remotely bound configuration.
+
+Mandatory native offline regression now contains 16 suites and **155 cases**
+(12 G1-01 topology, 19 G1-03 policy, 18 schema parity, all previous suite
+minima retained). Any reported CI or CodeQL result must match the exact
+new follow-up HEAD; old PR #40's 8/8 + 2/2 evidence does not qualify this
+change. Real WAM Core daemon runtime remains BLOCKED.

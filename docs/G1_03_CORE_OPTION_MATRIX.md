@@ -2,7 +2,8 @@
 
 **Scope:** source-only option inventory and observable configuration mismatches.
 **No verified binary, no daemon execution, no sockets, no runtime isolation proof.**
-The canonical legacy G1-01 config is deliberately unchanged by this change.
+This stacked follow-up changes the *offline* G1-01 candidate only; historical
+G1-01/03 source branches and prior evidence remain unchanged.
 
 ## Source reference (2026-10-10)
 
@@ -16,20 +17,20 @@ The canonical legacy G1-01 config is deliberately unchanged by this change.
   `d644ffeb907e2bb6887dca6008f53306eca49d3d`.
   This installer is **observed and commit-addressed here**, but not covered
   by the wallet's current three-blob source-pin contract.
-- The `install.sh` generated `wam.conf` places `regtest=1` at global
+- The pinned `install.sh` generated `wam.conf` places `regtest=1` at global
   scope for regtest, keeps `rpcallowip=127.0.0.1` globally, and places
   `rpcbind=127.0.0.1` **under `[regtest]`**. The installer explicitly
   warns that Core may refuse a network-specific `rpcbind` at global scope.
 
-## G1-01 legacy proposal vs source-observed installer
+## Revised G1-01 offline proposal vs source-observed installer
 
 | G1-01 preview option(s) | Source evidence | Status |
 | --- | --- | --- |
 | `regtest=1`, `server=1`, `daemon=0`, `listen=1` | Appears in installer config (regtest branch) | **Source observed only** |
 | `rpcallowip=127.0.0.1` (global) | Installer uses global scope | **Source observed only** |
-| `rpcbind=127.0.0.1` (global) | Installer instead puts it under `[regtest]`; warns about top-level rejection | **MISMATCH — block runtime qualification** |
+| `rpcbind=127.0.0.1` (**inside `[regtest]`**) | Installer likewise places it under `[regtest]` | **Offline placement corrected, runtime unverified** |
 | `[regtest]` with `rpcport`, `port`, `connect` | Installer uses `[regtest]` but does not establish those three override behaviors for paired nodes | **Unverified** |
-| `bind=127.0.0.1` (global) | G1-01 candidate; installer does not establish P2P bind/isolation behavior | **Unverified** |
+| `bind=127.0.0.1` (**inside `[regtest]`**) | Bitcoin Core inherited network-only option rules require sectioning; installer does not demonstrate P2P isolation | **Offline placement corrected, runtime unverified** |
 | `dns=0`, `dnsseed=0`, `discover=0`, `upnp=0`, `natpmp=0` | Not established by source observation of installer | **Unverified** |
 | `listenonion=0`, `onion=0`, `proxy=0` | Not established by installer | **Unverified** |
 | `connect=127.0.0.1:<peer-port>` | Reciprocally planned in G1-01; no real two-peer link tested | **Unverified** |
@@ -38,11 +39,13 @@ The wallet's pinned `wam-params.h` reports regtest default RPC/P2P ports
 `29554/29555`. G1-01's four ports are caller-supplied preview placeholders,
 not those defaults, not reserved, and not proof of bind/listen behavior.
 
-**Security review finding:** do not run the current preview as if it were a
-verified WAM Core configuration. A separate reviewed G1-01 legacy/config
-revision may be needed to move `rpcbind` into `[regtest]` (and rebaseline exact
-parity tests); do not silently normalize this in schema v1. This is an
-identified source-level compatibility risk, **not a reproduced daemon error**.
+**Security review finding (follow-up resolution):** earlier global-scope
+`rpcbind` and `bind` are now both moved into `[regtest]` in the separate
+stacked follow-up branch. This removes the *identified source-level placement
+mismatch* while preserving byte-exact parity against the revised G1-01 plan.
+It is **not** a reproduced daemon success: syntax support, effective binds,
+P2P/RPC isolation, and every remaining option still require the separately
+attested Core binary and OS-level network tests.
 
 ## Core binary + network qualification (still BLOCKED)
 
@@ -68,3 +71,12 @@ UNVERIFIED; OS-level network isolation UNPROVEN; G1-04/G1-05 live tests BLOCKED*
 
 This document is a source observation and issue inventory, not a compatibility
 certificate or permission to run WAM Core, WSP, signer, wallet or funds.
+
+### Scope of static review
+
+The network-only `bind` and `rpcbind` sectioning rule is derived from
+Bitcoin Core configuration documentation and the WAM Core pinned installer.
+Both values are local loopback addresses. This change does **not** establish
+that `onion=0`, `proxy=0`, `dns=0`, other option combinations, or fixed
+peer topology will behave as intended on a particular WAM binary. None of
+those are marked verified; keep G1-04/05 live gates closed.

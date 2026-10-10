@@ -60,3 +60,51 @@ offline CI suite on native Windows x86/x64, macOS x64 and Linux x64. Existing
 required. No runtime use, Core change, real wallet or release claim is allowed.
 
 **G1-01 PASS = topology contract test PASS only**, not REGTEST-E2E-001.
+
+## G1-01 network-only config section correction (stacked follow-up)
+
+The historical G1-01 PR #27 and reviewed G1-03/PR #38/#40 heads remain
+unchanged. This separate follow-up branch revises **only the offline candidate**
+to place both `bind=127.0.0.1` (P2P) and `rpcbind=127.0.0.1` (RPC)
+**after the `[regtest]` header**, together with the already sectioned
+`rpcport`, `port`, and reciprocal `connect`.
+
+Reason: the WAM Core pinned installer places `rpcbind` under the network
+section; Bitcoin Core's inherited configuration rules treat `bind` and
+`rpcbind` as network-scoped options. A top-level entry may apply only
+to mainnet or be rejected/ignored on regtest, depending on binary/version.
+This is a **source-level risk correction**, not measured Core behavior.
+
+Before/after (illustrative only, not a runnable config):
+
+```ini
+# BEFORE: global scope could be wrong for regtest
+bind=127.0.0.1
+rpcbind=127.0.0.1
+[regtest]
+rpcport=<A_RPC>
+port=<A_P2P>
+connect=127.0.0.1:<B_P2P>
+```
+
+```ini
+# AFTER: network-only entries under [regtest]
+rpcallowip=127.0.0.1
+[regtest]
+bind=127.0.0.1
+rpcbind=127.0.0.1
+rpcport=<A_RPC>
+port=<A_P2P>
+connect=127.0.0.1:<B_P2P>
+```
+
+No other config options, topology semantics, safety flags, network I/O,
+signing, scanner or release behavior are changed. New regression tests
+confirm the corrected ordering and deny the historical layout in the
+policy gate. Schema v1 derives from the updated legacy canonical preview
+and retains byte-exact parity. The reviewed test-count minimum on this
+follow-up stack increases from 150 to **155 cases (16 mandatory suites)**;
+original stage descriptions above are historical baselines.
+
+**No real Core process was run; publisher provenance, option effectiveness,
+P2P/RPC isolation, external-peer denial and G1-04/G1-05 remain BLOCKED.**

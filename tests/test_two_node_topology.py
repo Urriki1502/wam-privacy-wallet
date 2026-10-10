@@ -111,5 +111,34 @@ class TwoNodeTopologyTests(unittest.TestCase):
         self.assertNotIn("Users\\", repr(a))
 
 
+    def test_network_only_bind_options_are_scoped_inside_regtest(self):
+        """Bitcoin-derived bind/rpcbind must not silently target mainnet."""
+        for node in plan_two_node_topology(PORTS).nodes:
+            with self.subTest(node=node.label):
+                lines = node.config_preview.splitlines()
+                self.assertEqual(lines.count("[regtest]"), 1)
+                section_index = lines.index("[regtest]")
+                self.assertEqual(lines.count("bind=127.0.0.1"), 1)
+                self.assertEqual(lines.count("rpcbind=127.0.0.1"), 1)
+                self.assertNotIn("bind=127.0.0.1", lines[:section_index])
+                self.assertNotIn("rpcbind=127.0.0.1", lines[:section_index])
+                self.assertIn("bind=127.0.0.1", lines[section_index + 1:])
+                self.assertIn("rpcbind=127.0.0.1", lines[section_index + 1:])
+                self.assertLess(lines.index("bind=127.0.0.1"),
+                                lines.index("rpcbind=127.0.0.1"))
+
+    def test_regtest_network_ports_are_sectioned_but_global_safety_controls_remain(self):
+        for node in plan_two_node_topology(PORTS).nodes:
+            with self.subTest(node=node.label):
+                global_lines, network_lines = node.config_preview.split("[regtest]\n", 1)
+                for key in ("regtest=1", "server=1", "rpcallowip=127.0.0.1",
+                            "dnsseed=0", "discover=0", "upnp=0", "natpmp=0"):
+                    self.assertIn(key + "\n", global_lines)
+                self.assertEqual(
+                    [line.split("=", 1)[0] for line in network_lines.splitlines()],
+                    ["bind", "rpcbind", "rpcport", "port", "connect"],
+                )
+
+
 if __name__ == "__main__":
     unittest.main()

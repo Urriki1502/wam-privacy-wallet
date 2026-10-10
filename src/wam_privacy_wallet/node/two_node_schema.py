@@ -14,6 +14,9 @@ from .two_node_policy import TwoNodePolicyError, audit_two_node_policy
 from .two_node_topology import TwoNodePlan
 
 SCHEMA_VERSION = 1
+# Bitcoin-derived options scoped to the selected network, not global defaults.
+# Keep fail-closed independently of the upstream equality/parity audit.
+_NETWORK_ONLY_KEYS = frozenset(("bind", "rpcbind", "rpcport", "port", "connect"))
 _DENIED = "G1_SCHEMA_INVALID"
 
 
@@ -79,7 +82,8 @@ def _parse_legacy(preview: str) -> tuple[ConfigOptionV1, ...]:
         key, value = line.split("=", 1)
         if (not key.isascii() or not key.isalnum() or key != key.lower()
                 or not value or len(value) > 128 or value.strip() != value
-                or "\r" in value or (section, key) in seen):
+                or "\r" in value or (section, key) in seen
+                or (key in _NETWORK_ONLY_KEYS and section != "regtest")):
             raise TwoNodeSchemaError(_DENIED)
         seen.add((section, key))
         options.append(ConfigOptionV1(section, key, value))
@@ -133,7 +137,9 @@ def serialize_legacy_preview(node: object) -> str:
                 or not option.value or len(option.value) > 128
                 or option.value.strip() != option.value
                 or any(ch in option.value for ch in "\r\n")
-                or (option.section, option.key) in seen):
+                or (option.section, option.key) in seen
+                or (option.key in _NETWORK_ONLY_KEYS
+                    and option.section != "regtest")):
             raise TwoNodeSchemaError(_DENIED)
         seen.add((option.section, option.key))
         lines.append(f"{option.key}={option.value}")

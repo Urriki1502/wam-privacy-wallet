@@ -247,5 +247,22 @@ class TwoNodePolicyAuditTests(unittest.TestCase):
         self.assertEqual(first, second)
 
 
+    def test_historical_global_bind_and_rpcbind_layout_is_rejected(self):
+        """Reject the original preview placing network-only options globally."""
+        a, b = self.plan.nodes
+        current = "[regtest]\nbind=127.0.0.1\nrpcbind=127.0.0.1\n"
+        former = "bind=127.0.0.1\nrpcbind=127.0.0.1\n[regtest]\n"
+        for index, node in enumerate((a, b)):
+            self.assertIn(current, node.config_preview)
+            old_preview = node.config_preview.replace(current, former)
+            self.assertNotEqual(old_preview, node.config_preview)
+            nodes = list(self.plan.nodes)
+            nodes[index] = replace(node, config_preview=old_preview)
+            with self.subTest(node=node.label):
+                with self.assertRaisesRegex(TwoNodePolicyError,
+                                            "^G1_POLICY_PLAN_INVALID$"):
+                    audit_two_node_policy(replace(self.plan, nodes=tuple(nodes)))
+
+
 if __name__ == "__main__":
     unittest.main()
