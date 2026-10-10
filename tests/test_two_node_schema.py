@@ -217,8 +217,9 @@ class ParallelTwoNodeSchemaTests(unittest.TestCase):
                 legacy = self.legacy.nodes[0 if node.label == "node-a" else 1]
                 self.assertEqual(serialize_legacy_preview(node), legacy.config_preview)
 
-    def test_global_bind_or_rpcbind_relocation_fails_closed(self):
-        for wrong_key in ("bind", "rpcbind"):
+    def test_global_network_only_option_relocation_fails_closed(self):
+        from wam_privacy_wallet.node.two_node_schema import _parse_legacy
+        for wrong_key in ("bind", "rpcbind", "rpcport", "port", "connect"):
             for index, node in enumerate(self.schema.nodes):
                 changed = tuple(
                     replace(opt, section="global") if opt.key == wrong_key else opt
@@ -230,6 +231,17 @@ class ParallelTwoNodeSchemaTests(unittest.TestCase):
                     with self.assertRaisesRegex(TwoNodeSchemaError, DENIAL):
                         serialize_legacy_preview(nodes[index])
                     self.assertDenied(replace(self.schema, nodes=tuple(nodes)))
+                    original = self.legacy.nodes[index].config_preview
+                    raw = next(opt.value for opt in node.options if opt.key == wrong_key)
+                    option_line = f"{wrong_key}={raw}\\n"
+                    # Construct the old incorrect global-option layout, not
+                    # merely a malformed missing-line candidate.
+                    moved = original.replace(option_line, "", 1).replace(
+                        "[regtest]\\n", option_line + "[regtest]\\n", 1
+                    )
+                    self.assertNotEqual(moved, original)
+                    with self.assertRaisesRegex(TwoNodeSchemaError, DENIAL):
+                        _parse_legacy(moved)
 
 
 if __name__ == "__main__":
