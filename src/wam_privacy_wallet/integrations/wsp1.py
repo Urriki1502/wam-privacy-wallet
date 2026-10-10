@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from importlib import metadata
 
 WSP1_REPOSITORY = "https://github.com/Urriki1502/wam-silent-payments"
-WSP1_COMMIT = "dcf1aecc00a64bfad3151fa202c3e07d47d83e69"
+WSP1_COMMIT = "ac55f13423620252bdbf848c7e8a280c3b84721e"
 WSP1_DISTRIBUTION = "wam-silent-payments"
 WSP1_VERSION = "1.0.0.dev0"
 WSP1_API_VERSION = 1

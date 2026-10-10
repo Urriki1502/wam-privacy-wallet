@@ -9,7 +9,7 @@ against the real, public `wam-silent-payments` repository.
 | Field | Exact expectation |
 | --- | --- |
 | Repository | `https://github.com/Urriki1502/wam-silent-payments` |
-| Commit | `dcf1aecc00a64bfad3151fa202c3e07d47d83e69` |
+| Commit | `ac55f13423620252bdbf848c7e8a280c3b84721e` |
 | Python distribution | `wam-silent-payments` |
 | Package version | `1.0.0.dev0` |
 | Public API | `SilentWallet`, `create_silent_wallet` |
@@ -45,7 +45,7 @@ not evidence of secure production behavior.
 ## Local verification
 
 ```sh
-python -m pip install "git+https://github.com/Urriki1502/wam-silent-payments.git@dcf1aecc00a64bfad3151fa202c3e07d47d83e69"
+python -m pip install "git+https://github.com/Urriki1502/wam-silent-payments.git@ac55f13423620252bdbf848c7e8a280c3b84721e"
 PYTHONPATH=src python -m unittest discover -s tests -p test_wsp1_contract.py -v
 ```
 
@@ -71,3 +71,13 @@ may bypass this qualification by selecting an unreviewed commit.
 
 All required jobs must pass at the exact commit before merge. A passing
 integration test remains a non-production qualification, not a wallet audit.
+
+## Windows x86/x64 lock remediation review status
+
+This experimental pin contains the proposed native Windows scanner-lock fix
+from [WSP-1 PR #9](https://github.com/Urriki1502/wam-silent-payments/pull/9).
+The original reviewed WSP-1 baseline is unchanged; this commit is on an
+unmerged remediation branch pending independent review. Both native Windows
+x86/x64 lock regressions and full Windows x64 scanner regression are separate
+gates. The Python/Qt GUI is **not yet qualified for native Windows x86**.
+This probe remains non-production, and it grants no mainnet permission.
