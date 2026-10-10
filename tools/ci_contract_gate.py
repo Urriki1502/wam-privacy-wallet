@@ -29,7 +29,7 @@ MINIMUM_CASES = {
     "test_regtest_artifact_preflight.py": 7,
     "test_two_node_topology.py": 10,
     "test_provenance_intake.py": 10,
-    "test_two_node_policy.py": 10,
+    "test_two_node_policy.py": 13,
     "test_rpc_qualification_prep.py": 10,
     "test_reorg_qualification_prep.py": 10,
     "test_ci_contract_gate.py": 10,

@@ -20,11 +20,11 @@
 | --- | --- | --- | --- |
 | G1-01 [#27](https://github.com/Urriki1502/wam-privacy-wallet/pull/27) | Two-node loopback *proposal* only | 14 suites / 116 cases + 8 Wallet jobs + 2 CodeQL PASS | Draft; review and then integrate |
 | G1-02 [#28](https://github.com/Urriki1502/wam-privacy-wallet/pull/28) | Untrusted binary provenance *metadata intake* | 14/116, 8 Wallet + 2 CodeQL PASS | Draft; **not publisher proof** |
-| G1-03 [#29](https://github.com/Urriki1502/wam-privacy-wallet/pull/29) | Strict policy audit for G1-01 candidate | 15/126 and 8 Wallet PASS; CodeQL 2 PASS at exact SHA via closed verification PR #30 | **Stacked on #27**, must review #27 first |
+| G1-03 [#29](https://github.com/Urriki1502/wam-privacy-wallet/pull/29) | Strict policy audit for G1-01 candidate | previous head 15/126 PASS; updated hardened head requires fresh 15/129 CI and CodeQL | **Stacked on #27**, must review #27 first |
 | G1-04 [#31](https://github.com/Urriki1502/wam-privacy-wallet/pull/31) | Required RPC/auth/cookie/restart negative-case *inventory* | 14/116, 8 Wallet + 2 CodeQL PASS | Draft; **real RPC qualification BLOCKED** |
 | G1-05 [#32](https://github.com/Urriki1502/wam-privacy-wallet/pull/32) | Required fork/reorg/restore/scanner/lease *inventory* | 14/116, 8 Wallet + 2 CodeQL PASS | Draft; **real reorg/scanner qualification BLOCKED** |
 
-**This combined rehearsal (new review PR, DO NOT MERGE)** combines the five *non-executing* G1 source/document/test deltas without changing WAM Core, WSP or frozen research. It should qualify **18 mandatory offline suites / 156 cases per architecture** plus three x64 GUI jobs, pinned Core GET-only check and CodeQL **at one exact integrated HEAD**. Individual green checks do not prove combined green until the run is inspected.
+**This combined rehearsal (new review PR, DO NOT MERGE)** combines the five *non-executing* G1 source/document/test deltas without changing WAM Core, WSP or frozen research. It should qualify **18 mandatory offline suites / 159 cases per architecture** plus three x64 GUI jobs, pinned Core GET-only check and CodeQL **at one exact integrated HEAD**. Individual green checks do not prove combined green until the run is inspected.
 
 ## 3. Critical unfinished dependencies / priority
 
@@ -67,8 +67,12 @@ flowchart TD
 ## 5. Verification and handoff checklist
 
 1. Confirm combined source blobs match individually reviewed PR HEADs exactly; do not copy their original divergent `wallet-ci.yml`, only register all 5 new test modules in the existing fail-closed runner.
-2. Run 18/18 mandatory suites and at least 156 collected cases **on each of Windows x86, Windows x64, macOS x64 and Linux x64**; do not hide failed, skipped or missing suites.
+2. Run 18/18 mandatory suites and at least 159 collected cases **on each of Windows x86, Windows x64, macOS x64 and Linux x64**; do not hide failed, skipped or missing suites.
 3. Confirm full GUI discovery Linux/macOS/Windows x64, pinned Core GET-only source check, and CodeQL Python/Actions 2/2 on exact integrated HEAD.
 4. Compare integration end-to-end wall-clock with the preceding clean main runs; distinguish elapsed time from billable runner-minutes.
 5. **Do not merge this rehearsal.** Perform code/architecture/security review of individual Draft PRs; then, with explicit approval, integrate in dependency order with refreshed gate counts on `main` after each merge.
 6. After real Core provenance and reviewed execution environment are available, create separate *manual* real-node qualification jobs with honest **BLOCKED** semantics when prerequisites are missing.
+
+## Strict-schema G1-03 update
+
+G1-03 SHA `adb3d74aef553b2e2e841f6ae8f0ca7c9598a5c0` includes 3 additional regression cases to block `False == 0 == 0.0`, numeric-equivalent peer ports and string-subclass coercion. Combined acceptance grows from 18/156 to **18/159**. Historical green runs on old SHA must never qualify the refreshed HEAD. Real Core verification remains BLOCKED.
