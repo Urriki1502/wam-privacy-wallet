@@ -130,10 +130,10 @@ class TwoNodeTopologyTests(unittest.TestCase):
     def test_regtest_network_ports_are_sectioned_but_global_safety_controls_remain(self):
         for node in plan_two_node_topology(PORTS).nodes:
             with self.subTest(node=node.label):
-                global_lines, network_lines = node.config_preview.split("[regtest]\\n", 1)
+                global_lines, network_lines = node.config_preview.split("[regtest]\n", 1)
                 for key in ("regtest=1", "server=1", "rpcallowip=127.0.0.1",
                             "dnsseed=0", "discover=0", "upnp=0", "natpmp=0"):
-                    self.assertIn(key + "\\n", global_lines)
+                    self.assertIn(key + "\n", global_lines)
                 self.assertEqual(
                     [line.split("=", 1)[0] for line in network_lines.splitlines()],
                     ["bind", "rpcbind", "rpcport", "port", "connect"],
