@@ -1,81 +1,79 @@
 # WAM Privacy Wallet
 
-**Status:** Experimental GUI shell only — no wallet functionality or production code.
+**Community open-source project • MIT License • Experimental software • NOT production-ready**
 
-WAM Privacy Wallet is a proposed cross-platform desktop application for **macOS** and **Windows**, using a modular, non-consensus architecture. This repository is intentionally independent of the existing WAM research and security repositories.
+A proposed cross-platform, privacy-focused WAM desktop wallet. Its intended architecture is a user-operated, locally validating WAM Core full node, local WSP-1 scanning, explicit signer/consent boundaries, and modular wallet/network privacy controls. This repository does **not** authorize changes to WAM Core consensus.
 
-> **Safety boundary:** Experimental development only. Do not use this scaffold with real keys or funds. Mainnet support, security audit and release approval have not been established.
+> **Do not use this software with real wallet keys, seed phrases, production credentials or funds.** Current tests, GUI screens and regtest checks are not proof of wallet-security readiness or mainnet support. No production release, independent audit or mainnet acceptance is claimed.
 
-## Planned architecture
+## Project status
+
+| Area | Status / evidence boundary |
+| --- | --- |
+| Phase 001 — Qt/PySide6 GUI shell | Merged; offline navigation and placeholders, not a functional wallet |
+| Phase 002 — Local regtest endpoint contract | Merged; fail-closed local configuration |
+| Phase 003 — WSP-1 pinned engine interface | **Open Draft PR [#3](https://github.com/Urriki1502/wam-privacy-wallet/pull/3)**; not merged or accepted |
+| Phase 004 — Regtest chain identity | Merged; read-only synthetic/contract verification |
+| Phase 005 — Loopback read-only RPC | Merged; bounded read-only transport, not spending authority |
+| Phase 006 — Local regtest gateway | Merged; coupled chain-identity and read-only RPC checks |
+| Phase 007 — Opt-in verified Core regtest harness | Merged; requires separately verified local environment |
+| Phase 008 — WAM Core profile gate | Merged; fail-closed read-only profile checks |
+| Phase 009 — WAM Core source pin | Merged; source identity/drift evidence, not consensus approval |
+
+The words *merged* and *CI passed* establish repository change status only; they **do not** establish wallet functional completeness, protocol correctness, signer safety or production acceptance.
+
+## Architecture
 
 ```text
 User
-  └── Desktop GUI shell (Qt / PySide6; navigation only)
-        └── Application Layer
-              ├── WSP-1 / Silent Payments adapter
-              │     ├── Local scanner
-              │     ├── PSBTv2 / signer boundary
-              │     └── Backup / recovery
-              ├── Wallet privacy + PayJoin policy
-              ├── Network privacy policy
-              ├── Selective disclosure (review-gated)
-              └── WAM SDK / RPC adapter
-                    └── User-owned, locally validated WAM Core full node
+  -> Desktop GUI / consent boundary (Qt / PySide6)
+      -> wallet application / policy
+          -> WSP-1 adapter (currently review-gated)
+             -> local scanner / address derivation
+             -> backup and recovery
+             -> separately authorized PSBT / signer boundary
+          -> PayJoin policy / selective disclosure (future, review-gated)
+          -> network privacy (future, review-gated)
+          -> loopback-only WAM RPC profile / identity gate
+              -> user-owned, locally validating WAM Core full node
 
-Independent: WAM Security → regression checks and release assurance
-Separate R&D: Shielded / Halo2 (NOT part of this wallet's V1 scope)
+Separate: wam-security assurance, upstream research modules
+Excluded: shielded/Halo2 consensus changes or hosted scanner requirement
 ```
 
-## Repository boundaries
+**A locally operated full node is a privacy improvement, not an anonymity guarantee.** WAM-operated bootstrap seeds, network peers and first-hop observers may still see connection metadata. See [THREAT_MODEL](docs/THREAT_MODEL.md).
 
-| Repository | Responsibility |
-| --- | --- |
-| `wam-privacy-wallet` | Independent desktop application and cross-platform integration |
-| `wam-silent-payments` | WSP-1 protocol engine; future pinned dependency |
-| `wam-silent-wallet` | Existing GUI implementation for reference and reviewed reuse |
-| `wam-privacy` | Privacy research and separately qualified modules |
-| `wam-security` | Independent security assurance and release gates |
+## Local development (no real funds)
 
-The original repositories must **not** be modified as a side effect of work here. No code has been copied into this scaffold.
-
-## Scope and release policy
-
-- **In scope for future V1 work:** local-node operation, Silent Payments, safe signing and recovery, privacy-aware wallet policy, selected PayJoin/network privacy, and reviewed selective disclosure.
-- **Out of scope:** shielded pool, Halo2 consensus activation, changes to WAM consensus, hosted scanner dependencies, and mainnet claims before maintainers approve the required WSP network profile.
-- **Security baseline:** pin dependency commits, preserve scanning/spending key separation, validate Windows locking/RPC interoperability, and require independent review before any production release.
-
-## Experimental GUI preview (Phase 001)
-
-The next development stage provides an offline, navigable **PySide6 / Qt 6** desktop shell with Overview, Receive, Send, Privacy, Node and Recovery pages. Every page is a static placeholder: **it cannot read wallet files, generate addresses, connect to a node, sign or broadcast transactions**.
-
-Install optional dependencies and launch on macOS/Windows:
+Requires Python 3.12. The GUI uses optional PySide6. From the repository root:
 
 ```sh
 python -m pip install -e ".[gui]"
+python -m compileall -q src tests
+python -m unittest discover -s tests -v
 python -m wam_privacy_wallet
 ```
 
-To run the headless GUI smoke tests use `QT_QPA_PLATFORM=offscreen` (PowerShell: `$env:QT_QPA_PLATFORM = 'offscreen'`). The `gui-shell-ci.yml` workflow runs all tests on Ubuntu, macOS and Windows with Python 3.12. It is **not** a wallet security or platform packaging qualification. See [docs/GUI_SHELL.md](docs/GUI_SHELL.md) for the exact boundary.
+On headless Linux, set `QT_QPA_PLATFORM=offscreen` for Qt smoke tests. In Windows PowerShell: `$env:QT_QPA_PLATFORM = "offscreen"`. These commands exercise available scaffold/GUI and Python tests; integration cases that require a validated Core installation or native dependencies have separate prerequisites and **must not** be represented as fully tested merely by this command.
 
-## Foundation CI
+The CI workflows cover the available Linux, Windows and macOS matrices with varying scopes. Check the exact HEAD SHA, job logs and required checks on each PR. A green workflow does not qualify real-funds operation.
 
-`.github/workflows/scaffold-ci.yml` checks only Python syntax, scaffold metadata and a minimal import contract on **ubuntu-latest**, **macos-latest** and **windows-latest** (Python 3.12).
+## Repository boundaries
 
-**Passing scaffold CI does not mean wallet code is correct, secure, cross-platform, or production-ready.** Functional, integration, signing, crash-consistency and release checks will be added in their own reviewable phases.
+- [wam-silent-payments](https://github.com/Urriki1502/wam-silent-payments): upstream WSP-1 engine, to be integrated only with reviewed SHA/version pins.
+- [wam-silent-wallet](https://github.com/Urriki1502/wam-silent-wallet): separate wallet implementation and reference materials.
+- [wam-privacy](https://github.com/Urriki1502/wam-privacy): independent wallet/network privacy research; freezes and Draft PRs stay independent.
+- [wam-security](https://github.com/Urriki1502/wam-security): independent assurance and regression research.
+- [wam-sdk](https://github.com/Urriki1502/wam-sdk): separate SDK/research resources.
 
-Local scaffold verification:
+No license from this repository automatically covers external dependencies or third-party assets. Review upstream licenses and authorship before any copy or redistribution.
 
-```sh
-python -m compileall -q src tests
-PYTHONPATH=src python -m unittest discover -s tests -p test_scaffold.py -v
-```
+## Roadmap and contribution
 
-On Windows PowerShell, use `$env:PYTHONPATH = 'src'` before running the second command.
+See [ROADMAP](docs/ROADMAP.md), [ARCHITECTURE](docs/ARCHITECTURE.md), [WSP-1 integration boundaries](docs/WSP1_INTEGRATION.md), [RELEASE_POLICY](docs/RELEASE_POLICY.md), and [CONTRIBUTING](CONTRIBUTING.md). Keep each feature on its own PR with exact-head CI and explicit security review. Do not merge WSP-1 PR #3 or alter WAM Core as part of this documentation launch.
 
-## Development approach
+Report sensitive vulnerabilities privately per [SECURITY](SECURITY.md). Public Issues and PRs must not contain keys, real RPC credentials or wallet backups.
 
-Each change is a small, reviewable PR. Run local tests, push the exact revision, inspect GitHub Actions by commit SHA, then merge only after the required gates pass. No concurrent code-writing agents or unreviewed production integration. See [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+## License
 
-## Licensing
-
-**License selection is deferred.** No LICENSE file has been added. Before importing third-party or repository code, verify attribution and license compatibility. A missing license does not grant permission to reuse third-party code.
+Released under the [MIT License](LICENSE): Copyright (c) 2026 Urriki1502 and contributors, for work the respective copyright holders are authorized to license. Contributions must comply with the repository's licensing and attribution policy. Open source **does not mean** production-ready, officially endorsed by WAM Core, or safe to transact with real funds.
