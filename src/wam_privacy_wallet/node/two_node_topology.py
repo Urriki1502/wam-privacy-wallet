@@ -42,12 +42,13 @@ def _config_preview(rpc: int, p2p: int, peer_p2p: int) -> str:
     # Informational template, NOT a validated WAM Core runtime configuration.
     # connect=0 from the single-node identity diagnostic cannot support a
     # two-node peer connection. Explicit loopback-only peers are proposed.
+    # Core's Bitcoin-derived network-only bind/rpcbind options must be scoped
+    # inside [regtest], never applied as main-network defaults at top level.
     return "\n".join((
         "regtest=1",
         "server=1",
         "daemon=0",
         "listen=1",
-        "bind=127.0.0.1",
         "dns=0",
         "dnsseed=0",
         "discover=0",
@@ -56,9 +57,10 @@ def _config_preview(rpc: int, p2p: int, peer_p2p: int) -> str:
         "listenonion=0",
         "onion=0",
         "proxy=0",
-        "rpcbind=127.0.0.1",
         "rpcallowip=127.0.0.1",
         "[regtest]",
+        "bind=127.0.0.1",
+        "rpcbind=127.0.0.1",
         f"rpcport={rpc}",
         f"port={p2p}",
         f"connect=127.0.0.1:{peer_p2p}",
