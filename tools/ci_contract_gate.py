@@ -12,17 +12,20 @@ import sys
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-MANDATORY_SUITES = (
-    "test_scaffold.py",
-    "test_core_profile.py",
-    "test_core_source_pin.py",
-    "test_node_contract.py",
-    "test_read_rpc.py",
-    "test_real_regtest_harness.py",
-    "test_regtest_attestation.py",
-    "test_regtest_gateway.py",
-    "test_ci_contract_gate.py",
-)
+# Baseline test-count floors measured on all four PR #26 CI platforms.
+# These protect against accidental shrinking of a named test module.
+MINIMUM_CASES = {
+    "test_scaffold.py": 5,
+    "test_core_profile.py": 9,
+    "test_core_source_pin.py": 10,
+    "test_node_contract.py": 7,
+    "test_read_rpc.py": 11,
+    "test_real_regtest_harness.py": 10,
+    "test_regtest_attestation.py": 10,
+    "test_regtest_gateway.py": 10,
+    "test_ci_contract_gate.py": 10,
+}
+MANDATORY_SUITES = tuple(MINIMUM_CASES)
 
 
 class ContractGateError(Exception):
@@ -40,7 +43,12 @@ def run_single(pattern: str, test_dir: Path) -> int:
     count = suite.countTestCases()
     if count == 0:
         raise ContractGateError(f"CI_REQUIRED_SUITE_EMPTY: {pattern}")
-    print(f"CI_DISCOVERED_TESTS: {pattern}: {count}", flush=True)
+    minimum = MINIMUM_CASES[pattern]
+    if count < minimum:
+        raise ContractGateError(
+            f"CI_REQUIRED_SUITE_BELOW_BASELINE: {pattern}: {count} < {minimum}"
+        )
+    print(f"CI_DISCOVERED_TESTS: {pattern}: {count} (minimum {minimum})", flush=True)
     result = unittest.TextTestRunner(verbosity=2).run(suite)
     if not result.wasSuccessful() or loader.errors:
         raise ContractGateError(f"CI_REQUIRED_SUITE_FAILED: {pattern}")

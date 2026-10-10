@@ -8,7 +8,9 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from tools.ci_contract_gate import ContractGateError, MANDATORY_SUITES, run_all, run_single
+from tools.ci_contract_gate import (
+    ContractGateError, MANDATORY_SUITES, MINIMUM_CASES, run_all, run_single,
+)
 
 
 class MandatoryOfflineContractGateTests(unittest.TestCase):
@@ -24,6 +26,10 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
             def discover(self, **_kwargs):
                 return suite
         return patch("tools.ci_contract_gate.unittest.TestLoader", return_value=FakeLoader())
+    
+    def _fixture_floor(self):
+        # Synthetic single-test suites model unrelated failure cases.
+        return patch.dict(MINIMUM_CASES, {self.pattern: 1})
 
     def test_manifest_preserves_original_eight_and_self_test(self):
         self.assertEqual(len(MANDATORY_SUITES), 9)
@@ -50,14 +56,14 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
         def fail():
             raise AssertionError("synthetic failure")
         suite = unittest.TestSuite([unittest.FunctionTestCase(fail)])
-        with self._with_suite(suite), contextlib.redirect_stderr(io.StringIO()):
+        with self._with_suite(suite), self._fixture_floor(), contextlib.redirect_stderr(io.StringIO()):
             with self.assertRaisesRegex(ContractGateError, "^CI_REQUIRED_SUITE_FAILED"):
                 run_single(self.pattern, self.folder)
 
     def test_passing_suite_is_counted(self):
         (self.folder / self.pattern).write_text("# synthetic suite\n", encoding="utf-8")
         suite = unittest.TestSuite([unittest.FunctionTestCase(lambda: None)])
-        with self._with_suite(suite), contextlib.redirect_stderr(io.StringIO()):
+        with self._with_suite(suite), self._fixture_floor(), contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(run_single(self.pattern, self.folder), 1)
 
     def test_entirely_skipped_suite_fails_closed(self):
@@ -67,8 +73,32 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
             def test_skipped(self):
                 pass
         suite = unittest.defaultTestLoader.loadTestsFromTestCase(Skipped)
-        with self._with_suite(suite), contextlib.redirect_stderr(io.StringIO()):
+        with self._with_suite(suite), self._fixture_floor(), contextlib.redirect_stderr(io.StringIO()):
             with self.assertRaisesRegex(ContractGateError, "^CI_REQUIRED_SUITE_ALL_SKIPPED"):
+                run_single(self.pattern, self.folder)
+
+    def test_minimum_case_floors_pinned_for_all_mandatory_suites(self):
+        expected = {
+            "test_scaffold.py": 5,
+            "test_core_profile.py": 9,
+            "test_core_source_pin.py": 10,
+            "test_node_contract.py": 7,
+            "test_read_rpc.py": 11,
+            "test_real_regtest_harness.py": 10,
+            "test_regtest_attestation.py": 10,
+            "test_regtest_gateway.py": 10,
+            "test_ci_contract_gate.py": 10,
+        }
+        self.assertEqual(MINIMUM_CASES, expected)
+        self.assertEqual(MANDATORY_SUITES, tuple(expected))
+
+    def test_nonempty_suite_below_original_count_fails_closed(self):
+        (self.folder / self.pattern).write_text("# synthetic test\n", encoding="utf-8")
+        suite = unittest.TestSuite([unittest.FunctionTestCase(lambda: None)])
+        with self._with_suite(suite):
+            with self.assertRaisesRegex(
+                ContractGateError, "^CI_REQUIRED_SUITE_BELOW_BASELINE:"
+            ):
                 run_single(self.pattern, self.folder)
 
     def test_other_suites_still_run_after_one_failure(self):
