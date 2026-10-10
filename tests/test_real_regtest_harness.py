@@ -6,6 +6,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
+from types import SimpleNamespace
 
 from wam_privacy_wallet.node.real_regtest import (
     RealRegtestError, _clean_env, _read_cookie, _write_private_conf,
@@ -27,6 +28,118 @@ class HarnessTests(unittest.TestCase):
         for sha in (None, "bad", self.digest.upper(), "0" * 64):
             with self.subTest(sha=sha), self.assertRaises(RealRegtestError):
                 verify_binary(self.binary, sha)
+
+    def test_binary_swap_between_metadata_check_and_open_denied(self):
+        """Synthetic replacement before fd open must never be hashed as original."""
+        original_open = os.open
+
+        def swap_first(name, flags, *args, **kwargs):
+            self.binary.unlink()
+            self.binary.write_bytes(b"REPLACEMENT SYNTHETIC FILE")
+            return original_open(name, flags, *args, **kwargs)
+
+        with patch("wam_privacy_wallet.node.real_regtest.os.open",
+                   side_effect=swap_first):
+            with self.assertRaisesRegex(RealRegtestError, "^CORE_BINARY_CHANGED$"):
+                verify_binary(self.binary, self.digest)
+
+    def test_binary_metadata_change_during_hash_denied(self):
+        """A changed descriptor mtime after hashing invalidates verification."""
+        original_fstat = os.fstat
+        calls = 0
+
+        def changed_second_stat(fd):
+            nonlocal calls
+            calls += 1
+            current = original_fstat(fd)
+            if calls != 2:
+                return current
+            return SimpleNamespace(
+                st_mode=current.st_mode,
+                st_dev=current.st_dev,
+                st_ino=current.st_ino,
+                st_size=current.st_size,
+                st_mtime_ns=current.st_mtime_ns + 1,
+                st_ctime_ns=current.st_ctime_ns,
+            )
+
+        with patch("wam_privacy_wallet.node.real_regtest.os.fstat",
+                   side_effect=changed_second_stat):
+            with self.assertRaisesRegex(RealRegtestError, "^CORE_BINARY_CHANGED$"):
+                verify_binary(self.binary, self.digest)
+        self.assertEqual(calls, 2)
+
+    def test_binary_hash_never_reopens_path_for_bytes(self):
+        """Path.open is not used after the descriptor identity check."""
+        with patch.object(Path, "open", side_effect=AssertionError("UNSAFE_REOPEN")):
+            self.assertEqual(verify_binary(self.binary, self.digest),
+                             self.binary.resolve())
+
+    def test_binary_native_stat_fd_consistency_repeated(self):
+        """Expose exact metadata fields if native stat/fstat ever disagree."""
+        for attempt in range(24):
+            before = self.binary.lstat()
+            fd = os.open(self.binary, os.O_RDONLY | getattr(os, "O_BINARY", 0))
+            try:
+                opened = os.fstat(fd)
+            finally:
+                os.close(fd)
+            current = self.binary.lstat()
+            diffs = [
+                name for name in ("st_dev", "st_ino", "st_size", "st_mtime_ns")
+                + (() if os.name == "nt" else ("st_ctime_ns",))
+                if (getattr(before, name) != getattr(opened, name)
+                    or getattr(opened, name) != getattr(current, name))
+            ]
+            self.assertEqual(diffs, [], "stat/fstat field mismatch at attempt "
+                             + str(attempt) + ": " + ", ".join(diffs))
+            self.assertEqual(verify_binary(self.binary, self.digest),
+                             self.binary.resolve())
+
+    def test_windows_ctime_disagreement_does_not_reject_matching_digest(self):
+        """Exercise CRT fstat/path lstat ctime divergence without a Windows host."""
+        real_fstat = os.fstat
+
+        def ctime_variant(fd):
+            value = real_fstat(fd)
+            return SimpleNamespace(
+                st_mode=value.st_mode, st_dev=value.st_dev, st_ino=value.st_ino,
+                st_size=value.st_size, st_mtime_ns=value.st_mtime_ns,
+                st_ctime_ns=value.st_ctime_ns + 123456789,
+            )
+
+        with patch("wam_privacy_wallet.node.real_regtest.os.fstat",
+                   side_effect=ctime_variant):
+            with patch("wam_privacy_wallet.node.real_regtest._WINDOWS", True):
+                self.assertEqual(verify_binary(self.binary, self.digest),
+                                 self.binary.resolve())
+            with patch("wam_privacy_wallet.node.real_regtest._WINDOWS", False):
+                with self.assertRaisesRegex(RealRegtestError, "^CORE_BINARY_CHANGED$"):
+                    verify_binary(self.binary, self.digest)
+
+    def test_windows_ctime_tolerance_still_denies_size_and_mtime_changes(self):
+        """Platform metadata exception cannot bypass integrity fields."""
+        real_fstat = os.fstat
+        for attribute in ("st_size", "st_mtime_ns", "st_dev", "st_ino"):
+            def corrupt(fd):
+                value = real_fstat(fd)
+                fields = {
+                    "st_mode": value.st_mode, "st_dev": value.st_dev,
+                    "st_ino": value.st_ino, "st_size": value.st_size,
+                    "st_mtime_ns": value.st_mtime_ns,
+                    "st_ctime_ns": value.st_ctime_ns,
+                }
+                fields[attribute] += 1
+                return SimpleNamespace(**fields)
+
+            with self.subTest(field=attribute):
+                with patch("wam_privacy_wallet.node.real_regtest._WINDOWS", True):
+                    with patch("wam_privacy_wallet.node.real_regtest.os.fstat",
+                               side_effect=corrupt):
+                        with self.assertRaisesRegex(
+                            RealRegtestError, "^CORE_BINARY_CHANGED$"
+                        ):
+                            verify_binary(self.binary, self.digest)
 
     def test_no_symlinks_or_missing_binaries(self):
         with self.assertRaisesRegex(RealRegtestError, "CORE_BINARY_UNAVAILABLE"):

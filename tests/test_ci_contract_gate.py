@@ -84,7 +84,7 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
             "test_core_source_pin.py": 10,
             "test_node_contract.py": 7,
             "test_read_rpc.py": 11,
-            "test_real_regtest_harness.py": 12,
+            "test_real_regtest_harness.py": 18,
             "test_regtest_attestation.py": 10,
             "test_regtest_gateway.py": 10,
             "test_reuse_manifest.py": 6,
