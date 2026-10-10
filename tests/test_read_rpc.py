@@ -82,7 +82,7 @@ class LocalReadOnlyRpcTests(unittest.TestCase):
             LocalReadOnlyRpc('localhost', ExplicitRpcAuth('user', 'secret'))
         with self.assertRaises(ValueError):
             LocalRegtestEndpoint('192.168.1.1', 8999)
-        for u, p in [('', 'p'), ('u\\nInjected', 'p'), ('u:bad', 'p'), ('u', ''), ('u', 'bad\\r')]:
+        for u, p in [('', 'p'), ('u\nInjected', 'p'), ('u:bad', 'p'), ('u', ''), ('u', 'bad\r')]:
             with self.subTest(u=u):
                 with self.assertRaisesRegex(ValueError, 'WAM_RPC_INVALID_AUTH'):
                     ExplicitRpcAuth(u, p)
