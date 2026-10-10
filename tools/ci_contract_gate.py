@@ -23,6 +23,7 @@ MINIMUM_CASES = {
     "test_real_regtest_harness.py": 10,
     "test_regtest_attestation.py": 10,
     "test_regtest_gateway.py": 10,
+    "test_reuse_manifest.py": 6,
     "test_ci_contract_gate.py": 10,
 }
 MANDATORY_SUITES = tuple(MINIMUM_CASES)
