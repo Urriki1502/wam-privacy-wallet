@@ -202,5 +202,35 @@ class ParallelTwoNodeSchemaTests(unittest.TestCase):
         self.assertEqual(evidence.status, "OFFLINE_PARITY_ONLY")
 
 
+    def test_schema_places_both_bind_options_under_regtest(self):
+        for node in self.schema.nodes:
+            with self.subTest(node=node.label):
+                pairs = [(opt.section, opt.key) for opt in node.options]
+                self.assertEqual(pairs.count(("regtest", "bind")), 1)
+                self.assertEqual(pairs.count(("regtest", "rpcbind")), 1)
+                self.assertNotIn(("global", "bind"), pairs)
+                self.assertNotIn(("global", "rpcbind"), pairs)
+                self.assertEqual(
+                    tuple(opt.key for opt in node.options if opt.section == "regtest"),
+                    ("bind", "rpcbind", "rpcport", "port", "connect"),
+                )
+                legacy = self.legacy.nodes[0 if node.label == "node-a" else 1]
+                self.assertEqual(serialize_legacy_preview(node), legacy.config_preview)
+
+    def test_global_bind_or_rpcbind_relocation_fails_closed(self):
+        for wrong_key in ("bind", "rpcbind"):
+            for index, node in enumerate(self.schema.nodes):
+                changed = tuple(
+                    replace(opt, section="global") if opt.key == wrong_key else opt
+                    for opt in node.options
+                )
+                nodes = list(self.schema.nodes)
+                nodes[index] = replace(node, options=changed)
+                with self.subTest(node=index, key=wrong_key):
+                    with self.assertRaisesRegex(TwoNodeSchemaError, DENIAL):
+                        serialize_legacy_preview(nodes[index])
+                    self.assertDenied(replace(self.schema, nodes=tuple(nodes)))
+
+
 if __name__ == "__main__":
     unittest.main()
