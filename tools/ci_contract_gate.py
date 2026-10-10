@@ -32,6 +32,7 @@ MINIMUM_CASES = {
     "test_two_node_schema.py": 18,
     "test_provenance_intake.py": 13,
     "test_rpc_qualification_prep.py": 13,
+    "test_reorg_qualification_prep.py": 13,
     "test_ci_contract_gate.py": 10,
 }
 MANDATORY_SUITES = tuple(MINIMUM_CASES)
