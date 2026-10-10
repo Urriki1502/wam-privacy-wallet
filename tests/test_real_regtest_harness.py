@@ -6,6 +6,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
+from types import SimpleNamespace
 
 from wam_privacy_wallet.node.real_regtest import (
     RealRegtestError, _clean_env, _read_cookie, _write_private_conf,
@@ -27,6 +28,52 @@ class HarnessTests(unittest.TestCase):
         for sha in (None, "bad", self.digest.upper(), "0" * 64):
             with self.subTest(sha=sha), self.assertRaises(RealRegtestError):
                 verify_binary(self.binary, sha)
+
+    def test_binary_swap_between_metadata_check_and_open_denied(self):
+        """Synthetic replacement before fd open must never be hashed as original."""
+        original_open = os.open
+
+        def swap_first(name, flags, *args, **kwargs):
+            self.binary.unlink()
+            self.binary.write_bytes(b"REPLACEMENT SYNTHETIC FILE")
+            return original_open(name, flags, *args, **kwargs)
+
+        with patch("wam_privacy_wallet.node.real_regtest.os.open",
+                   side_effect=swap_first):
+            with self.assertRaisesRegex(RealRegtestError, "^CORE_BINARY_CHANGED$"):
+                verify_binary(self.binary, self.digest)
+
+    def test_binary_metadata_change_during_hash_denied(self):
+        """A changed descriptor mtime after hashing invalidates verification."""
+        original_fstat = os.fstat
+        calls = 0
+
+        def changed_second_stat(fd):
+            nonlocal calls
+            calls += 1
+            current = original_fstat(fd)
+            if calls != 2:
+                return current
+            return SimpleNamespace(
+                st_mode=current.st_mode,
+                st_dev=current.st_dev,
+                st_ino=current.st_ino,
+                st_size=current.st_size,
+                st_mtime_ns=current.st_mtime_ns + 1,
+                st_ctime_ns=current.st_ctime_ns,
+            )
+
+        with patch("wam_privacy_wallet.node.real_regtest.os.fstat",
+                   side_effect=changed_second_stat):
+            with self.assertRaisesRegex(RealRegtestError, "^CORE_BINARY_CHANGED$"):
+                verify_binary(self.binary, self.digest)
+        self.assertEqual(calls, 2)
+
+    def test_binary_hash_never_reopens_path_for_bytes(self):
+        """Path.open is not used after the descriptor identity check."""
+        with patch.object(Path, "open", side_effect=AssertionError("UNSAFE_REOPEN")):
+            self.assertEqual(verify_binary(self.binary, self.digest),
+                             self.binary.resolve())
 
     def test_no_symlinks_or_missing_binaries(self):
         with self.assertRaisesRegex(RealRegtestError, "CORE_BINARY_UNAVAILABLE"):
