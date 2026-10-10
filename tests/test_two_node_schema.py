@@ -233,11 +233,11 @@ class ParallelTwoNodeSchemaTests(unittest.TestCase):
                     self.assertDenied(replace(self.schema, nodes=tuple(nodes)))
                     original = self.legacy.nodes[index].config_preview
                     raw = next(opt.value for opt in node.options if opt.key == wrong_key)
-                    option_line = f"{wrong_key}={raw}\\n"
+                    option_line = f"{wrong_key}={raw}\n"
                     # Construct the old incorrect global-option layout, not
                     # merely a malformed missing-line candidate.
                     moved = original.replace(option_line, "", 1).replace(
-                        "[regtest]\\n", option_line + "[regtest]\\n", 1
+                        "[regtest]\n", option_line + "[regtest]\n", 1
                     )
                     self.assertNotEqual(moved, original)
                     with self.assertRaisesRegex(TwoNodeSchemaError, DENIAL):
