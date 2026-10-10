@@ -9,7 +9,7 @@ import json
 import re
 from pathlib import Path
 
-_SHA = re.compile(r"[0-9a-f]{40}\\Z")
+_SHA = re.compile(r"[0-9a-f]{40}\Z")
 _REPOS = frozenset(("Urriki1502/wam-silent-payments", "Urriki1502/wam-silent-wallet"))
 _IDS = frozenset((
     "wsp-api", "wsp-scanner", "wsp-store", "wsp-signer",
@@ -52,7 +52,7 @@ def validate_manifest(data: object) -> None:
             or type(row["source_path"]) is not str
             or not row["source_path"].startswith("src/")
             or ".." in Path(row["source_path"]).parts
-            or "\\\\" in row["source_path"]
+            or "\\" in row["source_path"]
             or type(row["commit_sha"]) is not str or not _SHA.fullmatch(row["commit_sha"])
             or type(row["blob_sha"]) is not str or not _SHA.fullmatch(row["blob_sha"])
         ):
