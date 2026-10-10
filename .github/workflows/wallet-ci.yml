@@ -57,10 +57,12 @@ jobs:
       - name: Compile Python sources, tests, and tools
         run: python -m compileall -q src tests tools
 
+      # The offline matrix includes the research-only Phase 010 shape contract
+      # on Windows x86/x64, macOS and Ubuntu; no network or secret operations.
       # Execute each old contract target in a separate process and report ALL
       # failing targets, rather than stopping the rest at the first failure.
       # Keep contracts dependency-free exactly as in the original dedicated workflows.
-      - name: Run all eight original offline contract test suites
+      - name: Run all offline contract test suites, including Phase 010
         shell: python
         env:
           PYTHONPATH: src
@@ -76,9 +78,14 @@ jobs:
               'test_real_regtest_harness.py',
               'test_regtest_attestation.py',
               'test_regtest_gateway.py',
+              'test_scanner_read_contract.py',
           ]
           failures = []
           for pattern in patterns:
+              if not __import__('pathlib').Path('tests', pattern).is_file():
+                  print(f'MISSING REQUIRED TEST MODULE: {pattern}', flush=True)
+                  failures.append(pattern)
+                  continue
               print(f'::group::Offline contract: {pattern}', flush=True)
               outcome = subprocess.run(
                   [sys.executable, '-m', 'unittest', 'discover',
