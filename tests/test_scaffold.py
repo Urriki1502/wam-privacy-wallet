@@ -11,7 +11,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 class ScaffoldContractTests(unittest.TestCase):
     def test_package_is_explicitly_nonproduction(self):
-        self.assertEqual(wam_privacy_wallet.__status__, "scaffold-only")
+        self.assertEqual(wam_privacy_wallet.__status__, "gui-shell-only")
         self.assertEqual(wam_privacy_wallet.__version__, "0.0.0")
 
     def test_required_scaffold_files_exist(self):
