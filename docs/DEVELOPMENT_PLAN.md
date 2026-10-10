@@ -7,10 +7,17 @@
 - Dependency-free scaffold CI: Windows/macOS/Linux Python 3.12.
 - **No production code, no GUI, no wallet functionality.**
 
-## Proposed sequential gates (not started)
+## Phase 001 — GUI shell (in review, not merged)
+
+- Optional PySide6 GUI, six static pages and offline-only status labels.
+- Cross-platform widget smoke tests; no wallet APIs or filesystem/network calls.
+- New GUI CI must pass on Windows/macOS/Ubuntu before merge.
+- Phase 001 does not qualify signing, protocol integrations or release packages.
+
+## Remaining sequential gates (not started)
 
 1. Formalize API boundaries, version pins and WSP network-profile assumptions.
-2. Desktop GUI shell; smoke and packaging tests on macOS/Windows.
+2. Review platform-specific GUI packaging and accessibility independently.
 3. WSP-1 adapter + local node-only scanner; Windows locking fixes.
 4. Signing, wallet-state, backup/recovery and crash tests.
 5. Coin selection and wallet privacy policy.
