@@ -32,7 +32,7 @@ reproducible build, or the bytes an OS later executes. The returned frozen
 dataclass is **not a capability token**; no downstream component may treat it
 as trusted authorization without a separately reviewed provenance proof.
 The constructor also refuses caller-supplied trust/status flags; this prevents
-ordinary direct-construction/\`dataclasses.replace\` authority impersonation,
+ordinary direct-construction/`dataclasses.replace` authority impersonation,
 but does not make a Python object a cryptographic security boundary.
 
 ## Execution boundaries
@@ -42,8 +42,8 @@ signer, Core daemon, wallet or funds.** This stage never validates live
 binary flags or authorizes regtest, RPC, reorg, signing, release or mainnet.
 
 This port adds **13 deterministic adversarial provenance-intake tests**
-(10 original + 3 targeted type/forgery regressions). CI requires **17/17 suites, at least
-168 collected test cases per native architecture**: Windows x86/x64, macOS
+(10 original + 3 targeted type/forgery regressions). CI requires
+**17/17 suites, at least 168 collected test cases per native architecture**: Windows x86/x64, macOS
 x64, Linux x64. GUI on three OS, pinned Core read-only check and CodeQL
 Python/Actions remain mandatory. These numbers refer to offline tests only.
 
