@@ -68,17 +68,41 @@ def _free_local_port() -> int:
 
 
 def _read_cookie(path: Path) -> ExplicitRpcAuth:
-    """Read only our isolated test datadir's RPC cookie."""
+    """Read an isolated RPC cookie from one validated file descriptor.
+
+    The pathname is never re-opened for the actual read. Reject symlinks,
+    oversized files, changed inode/size/content metadata, and path swaps.
+    POSIX uses O_NOFOLLOW; non-POSIX needs a separate OS-security review for
+    native reparse-point and access-control guarantees.
+    """
     try:
-        info = path.lstat()
-        if not stat.S_ISREG(info.st_mode) or path.is_symlink() or info.st_size > 1024:
+        before = path.lstat()
+        if not stat.S_ISREG(before.st_mode) or not 1 <= before.st_size <= 1024:
             raise RealRegtestError("CORE_COOKIE_INVALID")
-        raw = path.read_bytes()
-        if not 1 <= len(raw) <= 1024:
+        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
+        flags |= getattr(os, "O_NOFOLLOW", 0)
+        with os.fdopen(os.open(path, flags), "rb") as stream:
+            opened = os.fstat(stream.fileno())
+            if (not stat.S_ISREG(opened.st_mode)
+                    or (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino)
+                    or opened.st_size != before.st_size):
+                raise RealRegtestError("CORE_COOKIE_INVALID")
+            raw = stream.read(1025)
+            after = os.fstat(stream.fileno())
+            if (not 1 <= len(raw) <= 1024
+                    or (after.st_dev, after.st_ino) != (opened.st_dev, opened.st_ino)
+                    or after.st_size != len(raw)
+                    or after.st_mtime_ns != opened.st_mtime_ns):
+                raise RealRegtestError("CORE_COOKIE_INVALID")
+        current = path.lstat()
+        if (not stat.S_ISREG(current.st_mode)
+                or (current.st_dev, current.st_ino) != (opened.st_dev, opened.st_ino)):
             raise RealRegtestError("CORE_COOKIE_INVALID")
         username, password = raw.decode("ascii").strip().split(":", 1)
         return ExplicitRpcAuth(username, password)
-    except (OSError, ValueError, UnicodeDecodeError):
+    except RealRegtestError:
+        raise
+    except (OSError, ValueError, UnicodeDecodeError, TypeError):
         raise RealRegtestError("CORE_COOKIE_UNAVAILABLE") from None
 
 
