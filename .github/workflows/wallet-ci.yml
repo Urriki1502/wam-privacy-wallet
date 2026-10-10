@@ -60,7 +60,7 @@ jobs:
       # Execute each old contract target in a separate process and report ALL
       # failing targets, rather than stopping the rest at the first failure.
       # Keep contracts dependency-free exactly as in the original dedicated workflows.
-      - name: Run all eight original offline contract test suites
+      - name: Run original contracts plus G1-00 local artifact preflight tests
         shell: python
         env:
           PYTHONPATH: src
@@ -76,6 +76,7 @@ jobs:
               'test_real_regtest_harness.py',
               'test_regtest_attestation.py',
               'test_regtest_gateway.py',
+              'test_regtest_artifact_preflight.py',
           ]
           failures = []
           for pattern in patterns:
