@@ -21,7 +21,7 @@ class ScaffoldContractTests(unittest.TestCase):
             "pyproject.toml",
             "docs/ARCHITECTURE.md",
             "docs/DEVELOPMENT_PLAN.md",
-            ".github/workflows/scaffold-ci.yml",
+            ".github/workflows/wallet-ci.yml",
         )
         for relative in required:
             with self.subTest(path=relative):
