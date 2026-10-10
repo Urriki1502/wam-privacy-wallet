@@ -1,6 +1,6 @@
 # WAM Privacy Wallet
 
-**Status:** Foundation scaffold only — no wallet functionality or production code.
+**Status:** Experimental GUI shell only — no wallet functionality or production code.
 
 WAM Privacy Wallet is a proposed cross-platform desktop application for **macOS** and **Windows**, using a modular, non-consensus architecture. This repository is intentionally independent of the existing WAM research and security repositories.
 
@@ -10,7 +10,7 @@ WAM Privacy Wallet is a proposed cross-platform desktop application for **macOS*
 
 ```text
 User
-  └── Desktop GUI (Qt / PySide6; future)
+  └── Desktop GUI shell (Qt / PySide6; navigation only)
         └── Application Layer
               ├── WSP-1 / Silent Payments adapter
               │     ├── Local scanner
@@ -44,6 +44,19 @@ The original repositories must **not** be modified as a side effect of work here
 - **Out of scope:** shielded pool, Halo2 consensus activation, changes to WAM consensus, hosted scanner dependencies, and mainnet claims before maintainers approve the required WSP network profile.
 - **Security baseline:** pin dependency commits, preserve scanning/spending key separation, validate Windows locking/RPC interoperability, and require independent review before any production release.
 
+## Experimental GUI preview (Phase 001)
+
+The next development stage provides an offline, navigable **PySide6 / Qt 6** desktop shell with Overview, Receive, Send, Privacy, Node and Recovery pages. Every page is a static placeholder: **it cannot read wallet files, generate addresses, connect to a node, sign or broadcast transactions**.
+
+Install optional dependencies and launch on macOS/Windows:
+
+```sh
+python -m pip install -e ".[gui]"
+python -m wam_privacy_wallet
+```
+
+To run the headless GUI smoke tests use `QT_QPA_PLATFORM=offscreen` (PowerShell: `$env:QT_QPA_PLATFORM = 'offscreen'`). The `gui-shell-ci.yml` workflow runs all tests on Ubuntu, macOS and Windows with Python 3.12. It is **not** a wallet security or platform packaging qualification. See [docs/GUI_SHELL.md](docs/GUI_SHELL.md) for the exact boundary.
+
 ## Foundation CI
 
 `.github/workflows/scaffold-ci.yml` checks only Python syntax, scaffold metadata and a minimal import contract on **ubuntu-latest**, **macos-latest** and **windows-latest** (Python 3.12).
@@ -54,7 +67,7 @@ Local scaffold verification:
 
 ```sh
 python -m compileall -q src tests
-PYTHONPATH=src python -m unittest discover -s tests -v
+PYTHONPATH=src python -m unittest discover -s tests -p test_scaffold.py -v
 ```
 
 On Windows PowerShell, use `$env:PYTHONPATH = 'src'` before running the second command.
