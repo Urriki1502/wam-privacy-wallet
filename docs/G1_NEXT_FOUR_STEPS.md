@@ -15,7 +15,7 @@ representation and parity audit only.
 
 | Phase | Work | Acceptance | Must **not** be claimed |
 | --- | --- | --- | --- |
-| G1-02 metadata intake | Port the historical [#28](https://github.com/Urriki1502/wam-privacy-wallet/pull/28) candidate, enforce strict types, preserve all suite floors | 17 mandatory suites / >=166 cases per architecture; GUI, pinned read-only Core and exact-HEAD CodeQL; source review | Publisher identity, binary provenance, source-to-binary identity, runnable daemon |
+| G1-02 metadata intake | Port the historical [#28](https://github.com/Urriki1502/wam-privacy-wallet/pull/28) candidate, enforce strict types, preserve all suite floors | 17 mandatory suites / >=168 cases per architecture; GUI, pinned read-only Core and exact-HEAD CodeQL; source review | Publisher identity, binary provenance, source-to-binary identity, runnable daemon |
 | G1-04 offline readiness | Reconcile [#31](https://github.com/Urriki1502/wam-privacy-wallet/pull/31) against new main without reducing 17-suite baseline | Offline RPC/cookie, restart/error inventories; independent review | Real cookie rotation or real RPC PASS |
 | G1-05 offline readiness | Reconcile [#32](https://github.com/Urriki1502/wam-privacy-wallet/pull/32) after G1-04 | Offline reorg/recovery, local-only scanner and lock-negative inventory | Actual two-node divergence, scanner or reorg PASS |
 | Trusted artifact + launch | Independently authenticated Core release and reviewed [TOCTOU blocker #36](https://github.com/Urriki1502/wam-privacy-wallet/issues/36) | Publisher proof, exact artifact, verified execution snapshot, host isolation and adversarial tests | Trust from submitter-provided checksum alone |
