@@ -25,6 +25,20 @@ from .regtest_gateway import LocalRegtestIdentityGateway
 
 _SHA = re.compile(r"[0-9a-f]{64}\Z", re.ASCII)
 
+# On Windows, CRT fstat() can report st_ctime_ns differently from Path.lstat().
+# It is not a portable file identity property on that platform. Preserve
+# dev/inode, size, mtime, byte count and mandatory SHA-256 for every platform.
+_WINDOWS = os.name == "nt"
+
+
+def _same_binary_file_metadata(first: os.stat_result, second: os.stat_result) -> bool:
+    """Compare metadata fields stable across pathname and fd stat APIs."""
+    fields = ("st_dev", "st_ino", "st_size", "st_mtime_ns")
+    if not _WINDOWS:
+        fields += ("st_ctime_ns",)
+    return all(getattr(first, name) == getattr(second, name) for name in fields)
+
+
 
 class RealRegtestError(RuntimeError):
     """Stable, non-sensitive failure status."""
@@ -60,27 +74,18 @@ def verify_binary(path: str | os.PathLike[str], sha256: str) -> Path:
         with os.fdopen(os.open(src, flags), "rb") as stream:
             opened = os.fstat(stream.fileno())
             if (not stat.S_ISREG(opened.st_mode)
-                    or (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino)
-                    or opened.st_size != before.st_size
-                    or opened.st_mtime_ns != before.st_mtime_ns
-                    or opened.st_ctime_ns != before.st_ctime_ns):
+                    or not _same_binary_file_metadata(before, opened)):
                 raise RealRegtestError("CORE_BINARY_CHANGED")
             for chunk in iter(lambda: stream.read(1024 * 1024), b""):
                 counted += len(chunk)
                 digest.update(chunk)
             finished = os.fstat(stream.fileno())
-            if ((finished.st_dev, finished.st_ino) != (opened.st_dev, opened.st_ino)
-                    or finished.st_size != opened.st_size
-                    or finished.st_mtime_ns != opened.st_mtime_ns
-                    or finished.st_ctime_ns != opened.st_ctime_ns
+            if (not _same_binary_file_metadata(opened, finished)
                     or counted != opened.st_size):
                 raise RealRegtestError("CORE_BINARY_CHANGED")
         current = src.lstat()
         if (not stat.S_ISREG(current.st_mode)
-                or (current.st_dev, current.st_ino) != (opened.st_dev, opened.st_ino)
-                or current.st_size != opened.st_size
-                or current.st_mtime_ns != opened.st_mtime_ns
-                or current.st_ctime_ns != opened.st_ctime_ns):
+                or not _same_binary_file_metadata(opened, current)):
             raise RealRegtestError("CORE_BINARY_CHANGED")
         if digest.hexdigest() != sha256:
             raise RealRegtestError("CORE_SHA256_MISMATCH")
