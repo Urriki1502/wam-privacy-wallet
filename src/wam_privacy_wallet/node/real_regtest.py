@@ -17,7 +17,8 @@ import tempfile
 import time
 from dataclasses import dataclass
 
-from .attestation import ChainIdentity, RegtestIdentityError
+from .attestation import RegtestIdentityError
+from .core_profile import CoreProfileError
 from .endpoint import LocalRegtestEndpoint
 from .read_rpc import ExplicitRpcAuth
 from .regtest_gateway import LocalRegtestIdentityGateway
@@ -193,7 +194,8 @@ def check_real_regtest(
                             auth,
                             timeout=2,
                         )
-                        identity: ChainIdentity = gateway.probe_identity()
+                        profile = gateway.probe_core_profile()
+                        identity = profile.identity
                         return RealRegtestEvidence(
                             binary_sha256=sha256,
                             network="regtest",
@@ -204,6 +206,8 @@ def check_real_regtest(
                     except RegtestIdentityError as exc:
                         if str(exc) != "WAM_NODE_PROBE_TRANSPORT_ERROR":
                             raise RealRegtestError("CORE_IDENTITY_REJECTED") from None
+                    except CoreProfileError:
+                        raise RealRegtestError("CORE_PROFILE_REJECTED") from None
                     except RealRegtestError as exc:
                         if str(exc) != "CORE_COOKIE_UNAVAILABLE":
                             raise
