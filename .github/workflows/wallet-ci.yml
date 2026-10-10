@@ -1,0 +1,162 @@
+# Consolidated, non-production WAM Privacy Wallet CI.
+# Preserves all eight offline contract suites on all four original architectures,
+# full GUI/scaffold discovery on the original three x64 platforms,
+# and the read-only WAM Core source-pin check. No WAM Core changes.
+name: Wallet CI (offline contracts, GUI, and pinned Core)
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Only supersede outdated runs for the same PR; never cancel main-branch validation.
+concurrency:
+  group: wallet-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  offline-contracts:
+    name: Offline contracts / ${{ matrix.os }} / ${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: windows-latest, arch: x86, bits: 32}
+          - {os: windows-latest, arch: x64, bits: 64}
+          - {os: macos-latest, arch: x64, bits: 64}
+          - {os: ubuntu-latest, arch: x64, bits: 64}
+    steps:
+      - name: Checkout source without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.12 at the required architecture
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: ${{ matrix.arch }}
+
+      - name: Verify native Python pointer width
+        id: architecture
+        shell: python
+        env:
+          EXPECTED_BITS: ${{ matrix.bits }}
+        run: |
+          import os
+          import struct
+          assert struct.calcsize('P') * 8 == int(os.environ['EXPECTED_BITS'])
+
+      # Superset of the original per-workflow syntax checks.
+      - name: Compile Python sources, tests, and tools
+        run: python -m compileall -q src tests tools
+
+      # The offline matrix includes the research-only Phase 010 shape contract
+      # on Windows x86/x64, macOS and Ubuntu; no network or secret operations.
+      # Execute each old contract target in a separate process and report ALL
+      # failing targets, rather than stopping the rest at the first failure.
+      # Keep contracts dependency-free exactly as in the original dedicated workflows.
+      - name: Run all offline contract test suites, including Phase 010
+        shell: python
+        env:
+          PYTHONPATH: src
+        run: |
+          import subprocess
+          import sys
+          patterns = [
+              'test_scaffold.py',
+              'test_core_profile.py',
+              'test_core_source_pin.py',
+              'test_node_contract.py',
+              'test_read_rpc.py',
+              'test_real_regtest_harness.py',
+              'test_regtest_attestation.py',
+              'test_regtest_gateway.py',
+              'test_scanner_read_contract.py',
+          ]
+          failures = []
+          for pattern in patterns:
+              if not __import__('pathlib').Path('tests', pattern).is_file():
+                  print(f'MISSING REQUIRED TEST MODULE: {pattern}', flush=True)
+                  failures.append(pattern)
+                  continue
+              print(f'::group::Offline contract: {pattern}', flush=True)
+              outcome = subprocess.run(
+                  [sys.executable, '-m', 'unittest', 'discover',
+                   '-s', 'tests', '-p', pattern, '-v'],
+                  check=False,
+              )
+              print('::endgroup::', flush=True)
+              if outcome.returncode:
+                  failures.append(pattern)
+          if failures:
+              print('FAILED CONTRACT SUITES: ' + ', '.join(failures), flush=True)
+              sys.exit(1)
+
+
+  gui-tests:
+    name: GUI + full test discovery / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - name: Checkout source without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Linux Qt runtime libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1 libopengl0 libxkbcommon-x11-0
+
+      - name: Install GUI test dependencies
+        run: python -m pip install -e ".[gui]"
+
+      - name: Check GUI dependency consistency
+        run: python -m pip check
+
+      - name: Check Python syntax
+        run: python -m compileall -q src tests
+
+      - name: Run complete scaffold and GUI test discovery
+        run: python -m unittest discover -s tests -v
+
+  upstream-pinned-readonly:
+    name: Verify pinned WAM Core source and current main (GET only)
+    runs-on: ubuntu-latest
+    needs: offline-contracts
+    timeout-minutes: 8
+    steps:
+      - name: Checkout source without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Check exact upstream Core source bytes (GET only)
+        env:
+          PYTHONPATH: src
+        run: python tools/check_core_source_pin.py --check-head
