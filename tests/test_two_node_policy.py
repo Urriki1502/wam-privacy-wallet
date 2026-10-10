@@ -250,8 +250,8 @@ class TwoNodePolicyAuditTests(unittest.TestCase):
     def test_historical_global_bind_and_rpcbind_layout_is_rejected(self):
         """Reject the original preview placing network-only options globally."""
         a, b = self.plan.nodes
-        current = "[regtest]\\nbind=127.0.0.1\\nrpcbind=127.0.0.1\\n"
-        former = "bind=127.0.0.1\\nrpcbind=127.0.0.1\\n[regtest]\\n"
+        current = "[regtest]\nbind=127.0.0.1\nrpcbind=127.0.0.1\n"
+        former = "bind=127.0.0.1\nrpcbind=127.0.0.1\n[regtest]\n"
         for index, node in enumerate((a, b)):
             self.assertIn(current, node.config_preview)
             old_preview = node.config_preview.replace(current, former)
