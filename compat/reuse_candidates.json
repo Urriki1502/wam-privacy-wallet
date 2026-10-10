@@ -1,0 +1,81 @@
+{
+  "schema": "wam-wallet-reuse-gate/v1",
+  "state": "RESEARCH_ONLY",
+  "node_network": "regtest",
+  "integration_allowed": false,
+  "upstream_repositories_not_modified": true,
+  "candidates": [
+    {
+      "id": "wsp-api",
+      "repository": "Urriki1502/wam-silent-payments",
+      "commit_sha": "ac55f13423620252bdbf848c7e8a280c3b84721e",
+      "source_path": "src/wam_sp/api.py",
+      "blob_sha": "3c5a285c721982540b8aa9242ac8d882c7981a53",
+      "status": "REVIEW_GATED",
+      "blocker": "Unmerged WSP-1 PR #9 and wallet PR #3; verify explicit scan/spend separation."
+    },
+    {
+      "id": "wsp-scanner",
+      "repository": "Urriki1502/wam-silent-payments",
+      "commit_sha": "ac55f13423620252bdbf848c7e8a280c3b84721e",
+      "source_path": "src/wam_sp/scanner.py",
+      "blob_sha": "6565efc474e7798e7231bf2ef4df771ac1f24a22",
+      "status": "REVIEW_GATED",
+      "blocker": "Requires verified local Core regtest, RPC attestation, exclusive Windows lock and reorg/recovery evidence."
+    },
+    {
+      "id": "wsp-store",
+      "repository": "Urriki1502/wam-silent-payments",
+      "commit_sha": "ac55f13423620252bdbf848c7e8a280c3b84721e",
+      "source_path": "src/wam_sp/store.py",
+      "blob_sha": "8d0b6b94afba15519534f057e51b59130bd7cb67",
+      "status": "REVIEW_GATED",
+      "blocker": "Verify SQLite crash consistency, rollback, file permissions and exclusive scanner lease before adoption."
+    },
+    {
+      "id": "wsp-signer",
+      "repository": "Urriki1502/wam-silent-payments",
+      "commit_sha": "ac55f13423620252bdbf848c7e8a280c3b84721e",
+      "source_path": "src/wam_sp/offline_signer.py",
+      "blob_sha": "45100e327abafd9758f6ba0d00efb78e65f0e241",
+      "status": "BLOCKED",
+      "blocker": "Never import signer into scanner; separate consent/PSBT security review and real-node qualification required."
+    },
+    {
+      "id": "wsp-backup",
+      "repository": "Urriki1502/wam-silent-payments",
+      "commit_sha": "ac55f13423620252bdbf848c7e8a280c3b84721e",
+      "source_path": "src/wam_sp/backup.py",
+      "blob_sha": "60a1938b0ea612d9ef7423e7e494e09a7afe0fa1",
+      "status": "REVIEW_GATED",
+      "blocker": "Require restore/rescan, encrypted bundle and tampered-bundle fault tests; no real secrets in CI."
+    },
+    {
+      "id": "wsp-rpc",
+      "repository": "Urriki1502/wam-silent-payments",
+      "commit_sha": "ac55f13423620252bdbf848c7e8a280c3b84721e",
+      "source_path": "src/wam_sp/rpc.py",
+      "blob_sha": "23624626cd7d04ce6e1915f1a9f5f1bef01b5002",
+      "status": "BLOCKED",
+      "blocker": "Separate scanning-only facade needed; do not broaden diagnostic RPC or expose upstream mutate methods."
+    },
+    {
+      "id": "silentwallet-session",
+      "repository": "Urriki1502/wam-silent-wallet",
+      "commit_sha": "44e749a5c8fde82f672d0bc9d11e43af4e52c673",
+      "source_path": "src/wam_silent_wallet/services/session_service.py",
+      "blob_sha": "ecda81a855ca2f981d7026d4d2d11b11baf8832c",
+      "status": "REVIEW_GATED",
+      "blocker": "Python best-effort passphrase zeroization is not hardened key custody; review lifetime and GUI consent."
+    },
+    {
+      "id": "silentwallet-node",
+      "repository": "Urriki1502/wam-silent-wallet",
+      "commit_sha": "44e749a5c8fde82f672d0bc9d11e43af4e52c673",
+      "source_path": "src/wam_silent_wallet/services/node_service.py",
+      "blob_sha": "5a55d0b83ba5687cf9e86f7b211e3fa84dda6b56",
+      "status": "BLOCKED",
+      "blocker": "Old default RPC 18443 is not WAM Core pinned regtest port 29554; replace defaults and qualify auth/profile."
+    }
+  ]
+}
