@@ -1,8 +1,7 @@
 # Wallet CI Consolidation — Phase 1 (review-only)
 
 This change proposes replacing nine independent PR/push workflows with one
-consolidated workflow and **five jobs** per ordinary PR or push (four platform
-jobs and one read-only source-pin verification). It does **not** disable tests.
+consolidated workflow and **eight jobs** per ordinary PR or push (four offline contract platform jobs, three independent GUI jobs, and one read-only source-pin verification). It does **not** disable tests.
 
 ## Baseline and coverage mapping
 
@@ -20,14 +19,18 @@ jobs and one read-only source-pin verification). It does **not** disable tests.
 
 The new cross-platform matrix runs **all eight targeted offline suites on all
 four architectures**, retaining and expanding the prior checks. The full GUI
-test suite remains on the three original x64 platforms. On each platform,
-offline tests run before installation of optional GUI dependencies, matching
-the earlier dependency-light verification model. The pinned-Core remote
-inspection remains **read-only**, and occurs only after local validation.
+test suite remains on the three original x64 platforms. The offline contract jobs run independently from optional GUI dependencies,
+matching the earlier dependency-light verification model. The GUI jobs run
+**in parallel** with offline suites to avoid serializing expensive macOS tests.
+The pinned-Core remote inspection remains **read-only**, and occurs only
+after the complete four-architecture offline contract matrix passes. All eight
+jobs must pass for the workflow to pass.
 
 ## CI cost controls
 
-- Shared setup replaces repeated runner provisioning and Python installation.
+- Shared setup within each contract job eliminates repeated runner provisioning
+  across the eight contract suites; GUI jobs remain separate and parallel so
+  overall wall-clock completion need not wait for serial GUI execution.
 - Pull-request concurrency cancels superseded runs of the same PR only.
 - `push: main` retains post-merge validation; `workflow_dispatch` is retained.
 - No path filters or test skips: a PR always runs the full wallet qualification.
@@ -36,7 +39,7 @@ inspection remains **read-only**, and occurs only after local validation.
 
 ## Pre-merge review gates
 
-1. Confirm all five jobs run and pass on the draft PR.
+1. Confirm all eight jobs run and pass on the draft PR.
 2. Verify Windows x86 and x64, macOS x64 and Linux x64 report the true Python architecture.
 3. Compare the test collection/results against the previous nine workflows;
    ensure the full GUI suite, offline negative tests, and upstream GET-only check pass.
@@ -51,3 +54,15 @@ inspection remains **read-only**, and occurs only after local validation.
 
 **Non-production status is unchanged.** CI PASS is not a claim that the
 wallet is ready for funds or real-world use.
+
+## Timing evidence and revised optimization
+
+Representative completed PR CI before consolidation (PR #16, Oct 10): 9 workflow
+runs, 34 jobs, 2m05s overall wall time; summed job wall times 1,026 seconds
+(excludes GitHub billing multipliers and rounding). The first consolidated run
+(PR #19) completed in 2m44s with 5 jobs and 299 summed job seconds: lower
+runner usage, **but 39s slower** overall. Mac GUI tests had been serialized
+after offline tests. This revision restores parallel GUI/contract execution
+using 8 jobs while keeping the reduced workflow count, exact test coverage
+and separate pinned-Core gate. Re-run and compare full pipeline wall time and
+billed minutes before merging. Do not claim speed improvement before evidence.
