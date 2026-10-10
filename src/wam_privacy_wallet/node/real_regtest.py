@@ -40,21 +40,53 @@ class RealRegtestEvidence:
 
 
 def verify_binary(path: str | os.PathLike[str], sha256: str) -> Path:
-    """Verify a regular executable file against an operator-supplied SHA256."""
+    """Hash a single checked file descriptor; this does NOT pin launch bytes.
+
+    Reject a replaced path or changed file metadata during hash verification.
+    The later subprocess.Popen(path) is still a separate, unsafe path lookup;
+    its verify-to-execute TOCTOU gate remains BLOCKED pending native review.
+    """
     if type(sha256) is not str or _SHA.fullmatch(sha256) is None:
         raise RealRegtestError("CORE_SHA256_INVALID")
     try:
         src = Path(path)
-        info = src.lstat()
-        if not stat.S_ISREG(info.st_mode) or src.is_symlink():
+        before = src.lstat()
+        if not stat.S_ISREG(before.st_mode):
             raise RealRegtestError("CORE_BINARY_NOT_REGULAR")
+        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
+        flags |= getattr(os, "O_NOFOLLOW", 0)
         digest = hashlib.sha256()
-        with src.open("rb") as stream:
+        counted = 0
+        with os.fdopen(os.open(src, flags), "rb") as stream:
+            opened = os.fstat(stream.fileno())
+            if (not stat.S_ISREG(opened.st_mode)
+                    or (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino)
+                    or opened.st_size != before.st_size
+                    or opened.st_mtime_ns != before.st_mtime_ns
+                    or opened.st_ctime_ns != before.st_ctime_ns):
+                raise RealRegtestError("CORE_BINARY_CHANGED")
             for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                counted += len(chunk)
                 digest.update(chunk)
+            finished = os.fstat(stream.fileno())
+            if ((finished.st_dev, finished.st_ino) != (opened.st_dev, opened.st_ino)
+                    or finished.st_size != opened.st_size
+                    or finished.st_mtime_ns != opened.st_mtime_ns
+                    or finished.st_ctime_ns != opened.st_ctime_ns
+                    or counted != opened.st_size):
+                raise RealRegtestError("CORE_BINARY_CHANGED")
+        current = src.lstat()
+        if (not stat.S_ISREG(current.st_mode)
+                or (current.st_dev, current.st_ino) != (opened.st_dev, opened.st_ino)
+                or current.st_size != opened.st_size
+                or current.st_mtime_ns != opened.st_mtime_ns
+                or current.st_ctime_ns != opened.st_ctime_ns):
+            raise RealRegtestError("CORE_BINARY_CHANGED")
         if digest.hexdigest() != sha256:
             raise RealRegtestError("CORE_SHA256_MISMATCH")
         return src.resolve(strict=True)
+    except RealRegtestError:
+        raise
     except (OSError, TypeError, ValueError):
         raise RealRegtestError("CORE_BINARY_UNAVAILABLE") from None
 
