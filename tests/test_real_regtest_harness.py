@@ -75,6 +75,27 @@ class HarnessTests(unittest.TestCase):
             self.assertEqual(verify_binary(self.binary, self.digest),
                              self.binary.resolve())
 
+    def test_binary_native_stat_fd_consistency_repeated(self):
+        """Expose exact metadata fields if native stat/fstat ever disagree."""
+        for attempt in range(24):
+            before = self.binary.lstat()
+            fd = os.open(self.binary, os.O_RDONLY | getattr(os, "O_BINARY", 0))
+            try:
+                opened = os.fstat(fd)
+            finally:
+                os.close(fd)
+            current = self.binary.lstat()
+            diffs = [
+                name for name in ("st_dev", "st_ino", "st_size",
+                                  "st_mtime_ns", "st_ctime_ns")
+                if (getattr(before, name) != getattr(opened, name)
+                    or getattr(opened, name) != getattr(current, name))
+            ]
+            self.assertEqual(diffs, [], "stat/fstat field mismatch at attempt "
+                             + str(attempt) + ": " + ", ".join(diffs))
+            self.assertEqual(verify_binary(self.binary, self.digest),
+                             self.binary.resolve())
+
     def test_no_symlinks_or_missing_binaries(self):
         with self.assertRaisesRegex(RealRegtestError, "CORE_BINARY_UNAVAILABLE"):
             verify_binary(self.root / "missing", self.digest)
