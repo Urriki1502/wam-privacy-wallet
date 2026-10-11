@@ -6,7 +6,9 @@ only the separate official-release workflow provides actual GnuPG evidence.
 from __future__ import annotations
 
 import hashlib
+import contextlib
 import io
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -17,6 +19,7 @@ import unittest
 from unittest.mock import patch
 
 from wam_privacy_wallet.node import core_signed_linux_memfd as bridge
+from tools import verify_core_release_sealed as cli
 from wam_privacy_wallet.node.core_archive_inventory import CoreArchiveInventory
 from wam_privacy_wallet.node.core_signed_release import (
     CoreReleaseSignatureError, SignedDistributionEvidence,
@@ -206,6 +209,48 @@ class SignedLinuxCoreMemfdTests(unittest.TestCase):
                 self.assertIs(getattr(proof, name), False)
             self.assertNotIn(str(self.archive), repr(proof))
 
+
+
+class SignedMemberCliTests(unittest.TestCase):
+    def test_cli_denies_relative_archive_before_fetch(self):
+        with patch.object(
+            cli, "official_release_metadata", side_effect=AssertionError("NO_FETCH"),
+        ):
+            with self.assertRaises(CoreReleaseSignatureError):
+                cli.verify_signed_linux_memfd(archive="not-absolute.tar.gz", gpg="/bin/gpg")
+
+    def test_cli_reports_only_redacted_failure(self):
+        with patch.object(
+            cli, "official_release_metadata",
+            side_effect=bridge.SignedNodeSealError("CORE_SIGNED_SEAL_DENIED"),
+        ):
+            stderr, stdout = io.StringIO(), io.StringIO()
+            with contextlib.redirect_stderr(stderr), contextlib.redirect_stdout(stdout):
+                status = cli.main(["--archive", "/tmp/release.tar.gz", "--gpg", "/bin/gpg"])
+            self.assertEqual(status, 2)
+            self.assertEqual(stderr.getvalue().strip(), "CORE_SIGNED_SEAL_DENIED")
+            self.assertEqual(stdout.getvalue(), "")
+
+    def test_cli_non_authority_json(self):
+        receipt = {
+            "status": "OFFICIAL_SIGNED_WAMD_LINUX_NOEXEC_MEMFD_REVIEW",
+            "kernel_seals_verified": True,
+            "kernel_noexec_enforced": True,
+            "executed_core": False,
+            "real_regtest_qualified": False,
+            "core_execution_allowed": False,
+            "execution_identity_bound": False,
+            "mainnet_allowed": False,
+        }
+        stdout = io.StringIO()
+        with patch.object(cli, "verify_signed_linux_memfd", return_value=receipt):
+            with contextlib.redirect_stdout(stdout):
+                status = cli.main(["--archive", "/tmp/release.tar.gz", "--gpg", "/bin/gpg"])
+        self.assertEqual(status, 0)
+        parsed = json.loads(stdout.getvalue())
+        self.assertIs(parsed["executed_core"], False)
+        self.assertIs(parsed["core_execution_allowed"], False)
+        self.assertNotIn("/tmp/", stdout.getvalue())
 
 if __name__ == "__main__":
     unittest.main()
