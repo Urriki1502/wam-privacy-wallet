@@ -21,9 +21,11 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_security_gate_ledger.SecurityGateLedgerTests.test_cannot_auto_promote_global_authority",
     "test_rpc_qualification_prep.RpcQualificationPreparationTests.test_fake_approval_release_or_core_execution_denied",
     "test_ci_contract_gate.MandatoryOfflineContractGateTests.test_minimum_case_floors_pinned_for_all_mandatory_suites",
+    "test_scanner_response_shape.ScannerResponseShapeTests.test_no_files_sockets_subprocess_or_wsp_imports",
+    "test_scanner_response_shape.ScannerResponseShapeTests.test_wrong_hash_or_previous_hash_or_height_rejected",
 })
-# Existing 267-case GUI baseline + 12 public-vector tests + 5 Receive GUI tests.
-FULL_MIN_CASES = 284
+# Existing 284-case full baseline plus 14 scanner response-shape regressions.
+FULL_MIN_CASES = 298
 
 
 def _cases(suite: unittest.TestSuite):
