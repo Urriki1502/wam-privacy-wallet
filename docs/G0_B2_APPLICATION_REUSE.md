@@ -29,9 +29,12 @@ node client, signer capability or wallet state.
 - The snapshot is explicitly **diagnostic-only**: merely holding a Python
   `VerifiedCoreProfile` cannot prove the Core binary or confer authorization.
 - Invalid/malformed profile objects are denied before displaying.
-- GUI integration is **not** enabled. Wiring the presenter requires a separate
-  review of concurrency, UI state transitions, stale snapshots and node
-  lifecycle.
+- A **review-only offline Node page integration** may render an externally
+  supplied, exact `NodeOverview` as an UNVERIFIED point-in-time diagnostic;
+  it never constructs or retains a Core profile, node connection or RPC client.
+  The Overview still reports DISCONNECTED and no wallet is loaded. This is
+  neither a real node lifecycle nor Core attestation: stale snapshots, real
+  concurrency and trusted-source qualification remain separate release gates.
 - Do not feed a stale snapshot into Scanner, Signer or a policy decision.
 - No silent hosted scanner fallback or auto-approved mainnet mode.
 - WSP-1 PR #3, Phase 010 PR #16, real Core E2E issue #9 and Win32 release
