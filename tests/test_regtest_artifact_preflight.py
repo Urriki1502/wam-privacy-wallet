@@ -59,6 +59,23 @@ class RegtestBinaryArtifactPreflightTests(unittest.TestCase):
         self.assertIs(evidence.execution_allowed, False)
         self.assertIs(evidence.binary_source_equivalence_verified, False)
 
+    def test_direct_evidence_digest_must_be_canonical_not_attestation(self):
+        for invalid in (None, True, b"0" * 64, "", "f" * 63,
+                        "F" * 64, "g" * 64, "f" * 64 + "\\n"):
+            with self.subTest(value=repr(invalid)):
+                with self.assertRaisesRegex(
+                    ValueError, "^G1_LOCAL_EVIDENCE_DIGEST_INVALID$"
+                ):
+                    LocalHashEvidence(invalid)
+        direct = LocalHashEvidence(self.digest)
+        self.assertEqual(direct.sha256, self.digest)
+        self.assertFalse(direct.execution_allowed)
+        self.assertFalse(direct.publisher_identity_verified)
+        with self.assertRaisesRegex(
+            ValueError, "^G1_LOCAL_EVIDENCE_DIGEST_INVALID$"
+        ):
+            replace(direct, sha256="invalid")
+
     def test_preflight_replace_cannot_escalate_qualification(self):
         evidence = evaluate_local_binary(self.binary, self.digest)
         for field_name, forged_value in (
