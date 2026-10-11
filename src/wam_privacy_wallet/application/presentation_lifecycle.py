@@ -14,6 +14,7 @@ from .node_status import NodeOverview
 from .recovery_transition import OfflineRecoveryTransition
 from .offline_resume_review import OfflineResumeReview
 from .offline_rescan_segments import OfflineRescanSegments
+from .offline_reorg_reconciliation import OfflineReorgReconciliation
 from .policy_evidence import SyntheticPolicyReport
 from .privacy_readiness import PrivacyResearchSnapshot
 from .receive_vector import ReceiveVectorPreview, _FIXED_FINGERPRINT
@@ -44,6 +45,11 @@ class OfflinePresentationState:
     ] = "ABSENT"
     rescan: Literal[
         "ABSENT", "NO_SEGMENTS", "CONTIGUOUS_UNVERIFIED", "REPLAY_NOT_APPLIED",
+    ] = "ABSENT"
+    reorg: Literal[
+        "ABSENT", "NO_PROGRESS_EVIDENCE", "CONTIGUOUS_BUT_UNVERIFIED",
+        "REPLAY_NOT_DOUBLE_COUNTED", "ROLLBACK_RESCAN_REVIEW",
+        "MIGRATION_RESCAN_REVIEW",
     ] = "ABSENT"
 
 
@@ -210,6 +216,80 @@ def _valid_rescan(value: object) -> bool:
     return value.disposition == "CONTIGUOUS_UNVERIFIED"
 
 
+def _valid_reorg(value: object) -> bool:
+    """Only bounded, non-authorizing synthetic reconciliation projections."""
+    if type(value) is not OfflineReorgReconciliation:
+        return False
+    if (
+        type(value.revision) is not int or not 1 <= value.revision < 2**63
+        or type(value.claimed_start_height) is not int
+        or type(value.claimed_end_height) is not int
+        or not 0 <= value.claimed_start_height <= value.claimed_end_height <= 100_000_000
+        or type(value.unique_segments) is not int
+        or type(value.replay_segments) is not int
+        or not 0 <= value.unique_segments <= 8
+        or not 0 <= value.replay_segments <= 1
+        or value.unique_segments + value.replay_segments > 8
+        or not value.unique_segments <= (
+            value.claimed_end_height - value.claimed_start_height
+        ) <= 16 * value.unique_segments
+        or type(value.status) is not str
+        or value.status != "REORG_RECONCILIATION_UNTRUSTED"
+        or type(value.verdict) is not str
+        or value.chain_verified is not False
+        or value.checkpoint_durable is not False
+        or value.restart_authorized is not False
+        or value.rescan_authorized is not False
+        or value.scanner_enabled is not False
+        or value.wallet_enabled is not False
+        or value.release_allowed is not False
+    ):
+        return False
+    if value.verdict == "NO_PROGRESS_EVIDENCE":
+        return value.unique_segments == 0 and value.replay_segments == 0
+    if value.verdict == "CONTIGUOUS_BUT_UNVERIFIED":
+        return value.unique_segments > 0 and value.replay_segments == 0
+    if value.verdict == "REPLAY_NOT_DOUBLE_COUNTED":
+        return value.unique_segments > 0 and value.replay_segments == 1
+    return value.verdict in ("ROLLBACK_RESCAN_REVIEW", "MIGRATION_RESCAN_REVIEW")
+
+
+def _matched_reorg(reorg: OfflineReorgReconciliation, *,
+                   resume: object, rescan: object, recovery: object) -> bool:
+    if resume is not None:
+        expected_verdicts = {
+            "REVALIDATE_BEFORE_RESCAN": (
+                "NO_PROGRESS_EVIDENCE", "CONTIGUOUS_BUT_UNVERIFIED",
+                "REPLAY_NOT_DOUBLE_COUNTED",
+            ),
+            "REWIND_RESCAN_REVIEW": ("ROLLBACK_RESCAN_REVIEW",),
+            "MIGRATION_RESCAN_REVIEW": ("MIGRATION_RESCAN_REVIEW",),
+        }
+        if (reorg.revision != resume.revision
+                or reorg.verdict not in expected_verdicts[resume.action]):
+            return False
+    if rescan is not None:
+        if (
+            reorg.revision != rescan.revision
+            or reorg.claimed_start_height != rescan.start_height
+            or reorg.claimed_end_height != rescan.observed_end_height
+            or reorg.unique_segments != rescan.unique_segment_count
+            or reorg.replay_segments != rescan.replay_count
+        ):
+            return False
+    if recovery is not None:
+        expected_recovery = {
+            "NO_PROGRESS_EVIDENCE": "REVIEW_ONLY_NOT_VERIFIED",
+            "CONTIGUOUS_BUT_UNVERIFIED": "REVIEW_ONLY_NOT_VERIFIED",
+            "REPLAY_NOT_DOUBLE_COUNTED": "REVIEW_ONLY_NOT_VERIFIED",
+            "ROLLBACK_RESCAN_REVIEW": "RESCAN_REQUIRED",
+            "MIGRATION_RESCAN_REVIEW": "MIGRATION_RESCAN_REQUIRED",
+        }
+        if expected_recovery[reorg.verdict] != recovery.decision:
+            return False
+    return True
+
+
 class OfflinePresentationController:
     """Whole-view replacements with revision checks and fail-closed rejection.
 
@@ -244,6 +324,7 @@ class OfflinePresentationController:
         recovery: object = None,
         resume: object = None,
         rescan: object = None,
+        reorg: object = None,
     ) -> OfflinePresentationState:
         if type(expected_revision) is not int or expected_revision != self._state.revision:
             self._reject()
@@ -259,6 +340,10 @@ class OfflinePresentationController:
                 rescan.revision != resume.revision
                 or rescan.resume_action != resume.action
             ))
+            or (reorg is not None and not _valid_reorg(reorg))
+            or (reorg is not None and not _matched_reorg(
+                reorg, resume=resume, rescan=rescan, recovery=recovery
+            ))
         ):
             self._reject()
         self._state = OfflinePresentationState(
@@ -271,5 +356,6 @@ class OfflinePresentationController:
             recovery.decision if recovery is not None else "ABSENT",
             resume.action if resume is not None else "ABSENT",
             rescan.disposition if rescan is not None else "ABSENT",
+            reorg.verdict if reorg is not None else "ABSENT",
         )
         return self._state
