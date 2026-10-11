@@ -17,6 +17,10 @@ GUI_TEST_IDS = frozenset({
     "test_gui_shell.GuiShellSmokeTests.test_lifecycle_reset_invalidates_revision_and_all_panels",
     "test_gui_shell.GuiShellSmokeTests.test_lifecycle_replacement_does_not_retain_omitted_evidence",
     "test_gui_shell.GuiShellSmokeTests.test_lifecycle_render_failure_clears_and_invalidates",
+    "test_gui_shell.GuiShellSmokeTests.test_legacy_presenter_replaces_managed_snapshot_atomically",
+    "test_gui_shell.GuiShellSmokeTests.test_legacy_clear_invalidates_all_panels_and_prior_revision",
+    "test_gui_shell.GuiShellSmokeTests.test_legacy_invalid_input_does_not_mutate_accepted_state",
+    "test_gui_shell.GuiShellSmokeTests.test_legacy_demo_routes_through_controller_single_writer",
 })
 # Security-critical original non-GUI identities; additive to original suite floors.
 CRITICAL_NON_GUI_IDS = frozenset({
@@ -27,8 +31,8 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_rpc_qualification_prep.RpcQualificationPreparationTests.test_fake_approval_release_or_core_execution_denied",
     "test_ci_contract_gate.MandatoryOfflineContractGateTests.test_minimum_case_floors_pinned_for_all_mandatory_suites",
 })
-# Existing 284-case floor + 10 lifecycle contracts + 5 lifecycle GUI cases.
-FULL_MIN_CASES = 299
+# Existing 284-case floor + 10 lifecycle contracts + 9 lifecycle GUI cases.
+FULL_MIN_CASES = 303
 
 
 def _cases(suite: unittest.TestSuite):
