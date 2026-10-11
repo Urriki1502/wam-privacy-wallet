@@ -3,8 +3,9 @@
 ## Scope
 
 A single PySide6 / Qt desktop shell supports Windows and macOS. The pages are
-Overview, Receive, Send, Privacy, Node and Recovery. Navigation changes only
-which static explanation is displayed.
+Overview, Receive, Send, Privacy, Node and Recovery. Receive, Send and
+Recovery remain disabled placeholders. Node and Privacy support explicit,
+non-authorizing in-memory research diagnostic views.
 
 ## Incremental offline application integration
 
@@ -20,6 +21,14 @@ not retain the profile or snapshot and cannot grant scanner/signer authority.
 Callers are **not** authenticated, so the UI cannot attest freshness, origin,
 or correctness of a presented value. The existing frozen WSP-1 adapter remains
 unmerged and untouched.
+
+The Privacy page can also accept a strict immutable research-only snapshot from
+`application.privacy_readiness.research_readiness(manifest, ledger)`, composed
+from **injected** WSP source-pin inventory plus blocked security gate records.
+It labels the pin UNATTESTED, the privacy/PayJoin/network modules MODEL_ONLY,
+and scan/sign/send BLOCKED; reset clears the view. The GUI never reads source
+files or imports the upstream implementations itself. See
+[Application research readiness](APP_PRIVACY_RESEARCH_READINESS.md).
 
 ## Explicit non-features
 
@@ -38,8 +47,8 @@ status. Neither value is a measurement of the user's actual WAM node.
 - `test_scaffold.py` remains dependency-free, so foundation CI works independently.
 - `test_gui_shell.py` constructs Qt's real widgets headlessly and verifies navigation,
   nonproduction wording, offline placeholders, and absence of transaction buttons.
-- `gui-shell-ci.yml` installs the optional GUI extra and runs both suites on
-  GitHub-hosted Windows, macOS, and Ubuntu runners.
+- `wallet-ci.yml` installs the optional GUI extra, enforces the fail-closed
+  discovery floor, and runs offline smoke suites on Windows/macOS/Ubuntu.
 - A green GUI CI is a cross-platform smoke test, not evidence of wallet correctness,
   secure key management, release installation, or end-to-end mainnet support.
 
