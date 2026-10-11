@@ -156,3 +156,49 @@ Wallet CI 8/8 and CodeQL Python + Actions 2/2 on the exact modified SHA.
 The existing unconditional Core launch interlock is **not** removed.
 The actual signed distribution must still be reviewed by DEV WAM, including
 revocation and source/build provenance, before considering genuine runtime.
+
+## Signed-claimed WAM Core archive inventory — read-only review
+
+`node/core_archive_inventory.py` is a streaming ZIP/TAR.GZ **inventory
+reader**, not an extractor. It accepts a caller-provided
+`SignedDistributionEvidence` receipt but explicitly does **not trust** that
+receipt as proof a real WAM key signed the bytes: Python callers can construct
+a lookalike receipt. It independently compares the complete archive's SHA-256
+via nonexecuting staging and then inspects only the validated snapshot.
+
+The expected canonical node entries (per WAM Core release packaging and
+START_HERE) are `wam-coin-v0.1.11/bin/wamd` for Linux/macOS and
+`wam-coin-v0.1.11/bin/wamd.exe` for the Windows ZIP. Nothing is written to
+a destination, installed or executed. Entries are streamed in bounded chunks
+to derive the exact *member-content* SHA-256, size and bounded inventory
+counts; no extracted file or binary path is returned.
+
+Fail-closed guards: strict relative portable names with exact package root;
+reject `..`, `.`, absolute paths, drive prefixes, backslashes, embedded
+control chars, ambiguous Unicode, casefold duplicate names, symlink/hardlink,
+special files, unsupported ZIP encryption/compression, Windows/Unix symlinks,
+missing or empty node, wrong archive SHA, corrupt/truncated container,
+>64 members, >128 MiB single member, >256 MiB declared total expansion and
+ZIP member compression ratio above 400:1. TAR metadata is processed through
+Python `tarfile` and content hash reading is bounded; this is not a
+complete decompression-bomb defense for untrusted arbitrarily large archives
+or a substitute for a kernel-enforced sandbox.
+
+**Non-authority explicitly enforced:** output is
+`UNTRUSTED_ARCHIVE_INVENTORY`, with
+`archive_signer_revalidated=False`, `extracted_binary_verified=False`,
+`execution_identity_bound=False`, `core_execution_allowed=False`,
+`mainnet_allowed=False`, `real_wallet_allowed=False`. Observing an ELF/PE
+magic or matching an entry hash cannot assert publisher/build provenance or
+safe execution.
+
+Added **23 adversarial TAR/ZIP test cases** (incl. cross-platform archive
+names, traversal, symlink, collision, budget and no-extraction/no-socket/no
+subprocess tests); additive qualification floor **28 mandatory suites**,
+**364 full-discovery tests** on all three GUI hosts. Real GnuPG test with
+disposable synthetic key also stays mandatory in Ubuntu native CI.
+
+**Still blocked:** actual official WAM v0.1.11 signed checksum material has
+not been verified, source-to-packaged-node binding and exact OS executable
+identity/TOCTOU #36 remain unqualified. All actual WAM Core launches remain
+unconditionally denied. No real-money/mainnet wallet transactions.
