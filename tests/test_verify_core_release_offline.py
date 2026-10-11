@@ -22,7 +22,7 @@ from wam_privacy_wallet.node.core_signed_release import (
 )
 
 ARCHIVE = "wam-coin-v0.1.11-arm64-apple-darwin.tar.gz"
-ABS = "/opt/wam-review/"
+ABS = str(Path.cwd() / "wam-review-fixtures") + "/"\nGPG = str(Path.cwd() / "review-only-gpg-executable")
 
 
 def files(name=ARCHIVE):
@@ -31,7 +31,7 @@ def files(name=ARCHIVE):
         "key": ABS + "SIGNING-KEY.asc",
         "checksums": ABS + "SHA256SUMS",
         "signature": ABS + "SHA256SUMS.asc",
-        "gpg": "/usr/bin/gpg",
+        "gpg": GPG,
     }
 
 
@@ -91,7 +91,7 @@ class OfficialReleaseReviewCliTests(unittest.TestCase):
         self.assertIs(out["core_execution_allowed"], False)
         opts = verify.call_args.kwargs
         self.assertEqual(opts["archive_name"], ARCHIVE)
-        self.assertEqual(opts["gpg_executable"], Path("/usr/bin/gpg"))
+        self.assertEqual(opts["gpg_executable"], Path(GPG))
         self.assertEqual(inspect.call_args.kwargs["signed_receipt"], signed())
         self.assertEqual(inspect.call_args.kwargs["archive"], Path(ABS + ARCHIVE))
 
