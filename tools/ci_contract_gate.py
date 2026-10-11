@@ -41,6 +41,7 @@ MINIMUM_CASES = {
     "test_app_receive_public_vector.py": 12,
     "test_offline_recovery_disposition.py": 18,
     "test_offline_recovery_transition.py": 16,
+    "test_offline_resume_review.py": 19,
 }
 MANDATORY_SUITES = tuple(MINIMUM_CASES)
 
