@@ -143,6 +143,29 @@ class OfflineIntegrationStatusTests(unittest.TestCase):
                     replace(presentation().state, revision=revision)
                 )
 
+    def test_cleared_or_rejected_state_cannot_claim_evidence(self):
+        for transition in ("CLEARED", "REJECTED"):
+            original = presentation().reset()
+            contradictory = replace(original, transition=transition, node="UNVERIFIED")
+            with self.subTest(transition=transition), self.assertRaisesRegex(
+                OfflineIntegrationStatusError,
+                "^APP_INTEGRATION_PRESENTATION_DENIED$",
+            ):
+                inspect_offline_integration(contradictory)
+
+    def test_initial_and_replaced_revision_order_cannot_be_forged(self):
+        initial = presentation().state
+        for invalid in (
+            replace(initial, revision=1),
+            replace(initial, transition="REPLACED"),
+            replace(initial, transition="CLEARED"),
+        ):
+            with self.subTest(state=invalid), self.assertRaisesRegex(
+                OfflineIntegrationStatusError,
+                "^APP_INTEGRATION_PRESENTATION_DENIED$",
+            ):
+                inspect_offline_integration(invalid)
+
     def test_foreign_scan_summary_and_subclass_denied(self):
         class ForgedScan(OfflineScanWindowSummary):
             pass
