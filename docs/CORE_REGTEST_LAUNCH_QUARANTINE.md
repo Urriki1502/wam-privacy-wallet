@@ -67,3 +67,46 @@ REGTEST-only true E2E. No WAM Core consensus/source change is authorized.
 `main`. Does not modify held #50/#51, frozen WSP wallet #3/scanner #16 or
 ready-for-owner-review combined application #67. Owner alone makes development
 PR approval decisions; DEV WAM owns subsequent production review.
+
+## Additive cross-boundary source/bytes qualification (11 Oct 2026)
+
+The new `node/core_candidate_bridge.py` combines two independent,
+previously separate **untrusted** review operations: strict
+`provenance_intake.intake_core_artifact()` metadata schema checking and
+`core_artifact_staging.stage_untrusted_core_artifact()` bounded, read-only
+byte snapshotting. The bridge requires the candidate's pinned reviewed
+source *claim*, release format and candidate binary SHA, requires that its
+declared platform matches the actual Python host/process architecture
+(including native Windows 32-bit vs 64-bit), and compares the declared SHA
+to file bytes. No API parameter can override the actual runtime platform.
+
+There is **NO trusted DEV WAM publisher public key, signed release manifest,
+reproducible build attestation or approved binary digest** in this workflow;
+matching the intake's repository/commit or a caller-chosen digest is NOT
+proof of publisher authenticity, actual build provenance or executable
+identity. Every result remains `UNTRUSTED_CANDIDATE_REVIEW_ONLY` and
+`OFFLINE_STAGED_UNTRUSTED`. The unconditional real-Core launch interlock
+remains intact.
+
+The staging component additionally rejects Windows
+`FILE_ATTRIBUTE_REPARSE_POINT` metadata (even when file type otherwise
+appears regular), rejects custom `__fspath__` hooks and checks file identity
+and SHA **again on normal exit from the review context**, rejecting a
+modified or replaced staged file. This is best-effort tamper detection, not
+a security boundary against same-user attackers or an OS-guaranteed snapshot.
+No executable gets launched and no signed binary provenance is claimed.
+
+**New additive gates:** 4 extra staging cases + 14 cross-module candidate
+cases = **18 new tests**, pinned in **26 mandatory suites** with full GUI-host
+discovery minimum **321** (26 pre-existing GUI tests). Critical cases include
+host-tag mismatch before any file read, post-review same-size byte mutation,
+Windows reparse flag and nonauthorizing matching metadata.
+Exactly 8 native Wallet CI jobs plus 2 CodeQL analyses must pass on the
+*new* exact HEAD. Old `25/303` evidence belongs only to earlier commits.
+
+**Next trust-root requirement for DEV WAM:** provide authenticated official
+release identity (trusted publisher key or independently reviewed signed
+release manifest), exact candidate binary digest, source/build mapping,
+platform distribution and approved regtest genesis/profile. Then design a
+platform-qualified launcher binding those bytes to the process image while
+preserving the deny-mainnet gate. Until then issue #36 stays BLOCKED.
