@@ -75,7 +75,9 @@ def stage_untrusted_core_artifact(
     if type(claimed_sha256) is not str or _SHA.fullmatch(claimed_sha256) is None:
         raise CoreArtifactStagingError("CORE_STAGE_DIGEST_DENIED")
     # Arbitrary __fspath__ user code is outside the trusted API boundary.
-    if type(source) not in (str, Path):
+    # pathlib.Path() constructs PosixPath or WindowsPath, not the Path
+    # factory class itself. Accept only those exact native types and str.
+    if type(source) not in (str, type(Path())):
         raise CoreArtifactStagingError("CORE_STAGE_SOURCE_DENIED")
     try:
         candidate = Path(source)
