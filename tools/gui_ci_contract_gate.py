@@ -29,9 +29,12 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_offline_resume_review.OfflineResumeReviewTests.test_matching_crash_never_auto_resumes",
     "test_offline_resume_review.OfflineResumeReviewTests.test_legacy_to_v3_never_proves_migration",
     "test_offline_resume_review.OfflineResumeReviewTests.test_no_file_socket_process_or_wsp_imports",
+    "test_offline_rescan_segments.OfflineRescanSegmentsTests.test_exact_immediate_replay_does_not_double_count",
+    "test_offline_rescan_segments.OfflineRescanSegmentsTests.test_hash_identity_cannot_cycle_back_to_earlier_anchor",
+    "test_offline_rescan_segments.OfflineRescanSegmentsTests.test_output_immutable_no_sensitive_values_or_io",
 })
 # Existing 284-case full baseline + 18 offline recovery disposition cases.
-FULL_MIN_CASES = 337
+FULL_MIN_CASES = 360
 
 
 def _cases(suite: unittest.TestSuite):
