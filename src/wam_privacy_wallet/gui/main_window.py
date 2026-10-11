@@ -276,15 +276,28 @@ class MainWindow(QMainWindow):
         return self._offline_controller.state
 
     def _clear_managed_panels(self) -> None:
-        """Internal view reset: does not independently advance a revision."""
+        """Attempt ALL panel resets and signal any failure without leaking Qt details.
+
+        Partial cleanup is never silently accepted; a broken label setter must
+        not stop the other three panels from being cleared.
+        """
         self._managed_render_depth += 1
+        failed = False
         try:
-            self.clear_offline_node_snapshot()
-            self.clear_offline_privacy_readiness()
-            self.clear_offline_policy_report()
-            self.clear_public_receive_vector()
+            for clear in (
+                self.clear_offline_node_snapshot,
+                self.clear_offline_privacy_readiness,
+                self.clear_offline_policy_report,
+                self.clear_public_receive_vector,
+            ):
+                try:
+                    clear()
+                except Exception:
+                    failed = True
         finally:
             self._managed_render_depth -= 1
+        if failed:
+            raise OfflineLifecycleError("APP_OFFLINE_RENDER_DENIED") from None
 
     def clear_offline_presentation(self) -> None:
         """Invalidate revisions and clear every research evidence panel."""
@@ -302,27 +315,38 @@ class MainWindow(QMainWindow):
                 policy=policy, receive=receive,
             )
         except OfflineLifecycleError:
-            self._clear_managed_panels()
+            # Validation already rejected the revision; still clear every
+            # panel even if a broken widget raises while clearing.
+            try:
+                self._clear_managed_panels()
+            except OfflineLifecycleError:
+                pass
             raise
-        self._clear_managed_panels()
-        self._managed_render_depth += 1
         try:
-            if state.node == "UNVERIFIED":
-                self.present_offline_node_snapshot(node)
-            if state.privacy == "RESEARCH_ONLY":
-                self.present_offline_privacy_readiness(privacy)
-            if state.policy == "MODEL_ONLY":
-                self.present_offline_policy_report(policy)
-            if state.receive == "PUBLIC_FIXTURE":
-                self.present_public_receive_vector(receive)
-        except Exception:
-            # Presentation can fail after the controller committed a revision.
-            # Never leave a partial GUI with a falsely accepted state.
-            self._offline_controller.reset()
+            # Reset is part of the guarded transition: previously a failure
+            # here escaped before the controller revision was invalidated.
             self._clear_managed_panels()
+            self._managed_render_depth += 1
+            try:
+                if state.node == "UNVERIFIED":
+                    self.present_offline_node_snapshot(node)
+                if state.privacy == "RESEARCH_ONLY":
+                    self.present_offline_privacy_readiness(privacy)
+                if state.policy == "MODEL_ONLY":
+                    self.present_offline_policy_report(policy)
+                if state.receive == "PUBLIC_FIXTURE":
+                    self.present_public_receive_vector(receive)
+            finally:
+                self._managed_render_depth -= 1
+        except Exception:
+            # Presentation or reset can fail after a revision was accepted.
+            # Invalidate it, attempt every panel reset, and redact the error.
+            self._offline_controller.reset()
+            try:
+                self._clear_managed_panels()
+            except OfflineLifecycleError:
+                pass
             raise OfflineLifecycleError("APP_OFFLINE_RENDER_DENIED") from None
-        finally:
-            self._managed_render_depth -= 1
 
     def present_offline_node_snapshot(self, snapshot: object) -> None:
         """Display a non-authorizing, unverified projection; no node/RPC access.
