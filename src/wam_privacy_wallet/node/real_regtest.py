@@ -120,15 +120,15 @@ def _read_cookie(path: Path) -> ExplicitRpcAuth:
             if (not identical(opened, held) or not identical(held, after)
                     or len(raw) != opened.st_size):
                 raise RealRegtestError("CORE_COOKIE_CHANGED")
-        if (not 1 <= len(raw) <= 1024
-                or raw.count(b":") != 1
-                or any(ch in raw for ch in (b"\x00", b"\r"))):
+        if (not 1 <= len(raw) <= 1024 or raw.count(b":") != 1
+                or b"\x00" in raw):
             raise RealRegtestError("CORE_COOKIE_INVALID")
-        # WAM/Bitcoin cookies are ASCII "<username>:<password>", with no
-        # trailing newline in the generated file; do not strip whitespace or
-        # silently reinterpret malformed credential bytes.
-        credential_bytes = raw[:-1] if raw.endswith(b"\n") else raw
-        if b"\n" in credential_bytes:
+        # Accept at most one line ending at EOF for legacy harnesses, where
+        # Windows text mode writes CRLF. Never use unbounded strip() or accept
+        # embedded control characters in the actual username/password.
+        credential_bytes = (raw[:-2] if raw.endswith(b"\r\n")
+                            else raw[:-1] if raw.endswith(b"\n") else raw)
+        if b"\n" in credential_bytes or b"\r" in credential_bytes:
             raise RealRegtestError("CORE_COOKIE_INVALID")
         username, password = credential_bytes.decode("ascii").split(":", 1)
         return ExplicitRpcAuth(username, password)
