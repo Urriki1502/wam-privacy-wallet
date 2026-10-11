@@ -84,3 +84,20 @@ logs DO NOT qualify any updated HEAD. Obtain new 8/8 Wallet CI job evidence
 including Win x86/x64, macOS and three GUI hosts, then independently verify
 CodeQL Python and Actions and an eligible reviewer before considering any
 merge. Governance #35, WAM Core #36 and frozen/held PR boundaries still apply.
+
+## 11 Oct follow-up: repeated block identity review
+
+A review of the stacked offline scanner-window contract detected that a
+self-consistent previous-hash chain could still repeat the same block hash
+at two heights, or reuse its ancestor anchor as a new block. This is a
+synthetic input consistency defect (not an observed chain attack).
+The original scanner window PR #65 is patched first with
+`SCAN_WINDOW_DUPLICATE_BLOCK_HASH` and a negative test; the same exact
+validator/test improvement is mirrored into this #67 integration candidate.
+Its window mandatory floor is **19**, and **current cumulative thresholds**
+become **29 mandatory suites / at least 377 full-discovery tests**. All older
+29/376 and 28/356 green check results belong to older commit SHAs, and
+MUST NOT be reused as qualification of the newest HEAD.
+
+All prior real-Core, CodeQL, independent review and main ruleset blockers
+remain unaltered. This negative test does not enable a scanner or node.
