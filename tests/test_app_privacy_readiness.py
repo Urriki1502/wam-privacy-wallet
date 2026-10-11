@@ -62,17 +62,19 @@ class OfflinePrivacyReadinessTests(unittest.TestCase):
                 self.deny(manifest=corrupted)
 
     def test_exact_pinned_wsp_and_silent_wallet_sources_are_required(self):
-        for field, value in (
-            ("commit_sha", "0" * 40),
-            ("blob_sha", "BAD"),
-            ("source_path", "src/../secrets.py"),
-            ("repository", "untrusted/repo"),
-            ("status", "APPROVED"),
-        ):
-            with self.subTest(field=field):
-                corrupted = copy.deepcopy(self.manifest)
-                corrupted["candidates"][0][field] = value
-                self.deny(manifest=corrupted)
+        for index in (0, 7):  # WSP API and Silent Wallet node candidates
+            for field, value in (
+                ("commit_sha", "0" * 40),
+                ("blob_sha", "BAD"),
+                ("blob_sha", "0" * 40),  # well-formed but wrong Git blob SHA
+                ("source_path", "src/../secrets.py"),
+                ("repository", "untrusted/repo"),
+                ("status", "APPROVED"),
+            ):
+                with self.subTest(candidate=index, field=field, value=value):
+                    corrupted = copy.deepcopy(self.manifest)
+                    corrupted["candidates"][index][field] = value
+                    self.deny(manifest=corrupted)
 
     def test_manifest_missing_duplicate_or_unexpected_candidate_is_denied(self):
         for bad in ({}, [], None, True, {"schema": "fake"}):
