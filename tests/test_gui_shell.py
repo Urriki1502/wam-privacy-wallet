@@ -8,6 +8,9 @@ from pathlib import Path
 from wam_privacy_wallet.application.privacy_readiness import (
     PrivacyResearchSnapshot, research_readiness,
 )
+from wam_privacy_wallet.application.policy_evidence import (
+    SyntheticPolicyReport, inspect_synthetic_policy_evidence,
+)
 
 from wam_privacy_wallet.application.node_status import NodeOverview, node_overview
 from wam_privacy_wallet.node.attestation import ChainIdentity, WAM_REGTEST_GENESIS
@@ -188,6 +191,77 @@ class GuiShellSmokeTests(unittest.TestCase):
         self.assertNotIn("DO_NOT_DISPLAY", self.window.privacy_readiness_notice.text())
         self.window.clear_offline_privacy_readiness()
         self.assertEqual(self.window.privacy_readiness_status.text(), "RESEARCH INVENTORY · NOT LOADED")
+
+
+    def test_privacy_model_panel_starts_disabled_without_evidence(self) -> None:
+        self.assertEqual(self.window.privacy_policy_status.text(), "NO SYNTHETIC POLICY EVIDENCE")
+        self.assertIn("NOT AUTHORIZED", self.window.privacy_policy_notice.text())
+        self.assertEqual(self.window.findChildren(QPushButton), [])
+
+    def test_synthetic_network_and_payjoin_models_display_only_as_untrusted(self) -> None:
+        network = {
+            "schema": 1, "scan_route": "local", "broadcast_route": "tor",
+            "broadcast_encrypted": False, "async_payjoin": False,
+            "payjoin_route": None, "direct_fallback_present": False, "result": "PASS",
+        }
+        payjoin = {
+            "schema": 1, "receiver_inputs_added": 1, "output_substitution": False,
+            "sender_fee_contribution_used": False, "absolute_fee_increased": True,
+            "result": "PASS",
+        }
+        report = inspect_synthetic_policy_evidence(network, payjoin)
+        self.window.present_offline_policy_report(report)
+        self.window.navigation.setCurrentRow(3)
+        self.assertIn("UNTRUSTED", self.window.privacy_policy_status.text())
+        self.assertIn("NOT AUTHORIZED", self.window.privacy_policy_status.text())
+        self.assertIn("NO RPC / SIGN / SEND", self.window.privacy_policy_notice.text())
+        self.assertEqual(self.window.node_status.text(), "DISCONNECTED · NO RPC")
+        self.assertEqual(self.window.session_status.text(), "NO WALLET LOADED")
+        self.assertEqual(self.window.findChildren(QPushButton), [])
+
+    def test_forged_synthetic_policy_report_and_subclass_denied_without_display(self) -> None:
+        accepted = SyntheticPolicyReport(
+            "PIN_RECORDED_UNATTESTED", "MODEL_PASS_UNTRUSTED",
+            "MODEL_PASS_UNTRUSTED", "MODEL_ONLY_NO_AUTHORITY",
+            "BLOCKED", "BLOCKED", "BLOCKED",
+        )
+        class Forged(SyntheticPolicyReport):
+            pass
+        invalid_values = (
+            None, {"secret": "DO_NOT_DISPLAY"},
+            Forged(*tuple(getattr(accepted, name) for name in
+                ("provenance", "network", "payjoin", "authority", "scan", "sign", "send"))),
+            SyntheticPolicyReport(
+                "PIN_RECORDED_UNATTESTED", "MODEL_PASS_UNTRUSTED",
+                "MODEL_PASS_UNTRUSTED", "CAN_SIGN", "BLOCKED", "BLOCKED", "BLOCKED"),
+            SyntheticPolicyReport(
+                "PIN_RECORDED_UNATTESTED", "MODEL_PASS_UNTRUSTED",
+                "MODEL_PASS_UNTRUSTED", "MODEL_ONLY_NO_AUTHORITY", "BLOCKED", "READY", "BLOCKED"),
+            SyntheticPolicyReport(
+                "PIN_RECORDED_UNATTESTED", "MODEL_PASS_UNTRUSTED",
+                "MODEL_PASS_UNTRUSTED", "MODEL_ONLY_NO_AUTHORITY", "BLOCKED", True, "BLOCKED"),
+        )
+        self.window.present_offline_policy_report(accepted)
+        before = self.window.privacy_policy_status.text()
+        for item in invalid_values:
+            with self.subTest(kind=type(item).__name__):
+                with self.assertRaisesRegex(ValueError, "^APP_GUI_SYNTHETIC_POLICY_DENIED$"):
+                    self.window.present_offline_policy_report(item)
+                self.assertEqual(self.window.privacy_policy_status.text(), before)
+        self.assertNotIn("DO_NOT_DISPLAY", self.window.privacy_policy_notice.text())
+
+    def test_policy_report_reset_never_affects_other_diagnostics(self) -> None:
+        report = SyntheticPolicyReport(
+            "PIN_RECORDED_UNATTESTED", "MODEL_PASS_UNTRUSTED",
+            "MODEL_PASS_UNTRUSTED", "MODEL_ONLY_NO_AUTHORITY", "BLOCKED", "BLOCKED", "BLOCKED",
+        )
+        self.window.present_offline_policy_report(report)
+        self.assertFalse(any(value is report for value in vars(self.window).values()))
+        self.window.clear_offline_policy_report()
+        self.assertEqual(self.window.privacy_policy_status.text(), "NO SYNTHETIC POLICY EVIDENCE")
+        self.assertIn("NOT AUTHORIZED", self.window.privacy_policy_notice.text())
+        self.assertEqual(self.window.privacy_readiness_status.text(), "RESEARCH INVENTORY · NOT LOADED")
+        self.assertEqual(self.window.node_status.text(), "DISCONNECTED · NO RPC")
 
 
 if __name__ == "__main__":

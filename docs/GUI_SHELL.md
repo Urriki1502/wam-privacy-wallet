@@ -30,6 +30,19 @@ and scan/sign/send BLOCKED; reset clears the view. The GUI never reads source
 files or imports the upstream implementations itself. See
 [Application research readiness](APP_PRIVACY_RESEARCH_READINESS.md).
 
+## Synthetic privacy policy evidence (research-only)
+
+The Privacy page has a **separate, non-authorizing policy evidence panel**.
+`MainWindow.present_offline_policy_report(report)` accepts only an exact,
+immutable `SyntheticPolicyReport` validated by a strict mock-schema adapter.
+It displays **SIMULATED / UNTRUSTED / NOT AUTHORIZED** and never retains
+the report or enables a wallet action. Clear with
+`clear_offline_policy_report()`. No SDK, WSP scanner, signer, transaction,
+RPC, transport or external `wam-privacy` implementation is imported.
+
+See [Application Policy Evidence](APP_POLICY_EVIDENCE_OFFLINE.md) for exact
+upstream source pins, trust limitations and negative tests.
+
 ## Explicit non-features
 
 - No WAM SDK, WAM Core RPC, scanner, transaction builder or network requests.

@@ -11,6 +11,7 @@ from PySide6.QtCore import Qt
 
 from wam_privacy_wallet.application.node_status import NodeOverview
 from wam_privacy_wallet.application.privacy_readiness import PrivacyResearchSnapshot
+from wam_privacy_wallet.application.policy_evidence import SyntheticPolicyReport
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -220,6 +221,14 @@ class MainWindow(QMainWindow):
             self.privacy_readiness_notice.setObjectName("smallText")
             self.privacy_readiness_notice.setWordWrap(True)
             column.addWidget(self.privacy_readiness_notice)
+            self.privacy_policy_status = QLabel("NO SYNTHETIC POLICY EVIDENCE")
+            column.addWidget(self._status_card("SYNTHETIC POLICY MODEL", self.privacy_policy_status))
+            self.privacy_policy_notice = QLabel(
+                "PAYJOIN & NETWORK POLICY · NOT AUTHORIZED"
+            )
+            self.privacy_policy_notice.setObjectName("smallText")
+            self.privacy_policy_notice.setWordWrap(True)
+            column.addWidget(self.privacy_policy_notice)
             placeholder = QLabel("SCANNING, SIGNING AND SENDING · BLOCKED")
             placeholder.setObjectName("notice")
             column.addWidget(placeholder)
@@ -315,6 +324,37 @@ class MainWindow(QMainWindow):
         self.privacy_readiness_status.setText("RESEARCH INVENTORY · NOT LOADED")
         self.privacy_readiness_notice.setText(
             "WSP-1, PAYJOIN AND NETWORK PRIVACY · NO ACTIVE INTEGRATION"
+        )
+
+    def present_offline_policy_report(self, report: object) -> None:
+        """Present only fixed model vocabulary; never authorize operations."""
+        if (
+            type(report) is not SyntheticPolicyReport
+            or type(report.provenance) is not str
+            or report.provenance != "PIN_RECORDED_UNATTESTED"
+            or type(report.network) is not str
+            or report.network != "MODEL_PASS_UNTRUSTED"
+            or type(report.payjoin) is not str
+            or report.payjoin != "MODEL_PASS_UNTRUSTED"
+            or type(report.authority) is not str
+            or report.authority != "MODEL_ONLY_NO_AUTHORITY"
+            or type(report.scan) is not str or report.scan != "BLOCKED"
+            or type(report.sign) is not str or report.sign != "BLOCKED"
+            or type(report.send) is not str or report.send != "BLOCKED"
+        ):
+            raise ValueError("APP_GUI_SYNTHETIC_POLICY_DENIED")
+        self.privacy_policy_status.setText(
+            "SIMULATED MODELS · UNTRUSTED · NOT AUTHORIZED"
+        )
+        self.privacy_policy_notice.setText(
+            "NETWORK & PAYJOIN MODEL RESULTS ONLY · NO RPC / SIGN / SEND"
+        )
+
+    def clear_offline_policy_report(self) -> None:
+        """Reset only the synthetic model panel; never persist the input."""
+        self.privacy_policy_status.setText("NO SYNTHETIC POLICY EVIDENCE")
+        self.privacy_policy_notice.setText(
+            "PAYJOIN & NETWORK POLICY · NOT AUTHORIZED"
         )
 
     def _select_page(self, index: int) -> None:
