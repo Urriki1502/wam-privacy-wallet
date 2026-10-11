@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 
-from wam_privacy_wallet.application.presentation_lifecycle import OfflinePresentationController, OfflineLifecycleError, _valid_recovery
+from wam_privacy_wallet.application.presentation_lifecycle import OfflinePresentationController, OfflineLifecycleError, _valid_recovery, _valid_resume
 from wam_privacy_wallet.application.node_status import NodeOverview
 from wam_privacy_wallet.application.privacy_readiness import PrivacyResearchSnapshot
 from wam_privacy_wallet.application.policy_evidence import SyntheticPolicyReport
@@ -260,6 +260,16 @@ class MainWindow(QMainWindow):
             self.recovery_review_notice.setObjectName("smallText")
             self.recovery_review_notice.setWordWrap(True)
             column.addWidget(self.recovery_review_notice)
+            self.resume_review_status = QLabel("RESUME DISABLED · NO RESTART EVIDENCE")
+            column.addWidget(self._status_card(
+                "RESTART / RESCAN · SYNTHETIC REVIEW", self.resume_review_status
+            ))
+            self.resume_review_notice = QLabel(
+                "NO AUTOMATIC RESUME · NO DATABASE WRITER OR LIVE SCANNER"
+            )
+            self.resume_review_notice.setObjectName("smallText")
+            self.resume_review_notice.setWordWrap(True)
+            column.addWidget(self.resume_review_notice)
             placeholder = QLabel("REAL BACKUP, RESTORE AND MIGRATION · BLOCKED")
             placeholder.setObjectName("notice")
             column.addWidget(placeholder)
@@ -293,7 +303,7 @@ class MainWindow(QMainWindow):
         """Attempt ALL panel resets and signal any failure without leaking Qt details.
 
         Partial cleanup is never silently accepted; a broken label setter must
-        not stop the other four panels from being cleared.
+        not stop the other five panels from being cleared.
         """
         self._managed_render_depth += 1
         failed = False
@@ -304,6 +314,7 @@ class MainWindow(QMainWindow):
                 self.clear_offline_policy_report,
                 self.clear_public_receive_vector,
                 self.clear_offline_recovery_review,
+                self.clear_offline_resume_review,
             ):
                 try:
                     clear()
@@ -322,13 +333,13 @@ class MainWindow(QMainWindow):
     def replace_offline_presentation(
         self, expected_revision: object, *, node: object = None,
         privacy: object = None, policy: object = None, receive: object = None,
-        recovery: object = None,
+        recovery: object = None, resume: object = None,
     ) -> None:
-        """Atomically validate all five synthetic DTOs before displaying."""
+        """Atomically validate all six synthetic DTOs before displaying."""
         try:
             state = self._offline_controller.replace(
                 expected_revision, node=node, privacy=privacy,
-                policy=policy, receive=receive, recovery=recovery,
+                policy=policy, receive=receive, recovery=recovery, resume=resume,
             )
         except OfflineLifecycleError:
             # Validation already rejected the revision; still clear every
@@ -354,6 +365,8 @@ class MainWindow(QMainWindow):
                     self.present_public_receive_vector(receive)
                 if state.recovery != "ABSENT":
                     self.present_offline_recovery_review(recovery)
+                if state.resume != "ABSENT":
+                    self.present_offline_resume_review(resume)
             finally:
                 self._managed_render_depth -= 1
         except Exception:
@@ -400,6 +413,39 @@ class MainWindow(QMainWindow):
         self.recovery_review_status.setText("NO OFFLINE RECOVERY EVIDENCE")
         self.recovery_review_notice.setText(
             "NO WALLET RESTORED · NO DATABASE OPENED · SCANNER / SIGNER BLOCKED"
+        )
+
+    def present_offline_resume_review(self, preview: object) -> None:
+        """Show fixed crash/restart guidance, never grant resumable authority."""
+        if not _valid_resume(preview):
+            raise ValueError("APP_GUI_RESUME_REVIEW_DENIED")
+        if not self._managed_render_depth:
+            self.replace_offline_presentation(
+                self._offline_controller.state.revision, resume=preview
+            )
+            return
+        text = {
+            "REVALIDATE_BEFORE_RESCAN":
+                "REVALIDATE CHECKPOINT · RESUME NOT AUTHORIZED",
+            "REWIND_RESCAN_REVIEW":
+                "REWIND / RESCAN REVIEW · NOT STARTED",
+            "MIGRATION_RESCAN_REVIEW":
+                "MIGRATION + RESCAN REVIEW · NOT STARTED",
+        }
+        self.resume_review_status.setText(text[preview.action])
+        self.resume_review_notice.setText(
+            "SYNTHETIC INTERRUPTION ONLY · NO NODE / DB / SCANNER · "
+            "NO AUTOMATIC RESUME"
+        )
+
+    def clear_offline_resume_review(self) -> None:
+        """Clear non-persistent resume research evidence through single writer."""
+        if not self._managed_render_depth:
+            self.clear_offline_presentation()
+            return
+        self.resume_review_status.setText("RESUME DISABLED · NO RESTART EVIDENCE")
+        self.resume_review_notice.setText(
+            "NO AUTOMATIC RESUME · NO DATABASE WRITER OR LIVE SCANNER"
         )
 
     def present_offline_node_snapshot(self, snapshot: object) -> None:
