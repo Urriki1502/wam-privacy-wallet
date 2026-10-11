@@ -99,6 +99,7 @@ def inspect_offline_rescan_segments(
 
     expected = start_height
     prev_hash = None
+    seen_hashes = set()
     previous_segment = None
     unique_count = 0
     replay_count = 0
@@ -127,7 +128,7 @@ def inspect_offline_rescan_segments(
             continue
         if start != expected:
             raise OfflineRescanSegmentsError("RESCAN_GAP_OR_OVERLAP_DENIED")
-        if parent == terminal:
+        if parent == terminal or terminal in seen_hashes or parent in seen_hashes and parent != prev_hash:
             raise OfflineRescanSegmentsError("RESCAN_SEGMENT_CYCLE_DENIED")
         if prev_hash is not None and parent != prev_hash:
             raise OfflineRescanSegmentsError("RESCAN_LINK_CONFLICT_DENIED")
@@ -141,6 +142,8 @@ def inspect_offline_rescan_segments(
         block_count += end - start
         expected = end
         prev_hash = terminal
+        seen_hashes.add(parent)
+        seen_hashes.add(terminal)
         previous_segment = piece
         unique_count += 1
 
