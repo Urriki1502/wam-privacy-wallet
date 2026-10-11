@@ -30,7 +30,9 @@ class OfflineRescanSegmentsError(ValueError):
 class OfflineRescanSegments:
     """Scalar-only synthetic accounting preview, NOT a persisted progress token."""
 
-    status: Literal["OFFLINE_RESCAN_UNTRUSTED"]
+    status: Literal["OFFLINE_RESCAN_UNTRUSTED"] = field(
+        default="OFFLINE_RESCAN_UNTRUSTED", init=False
+    )
     disposition: Literal["NO_SEGMENTS", "CONTIGUOUS_UNVERIFIED", "REPLAY_NOT_APPLIED"]
     resume_action: Literal[
         "REVALIDATE_BEFORE_RESCAN", "REWIND_RESCAN_REVIEW",
@@ -148,7 +150,6 @@ def inspect_offline_rescan_segments(
         unique_count += 1
 
     return OfflineRescanSegments(
-        status="OFFLINE_RESCAN_UNTRUSTED",
         disposition=("REPLAY_NOT_APPLIED" if replay_count
                      else "CONTIGUOUS_UNVERIFIED" if unique_count
                      else "NO_SEGMENTS"),
