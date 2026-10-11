@@ -23,6 +23,7 @@ MINIMUM_CASES = {
     "test_real_regtest_harness.py": 13,
     "test_core_artifact_staging.py": 20,
     "test_core_candidate_bridge.py": 14,
+    "test_core_signed_release.py": 20,
     "test_regtest_attestation.py": 10,
     "test_regtest_gateway.py": 10,
     "test_reuse_manifest.py": 6,
