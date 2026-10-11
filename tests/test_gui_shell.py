@@ -428,5 +428,38 @@ class GuiShellSmokeTests(unittest.TestCase):
         self.assertEqual(self.window.findChildren(QPushButton), [])
 
 
+    def test_lifecycle_render_failure_clears_and_invalidates(self) -> None:
+        # A renderer can fail *after* a validated state was committed.
+        # That must never leave an accepted revision or stale panel visible.
+        from unittest.mock import patch
+        from wam_privacy_wallet.application.presentation_lifecycle import OfflineLifecycleError
+        self.window.replace_offline_presentation(
+            0, receive=rv.inspect_pinned_public_vector()
+        )
+        self.assertIn("PUBLIC FINGERPRINT", self.window.receive_vector_status.text())
+        with patch.object(MainWindow, "present_offline_node_snapshot",
+                          side_effect=RuntimeError("PRIVATE_RENDER_DETAIL")):
+            with self.assertRaisesRegex(
+                OfflineLifecycleError, "^APP_OFFLINE_RENDER_DENIED$"
+            ) as failure:
+                self.window.replace_offline_presentation(
+                    1, node=NodeOverview(
+                        "regtest", 42, "READ_ONLY_SNAPSHOT",
+                        "EXPERIMENTAL_NO_REAL_FUNDS",
+                    ),
+                )
+            self.assertIsNone(failure.exception.__cause__)
+        state = self.window.offline_presentation_state
+        self.assertEqual((state.transition, state.revision), ("CLEARED", 3))
+        self.assertEqual((state.node, state.receive), ("ABSENT", "ABSENT"))
+        self.assertEqual(self.window.node_diagnostic_status.text(),
+                         "NO DIAGNOSTIC SNAPSHOT · NO RPC")
+        self.assertEqual(self.window.receive_vector_status.text(),
+                         "NO PUBLIC SAMPLE · NO ADDRESS GENERATED")
+        self.assertEqual(self.window.session_status.text(), "NO WALLET LOADED")
+        self.assertNotIn("PRIVATE_RENDER_DETAIL", self.window.node_diagnostic_notice.text())
+        self.assertEqual(self.window.findChildren(QPushButton), [])
+
+
 if __name__ == "__main__":
     unittest.main()
