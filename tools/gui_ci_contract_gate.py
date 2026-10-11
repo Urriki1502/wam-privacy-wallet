@@ -12,6 +12,10 @@ GUI_TEST_IDS = frozenset({
     "test_gui_shell.GuiShellSmokeTests.test_offline_safety_notice_and_no_funds_state",
     "test_gui_shell.GuiShellSmokeTests.test_no_payment_actions_are_exposed",
     "test_gui_shell.GuiShellSmokeTests.test_window_is_portable_qt_widget",
+    "test_gui_shell.GuiShellSmokeTests.test_lifecycle_valid_then_invalid_clears_all_panels",
+    "test_gui_shell.GuiShellSmokeTests.test_lifecycle_stale_revision_clears_receive_and_node",
+    "test_gui_shell.GuiShellSmokeTests.test_lifecycle_reset_invalidates_revision_and_all_panels",
+    "test_gui_shell.GuiShellSmokeTests.test_lifecycle_replacement_does_not_retain_omitted_evidence",
 })
 # Security-critical original non-GUI identities; additive to original suite floors.
 CRITICAL_NON_GUI_IDS = frozenset({
@@ -22,8 +26,8 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_rpc_qualification_prep.RpcQualificationPreparationTests.test_fake_approval_release_or_core_execution_denied",
     "test_ci_contract_gate.MandatoryOfflineContractGateTests.test_minimum_case_floors_pinned_for_all_mandatory_suites",
 })
-# Existing 267-case GUI baseline + 12 public-vector tests + 5 Receive GUI tests.
-FULL_MIN_CASES = 284
+# Existing 284-case floor + 10 lifecycle contracts + 4 lifecycle GUI cases.
+FULL_MIN_CASES = 298
 
 
 def _cases(suite: unittest.TestSuite):
