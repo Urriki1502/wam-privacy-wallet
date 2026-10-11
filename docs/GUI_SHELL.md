@@ -57,6 +57,21 @@ previous display and yields a fixed redacted error.
 See [Pinned Privacy Research Models](PINNED_PRIVACY_RESEARCH_MODELS.md) for
 commit SHA, four exact Git blob hashes and original MIT attribution.
 
+## Receive — public WSP-1 synthetic vector only
+
+The Receive page can explicitly show a **redacted fingerprint** of a single
+prepublished public WSP-1 regtest test vector through
+`MainWindow.run_fixed_public_receive_demo()` or
+`present_public_receive_vector()`. This validates only the pinned MIT pure
+Bech32m codec and public example format. No seed, private key, scanner, wallet
+address derivation, live Core connection, QR code, clipboard/copy action or
+receive capability is present. It never displays a full address. The page
+warns **NOT A RECEIVING ADDRESS**, and `clear_public_receive_vector()` resets it.
+
+See [Public WSP Receive Vector](APP_WSP_PUBLIC_RECEIVE_VECTOR.md) for upstream
+commit/blob SHA evidence, MIT notice, checkout LF pins, negative tests and
+non-production limitations.
+
 ## Explicit non-features
 
 - No WAM SDK, WAM Core RPC, scanner, transaction builder or network requests.

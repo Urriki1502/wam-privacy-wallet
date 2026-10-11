@@ -12,6 +12,7 @@ from PySide6.QtCore import Qt
 from wam_privacy_wallet.application.node_status import NodeOverview
 from wam_privacy_wallet.application.privacy_readiness import PrivacyResearchSnapshot
 from wam_privacy_wallet.application.policy_evidence import SyntheticPolicyReport
+from wam_privacy_wallet.application.receive_vector import ReceiveVectorPreview, _FIXED_FINGERPRINT
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -200,6 +201,18 @@ class MainWindow(QMainWindow):
             caution.setObjectName("smallText")
             caution.setWordWrap(True)
             column.addWidget(caution)
+        elif title == "Receive":
+            self.receive_vector_status = QLabel("NO PUBLIC SAMPLE · NO ADDRESS GENERATED")
+            column.addWidget(self._status_card("PINNED WSP-1 PUBLIC TEST VECTOR", self.receive_vector_status))
+            self.receive_vector_notice = QLabel(
+                "NOT A RECEIVING ADDRESS · NO QR / COPY · SCANNER AND SIGNER BLOCKED"
+            )
+            self.receive_vector_notice.setObjectName("smallText")
+            self.receive_vector_notice.setWordWrap(True)
+            column.addWidget(self.receive_vector_notice)
+            placeholder = QLabel("REAL RECEIVE, DERIVATION & SCANNING · BLOCKED")
+            placeholder.setObjectName("notice")
+            column.addWidget(placeholder)
         elif title == "Node":
             self.node_diagnostic_status = QLabel("NO DIAGNOSTIC SNAPSHOT · NO RPC")
             column.addWidget(self._status_card("LOCAL OFFLINE DIAGNOSTIC", self.node_diagnostic_status))
@@ -372,6 +385,52 @@ class MainWindow(QMainWindow):
         self.privacy_policy_notice.setText(
             "PAYJOIN & NETWORK POLICY · NOT AUTHORIZED"
         )
+
+    def present_public_receive_vector(self, preview: object) -> None:
+        """Render a fingerprint only; never expose an address or QR action."""
+        if (
+            type(preview) is not ReceiveVectorPreview
+            or type(preview.profile) is not str
+            or preview.profile != "WSP-1"
+            or type(preview.network) is not str
+            or preview.network != "regtest"
+            or type(preview.provenance) is not str
+            or preview.provenance != "PIN_RECORDED_UNATTESTED"
+            or type(preview.sample) is not str
+            or preview.sample != "PUBLIC_SYNTHETIC_FIXTURE"
+            or type(preview.fingerprint) is not str
+            or preview.fingerprint != _FIXED_FINGERPRINT
+            or type(preview.receive) is not str or preview.receive != "BLOCKED"
+            or type(preview.scanner) is not str or preview.scanner != "BLOCKED"
+            or type(preview.signer) is not str or preview.signer != "BLOCKED"
+        ):
+            raise ValueError("APP_GUI_RECEIVE_VECTOR_DENIED")
+        self.receive_vector_status.setText(
+            f"SYNTHETIC REGTEST · PUBLIC FINGERPRINT {_FIXED_FINGERPRINT}"
+        )
+        self.receive_vector_notice.setText(
+            "PUBLIC TEST VECTOR ONLY · NOT A RECEIVING ADDRESS · "
+            "NO QR / COPY · NO SCANNER / SIGNER"
+        )
+
+    def clear_public_receive_vector(self) -> None:
+        """Remove the optional preview; no wallet object is ever retained."""
+        self.receive_vector_status.setText("NO PUBLIC SAMPLE · NO ADDRESS GENERATED")
+        self.receive_vector_notice.setText(
+            "NOT A RECEIVING ADDRESS · NO QR / COPY · SCANNER AND SIGNER BLOCKED"
+        )
+
+    def run_fixed_public_receive_demo(self) -> None:
+        """Explicit offline preview. Never starts a scanner or derives keys."""
+        from wam_privacy_wallet.application.receive_vector import (
+            ReceiveVectorError, inspect_pinned_public_vector,
+        )
+        try:
+            preview = inspect_pinned_public_vector()
+        except ReceiveVectorError:
+            self.clear_public_receive_vector()
+            raise ValueError("APP_GUI_RECEIVE_VECTOR_DENIED") from None
+        self.present_public_receive_vector(preview)
 
     def _select_page(self, index: int) -> None:
         if 0 <= index < self.page_stack.count():

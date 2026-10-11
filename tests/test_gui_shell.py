@@ -11,6 +11,7 @@ from wam_privacy_wallet.application.privacy_readiness import (
 from wam_privacy_wallet.application.policy_evidence import (
     SyntheticPolicyReport, inspect_synthetic_policy_evidence,
 )
+from wam_privacy_wallet.application import receive_vector as rv
 
 from wam_privacy_wallet.application.node_status import NodeOverview, node_overview
 from wam_privacy_wallet.node.attestation import ChainIdentity, WAM_REGTEST_GENESIS
@@ -291,6 +292,96 @@ class GuiShellSmokeTests(unittest.TestCase):
         self.assertNotIn("PRIVATE_SECRET", self.window.privacy_policy_notice.text())
         self.assertEqual(self.window.node_status.text(), "DISCONNECTED · NO RPC")
 
+
+
+    def test_receive_page_starts_without_any_address_or_wallet_controls(self) -> None:
+        self.window.navigation.setCurrentRow(1)
+        self.assertEqual(self.window.current_page_title, "Receive")
+        self.assertEqual(
+            self.window.receive_vector_status.text(),
+            "NO PUBLIC SAMPLE · NO ADDRESS GENERATED",
+        )
+        self.assertIn("NOT A RECEIVING ADDRESS", self.window.receive_vector_notice.text())
+        self.assertEqual(self.window.findChildren(QPushButton), [])
+        self.assertEqual(self.window.session_status.text(), "NO WALLET LOADED")
+
+    def test_fixed_public_vector_preview_renders_fingerprint_only(self) -> None:
+        preview = rv.inspect_pinned_public_vector()
+        self.window.present_public_receive_vector(preview)
+        self.window.navigation.setCurrentRow(1)
+        self.assertIn(rv._FIXED_FINGERPRINT, self.window.receive_vector_status.text())
+        self.assertIn("SYNTHETIC REGTEST", self.window.receive_vector_status.text())
+        self.assertNotIn(rv._PUBLIC_ONLY_VECTOR, self.window.receive_vector_status.text())
+        self.assertNotIn(rv._PUBLIC_ONLY_VECTOR, self.window.receive_vector_notice.text())
+        self.assertIn("NOT A RECEIVING ADDRESS", self.window.receive_vector_notice.text())
+        self.assertEqual(self.window.node_status.text(), "DISCONNECTED · NO RPC")
+        self.assertEqual(self.window.findChildren(QPushButton), [])
+        self.assertFalse(any(v is preview for v in vars(self.window).values()))
+
+    def test_explicit_receive_demo_is_non_authorizing_and_resettable(self) -> None:
+        self.window.run_fixed_public_receive_demo()
+        self.assertIn("PUBLIC FINGERPRINT", self.window.receive_vector_status.text())
+        self.assertIn("NO SCANNER / SIGNER", self.window.receive_vector_notice.text())
+        self.assertEqual(self.window.node_status.text(), "DISCONNECTED · NO RPC")
+        self.window.clear_public_receive_vector()
+        self.assertEqual(
+            self.window.receive_vector_status.text(),
+            "NO PUBLIC SAMPLE · NO ADDRESS GENERATED",
+        )
+        self.assertEqual(self.window.privacy_policy_status.text(), "NO SYNTHETIC POLICY EVIDENCE")
+
+    def test_forged_public_preview_cannot_enable_receive_or_leak_user_input(self) -> None:
+        correct = rv.inspect_pinned_public_vector()
+        class Forged(rv.ReceiveVectorPreview):
+            pass
+        self.window.present_public_receive_vector(correct)
+        before = self.window.receive_vector_status.text()
+        invalid = (
+            None, True, {}, {"seed": "SHOULD_NOT_DISPLAY"},
+            Forged(*tuple(getattr(correct, name) for name in
+                ("profile", "network", "provenance", "sample", "fingerprint",
+                 "receive", "scanner", "signer"))),
+            rv.ReceiveVectorPreview("WSP-1", "mainnet",
+                "PIN_RECORDED_UNATTESTED", "PUBLIC_SYNTHETIC_FIXTURE",
+                correct.fingerprint, "BLOCKED", "BLOCKED", "BLOCKED"),
+            rv.ReceiveVectorPreview("WSP-1", "regtest",
+                "PIN_RECORDED_UNATTESTED", "PUBLIC_SYNTHETIC_FIXTURE",
+                "untrusted-fingerprint", "BLOCKED", "BLOCKED", "BLOCKED"),
+            rv.ReceiveVectorPreview("WSP-1", "regtest",
+                "PIN_RECORDED_UNATTESTED", "PUBLIC_SYNTHETIC_FIXTURE",
+                correct.fingerprint, "READY", "BLOCKED", "BLOCKED"),
+        )
+        for value in invalid:
+            with self.subTest(kind=type(value).__name__):
+                with self.assertRaisesRegex(
+                    ValueError, "^APP_GUI_RECEIVE_VECTOR_DENIED$"
+                ):
+                    self.window.present_public_receive_vector(value)
+                self.assertEqual(self.window.receive_vector_status.text(), before)
+        self.assertNotIn("SHOULD_NOT_DISPLAY", self.window.receive_vector_notice.text())
+        self.assertEqual(self.window.findChildren(QPushButton), [])
+
+    def test_corrupt_codec_blocks_explicit_demo_and_clears_stale_preview(self) -> None:
+        from pathlib import Path
+        import tempfile
+        from unittest.mock import patch
+
+        self.window.run_fixed_public_receive_demo()
+        with tempfile.TemporaryDirectory(prefix="receive-codec-test-") as tmp:
+            corrupt = Path(tmp) / "codec.py"
+            corrupt.write_text("raise RuntimeError('secret')", encoding="utf-8")
+            with patch.object(rv, "_CODEC_FILE", corrupt):
+                with self.assertRaisesRegex(
+                    ValueError, "^APP_GUI_RECEIVE_VECTOR_DENIED$"
+                ) as failure:
+                    self.window.run_fixed_public_receive_demo()
+                self.assertIsNone(failure.exception.__cause__)
+        self.assertEqual(
+            self.window.receive_vector_status.text(),
+            "NO PUBLIC SAMPLE · NO ADDRESS GENERATED",
+        )
+        self.assertNotIn("secret", self.window.receive_vector_notice.text())
+        self.assertEqual(self.window.node_status.text(), "DISCONNECTED · NO RPC")
 
 
 if __name__ == "__main__":
