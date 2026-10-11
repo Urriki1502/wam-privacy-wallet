@@ -237,21 +237,35 @@ def inspect_wam_core_archive(*, archive: object,
     promotes a receipt into a credential or WAM Core executable approval.
     """
     name, sha256 = _receipt(signed_receipt)
+    # stage_untrusted_core_artifact's context manager catches ValueError
+    # thrown *through its yield*, so let it finish integrity/cleanup before
+    # propagating a typed archive denial (CoreArchiveInventoryError is a
+    # ValueError). Otherwise all malicious archive failures masquerade as
+    # checksum mismatch and critical regression identities lose their signal.
+    result = None
+    failure = None
     try:
         with stage_untrusted_core_artifact(archive, sha256) as staged:
             path = staged.snapshot_path
             target = _ALLOWED_BINARY[name]
-            if name.endswith(".tar.gz"):
-                result = _read_tar(path, target)
-            elif name.endswith(".zip"):
-                result = _read_zip(path, target)
-            else:
-                raise CoreArchiveInventoryError("CORE_ARCHIVE_FORMAT_DENIED")
-            # Do not return staged snapshot path or leaking file names.
-            return CoreArchiveInventory(
-                name, result.member_count, result.file_count,
-                result.total_uncompressed_bytes, target,
-                result.node_byte_count, result.node_sha256,
-            )
+            try:
+                if name.endswith(".tar.gz"):
+                    result = _read_tar(path, target)
+                elif name.endswith(".zip"):
+                    result = _read_zip(path, target)
+                else:
+                    raise CoreArchiveInventoryError("CORE_ARCHIVE_FORMAT_DENIED")
+            except CoreArchiveInventoryError as err:
+                failure = err
     except CoreArtifactStagingError:
         raise CoreArchiveInventoryError("CORE_ARCHIVE_DIGEST_DENIED") from None
+    if failure is not None:
+        raise failure from None
+    if result is None:
+        raise CoreArchiveInventoryError("CORE_ARCHIVE_CONTAINER_DENIED")
+    # No staged snapshot path, filesystem handle or untrusted members escape.
+    return CoreArchiveInventory(
+        name, result.member_count, result.file_count,
+        result.total_uncompressed_bytes, target,
+        result.node_byte_count, result.node_sha256,
+    )
