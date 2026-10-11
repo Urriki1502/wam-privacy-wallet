@@ -98,7 +98,11 @@ def _read_cookie(path: Path) -> ExplicitRpcAuth:
             and first.st_ino == other.st_ino
             and first.st_size == other.st_size
             and first.st_mtime_ns == other.st_mtime_ns
-            and first.st_ctime_ns == other.st_ctime_ns
+            # On Windows, native stat APIs can expose creation/change time
+            # differently between pathname and descriptor observations.
+            # Preserve inode/dev/size/mtime checks; ctime is additionally
+            # required where POSIX specifies it consistently.
+            and (os.name == "nt" or first.st_ctime_ns == other.st_ctime_ns)
             and valid(other)
         )
 
