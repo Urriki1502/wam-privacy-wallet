@@ -20,7 +20,7 @@ MINIMUM_CASES = {
     "test_core_source_pin.py": 10,
     "test_node_contract.py": 7,
     "test_read_rpc.py": 11,
-    "test_real_regtest_harness.py": 10,
+    "test_real_regtest_harness.py": 13,
     "test_regtest_attestation.py": 10,
     "test_regtest_gateway.py": 10,
     "test_reuse_manifest.py": 6,
@@ -49,6 +49,10 @@ MINIMUM_CASES = {
     "test_offline_reorg_reconciliation.py": 24,
     "test_offline_integration_status.py": 31,
     "test_regtest_scanner_wire.py": 15,
+    "test_core_artifact_staging.py": 20,
+    "test_core_candidate_bridge.py": 14,
+    "test_core_signed_release.py": 20,
+    "test_core_archive_inventory.py": 23,
 }
 MANDATORY_SUITES = tuple(MINIMUM_CASES)
 

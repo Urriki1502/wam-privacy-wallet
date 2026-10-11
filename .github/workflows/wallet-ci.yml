@@ -65,6 +65,14 @@ jobs:
           PYTHONPATH: src
         run: python -m tools.ci_contract_gate
 
+      # Real detached GnuPG verification with an ephemeral synthetic test key.
+      # This never runs WAM Core and never claims the official release is verified.
+      - name: Verify GnuPG detached signatures with disposable test key (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        env:
+          PYTHONPATH: src
+        run: python -m tools.ci_native_gpg_e2e
+
 
   gui-tests:
     name: GUI + full test discovery / ${{ matrix.os }}

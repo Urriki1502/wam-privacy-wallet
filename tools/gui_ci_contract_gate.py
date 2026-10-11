@@ -84,9 +84,29 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_regtest_scanner_wire.RegtestScannerReadBridgeTests.test_reorg_during_block_rpc_denied_after_read",
     "test_regtest_scanner_wire.RegtestScannerReadBridgeTests.test_live_transport_does_not_launch_core_or_load_wsp",
     "test_offline_integration_status.OfflineIntegrationStatusTests.test_mismatched_reorg_segment_or_recovery_fails_atomic_replacement",
+    "test_real_regtest_harness.HarnessTests.test_verified_binary_still_cannot_spawn_before_binding_review",
+    "test_real_regtest_harness.HarnessTests.test_launch_gate_precedes_workspace_creation_and_socket_bind",
+    "test_core_artifact_staging.CoreArtifactStagingTests.test_verified_synthetic_snapshot_never_authorizes_core_execution",
+    "test_core_artifact_staging.CoreArtifactStagingTests.test_postcopy_metadata_race_rejected",
+    "test_core_artifact_staging.CoreArtifactStagingTests.test_same_size_staged_byte_mutation_during_review_is_detected",
+    "test_core_artifact_staging.CoreArtifactStagingTests.test_windows_reparse_file_metadata_is_denied_even_if_regular",
+    "test_core_candidate_bridge.CoreCandidateBridgeTests.test_wrong_native_platform_is_denied_before_disk_read",
+    "test_core_candidate_bridge.CoreCandidateBridgeTests.test_staged_candidate_requires_identical_host_and_bytes",
+    "test_core_candidate_bridge.CoreCandidateBridgeTests.test_staged_mutation_on_context_exit_is_denied_with_redacted_code",
+    "test_core_signed_release.CoreSignedReleaseTests.test_valid_signature_contract_is_still_archive_only_and_no_core_launch",
+    "test_core_signed_release.CoreSignedReleaseTests.test_gpg_listed_primary_key_must_match_fixed_fingerprint",
+    "test_core_signed_release.CoreSignedReleaseTests.test_unsigned_checksums_are_never_acceptance_evidence",
+    "test_core_signed_release.CoreSignedReleaseTests.test_post_signature_archive_digest_mismatch_denied",
+    "test_core_signed_release.CoreSignedReleaseTests.test_gpg_invocation_never_uses_shell_or_user_gnupghome",
+    "test_core_archive_inventory.CoreArchiveInventoryTests.test_linux_tar_contains_readonly_node_hash_and_counts",
+    "test_core_archive_inventory.CoreArchiveInventoryTests.test_reject_tar_symlink_and_hardlink",
+    "test_core_archive_inventory.CoreArchiveInventoryTests.test_reject_zip_unix_symlink",
+    "test_core_archive_inventory.CoreArchiveInventoryTests.test_zip_compression_ratio_denies_bomb",
+    "test_core_archive_inventory.CoreArchiveInventoryTests.test_bogus_archive_digest_denied_before_container_inspection",
+    "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 517
+FULL_MIN_CASES = 597
 
 
 def _cases(suite: unittest.TestSuite):
