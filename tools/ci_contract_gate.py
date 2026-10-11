@@ -41,7 +41,7 @@ MINIMUM_CASES = {
     "test_app_receive_public_vector.py": 12,
     "test_app_presentation_lifecycle.py": 10,
     "test_scanner_response_shape.py": 14,
-    "test_scanner_window_contract.py": 18,
+    "test_scanner_window_contract.py": 19,
     "test_offline_recovery_disposition.py": 18,
     "test_offline_integration_status.py": 20,
 }
