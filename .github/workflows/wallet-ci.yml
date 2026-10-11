@@ -65,6 +65,14 @@ jobs:
           PYTHONPATH: src
         run: python -m tools.ci_contract_gate
 
+      # Actual GnuPG crypto using ephemeral synthetic test key, NOT
+      # WAM's production release key and NEVER a WAM Core executable.
+      - name: Verify real GnuPG detached signatures with disposable test key (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        env:
+          PYTHONPATH: src
+        run: python -m tools.ci_native_gpg_e2e
+
 
   gui-tests:
     name: GUI + full test discovery / ${{ matrix.os }}
