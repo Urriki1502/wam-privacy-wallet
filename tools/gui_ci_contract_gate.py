@@ -103,6 +103,9 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_offline_integration_status.OfflineIntegrationStatusTests.test_mismatched_reorg_segment_or_recovery_fails_atomic_replacement",
     "test_regtest_cookie_descriptor.RegtestCookieDescriptorTests.test_exact_terminal_crlf_is_accepted_but_internal_crlf_denied",
     "test_regtest_cookie_descriptor.RegtestCookieDescriptorTests.test_swap_between_lstat_and_fd_open_is_rejected",
+    "test_two_node_live_transition.TwoNodeLiveTransitionWireTests.test_higher_tip_with_rewritten_old_height_is_reorg",
+    "test_two_node_live_transition.TwoNodeLiveTransitionWireTests.test_two_real_independent_localhost_sockets_report_unchanged",
+    "test_two_node_live_transition.TwoNodeLiveTransitionWireTests.test_no_core_subprocess_on_successful_live_http_observation",
     "test_two_node_private_workspace.PrivateTwoNodeWorkspaceTests.test_caller_valueerror_propagates_and_workspace_is_deleted",
     "test_two_node_private_workspace.PrivateTwoNodeWorkspaceTests.test_real_temp_workspace_has_two_distinct_dirs_and_configs",
     "test_two_node_private_workspace.PrivateTwoNodeWorkspaceTests.test_windows_unreviewed_acl_denied_without_disk",
@@ -130,7 +133,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 718
+FULL_MIN_CASES = 733
 
 
 def _cases(suite: unittest.TestSuite):
