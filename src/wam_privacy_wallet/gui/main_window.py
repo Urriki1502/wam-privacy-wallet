@@ -224,7 +224,7 @@ class MainWindow(QMainWindow):
             self.privacy_policy_status = QLabel("NO SYNTHETIC POLICY EVIDENCE")
             column.addWidget(self._status_card("SYNTHETIC POLICY MODEL", self.privacy_policy_status))
             self.privacy_policy_notice = QLabel(
-                "NO PAYJOIN OR NETWORK POLICY IS AUTHORIZED"
+                "PAYJOIN & NETWORK POLICY · NOT AUTHORIZED"
             )
             self.privacy_policy_notice.setObjectName("smallText")
             self.privacy_policy_notice.setWordWrap(True)
@@ -354,7 +354,7 @@ class MainWindow(QMainWindow):
         """Reset only the synthetic model panel; never persist the input."""
         self.privacy_policy_status.setText("NO SYNTHETIC POLICY EVIDENCE")
         self.privacy_policy_notice.setText(
-            "NO PAYJOIN OR NETWORK POLICY IS AUTHORIZED"
+            "PAYJOIN & NETWORK POLICY · NOT AUTHORIZED"
         )
 
     def _select_page(self, index: int) -> None:
