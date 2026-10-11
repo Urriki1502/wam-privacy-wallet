@@ -43,6 +43,20 @@ RPC, transport or external `wam-privacy` implementation is imported.
 See [Application Policy Evidence](APP_POLICY_EVIDENCE_OFFLINE.md) for exact
 upstream source pins, trust limitations and negative tests.
 
+## Explicit fixed offline model demonstration
+
+`MainWindow.run_fixed_offline_policy_demo()` is a deliberate, zero-argument
+test/demo-only action. It first verifies byte-identical copies of the pinned
+MIT-licensed pure Python `wam-privacy` Network Privacy and PayJoin model
+sources, then exercises them with **fixed fake endpoint and transaction values**
+inside the Application. The display still says `SIMULATED / UNTRUSTED /
+NOT AUTHORIZED`; scan, signer, wallet creation and broadcast stay disabled.
+The demo is never invoked automatically on GUI startup. A failure clears the
+previous display and yields a fixed redacted error.
+
+See [Pinned Privacy Research Models](PINNED_PRIVACY_RESEARCH_MODELS.md) for
+commit SHA, four exact Git blob hashes and original MIT attribution.
+
 ## Explicit non-features
 
 - No WAM SDK, WAM Core RPC, scanner, transaction builder or network requests.
