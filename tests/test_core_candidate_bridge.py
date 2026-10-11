@@ -187,10 +187,12 @@ class CoreCandidateBridgeTests(unittest.TestCase):
                 self.assertEqual(bridge._native_runtime_platform(), expected)
 
     def test_no_caller_override_of_native_platform(self):
+        # Contextmanager generator validates its signature on __enter__.
         with self.assertRaises(TypeError):
-            review_local_core_candidate(
+            with review_local_core_candidate(
                 self.candidate(), self.file, host_tag="linux-x64"
-            )
+            ):
+                self.fail("Host spoofing must never be accepted")
 
     def test_cleanup_on_exception_inside_review_context(self):
         with self.assertRaisesRegex(RuntimeError, "^SYNTHETIC_REVIEW_CANCEL$"):
