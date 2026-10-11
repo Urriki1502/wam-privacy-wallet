@@ -123,7 +123,10 @@ def _read_cookie(path: Path) -> ExplicitRpcAuth:
         # WAM/Bitcoin cookies are ASCII "<username>:<password>", with no
         # trailing newline in the generated file; do not strip whitespace or
         # silently reinterpret malformed credential bytes.
-        username, password = raw.decode("ascii").split(":", 1)
+        credential_bytes = raw[:-1] if raw.endswith(b"\n") else raw
+        if b"\n" in credential_bytes:
+            raise RealRegtestError("CORE_COOKIE_INVALID")
+        username, password = credential_bytes.decode("ascii").split(":", 1)
         return ExplicitRpcAuth(username, password)
     except RealRegtestError:
         raise
