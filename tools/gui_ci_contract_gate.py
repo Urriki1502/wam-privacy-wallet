@@ -21,9 +21,23 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_security_gate_ledger.SecurityGateLedgerTests.test_cannot_auto_promote_global_authority",
     "test_rpc_qualification_prep.RpcQualificationPreparationTests.test_fake_approval_release_or_core_execution_denied",
     "test_ci_contract_gate.MandatoryOfflineContractGateTests.test_minimum_case_floors_pinned_for_all_mandatory_suites",
+    "test_offline_recovery_disposition.OfflineRecoveryDispositionTests.test_no_caller_can_claim_verified_writer_identity_or_integrity",
+    "test_offline_recovery_disposition.OfflineRecoveryDispositionTests.test_readonly_policy_never_uses_file_socket_or_subprocess",
+    "test_offline_recovery_transition.OfflineRecoveryTransitionTests.test_legacy_version_two_to_three_does_not_prove_rescan",
+    "test_offline_recovery_transition.OfflineRecoveryTransitionTests.test_downgrade_to_legacy_is_fail_closed",
+    "test_offline_recovery_transition.OfflineRecoveryTransitionTests.test_no_file_socket_subprocess_or_wsp_imports",
+    "test_offline_resume_review.OfflineResumeReviewTests.test_matching_crash_never_auto_resumes",
+    "test_offline_resume_review.OfflineResumeReviewTests.test_legacy_to_v3_never_proves_migration",
+    "test_offline_resume_review.OfflineResumeReviewTests.test_no_file_socket_process_or_wsp_imports",
+    "test_offline_rescan_segments.OfflineRescanSegmentsTests.test_exact_immediate_replay_does_not_double_count",
+    "test_offline_rescan_segments.OfflineRescanSegmentsTests.test_hash_identity_cannot_cycle_back_to_earlier_anchor",
+    "test_offline_rescan_segments.OfflineRescanSegmentsTests.test_output_immutable_no_sensitive_values_or_io",
+    "test_offline_reorg_reconciliation.OfflineReorgReconciliationTests.test_checkpoint_mismatch_across_receipts_denied",
+    "test_offline_reorg_reconciliation.OfflineReorgReconciliationTests.test_metamorphic_immediate_replay_never_increases_unique_work",
+    "test_offline_reorg_reconciliation.OfflineReorgReconciliationTests.test_no_file_socket_subprocess_or_operational_wsp_imports",
 })
-# Existing 267-case GUI baseline + 12 public-vector tests + 5 Receive GUI tests.
-FULL_MIN_CASES = 284
+# Existing 284-case full baseline + 18 offline recovery disposition cases.
+FULL_MIN_CASES = 384
 
 
 def _cases(suite: unittest.TestSuite):
