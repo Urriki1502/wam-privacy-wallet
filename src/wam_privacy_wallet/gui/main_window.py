@@ -301,14 +301,24 @@ class MainWindow(QMainWindow):
         self.clear_offline_privacy_readiness()
         self.clear_offline_policy_report()
         self.clear_public_receive_vector()
-        if state.node == "UNVERIFIED":
-            self.present_offline_node_snapshot(node)
-        if state.privacy == "RESEARCH_ONLY":
-            self.present_offline_privacy_readiness(privacy)
-        if state.policy == "MODEL_ONLY":
-            self.present_offline_policy_report(policy)
-        if state.receive == "PUBLIC_FIXTURE":
-            self.present_public_receive_vector(receive)
+        try:
+            if state.node == "UNVERIFIED":
+                self.present_offline_node_snapshot(node)
+            if state.privacy == "RESEARCH_ONLY":
+                self.present_offline_privacy_readiness(privacy)
+            if state.policy == "MODEL_ONLY":
+                self.present_offline_policy_report(policy)
+            if state.receive == "PUBLIC_FIXTURE":
+                self.present_public_receive_vector(receive)
+        except Exception:
+            # Presentation can fail after the controller committed a revision.
+            # Never leave a partial GUI with a falsely accepted state.
+            self._offline_controller.reset()
+            self.clear_offline_node_snapshot()
+            self.clear_offline_privacy_readiness()
+            self.clear_offline_policy_report()
+            self.clear_public_receive_vector()
+            raise OfflineLifecycleError("APP_OFFLINE_RENDER_DENIED") from None
 
     def present_offline_node_snapshot(self, snapshot: object) -> None:
         """Display a non-authorizing, unverified projection; no node/RPC access.
