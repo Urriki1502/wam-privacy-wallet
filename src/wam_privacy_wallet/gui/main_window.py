@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 
+from wam_privacy_wallet.application.presentation_lifecycle import OfflinePresentationController, OfflineLifecycleError
 from wam_privacy_wallet.application.node_status import NodeOverview
 from wam_privacy_wallet.application.privacy_readiness import PrivacyResearchSnapshot
 from wam_privacy_wallet.application.policy_evidence import SyntheticPolicyReport
@@ -88,6 +89,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self._offline_controller = OfflinePresentationController()
         self.setObjectName("wamPrivacyWalletWindow")
         self.setWindowTitle("WAM Privacy Wallet — Experimental")
         self.setMinimumSize(960, 620)
@@ -265,6 +267,48 @@ class MainWindow(QMainWindow):
         value.setObjectName("statusValue")
         contents.addWidget(value)
         return frame
+
+    @property
+    def offline_presentation_state(self):
+        """Immutable offline evidence state; never confers wallet authority."""
+        return self._offline_controller.state
+
+    def clear_offline_presentation(self) -> None:
+        """Invalidate revisions and clear every research evidence panel."""
+        self._offline_controller.reset()
+        self.clear_offline_node_snapshot()
+        self.clear_offline_privacy_readiness()
+        self.clear_offline_policy_report()
+        self.clear_public_receive_vector()
+
+    def replace_offline_presentation(
+        self, expected_revision: object, *, node: object = None,
+        privacy: object = None, policy: object = None, receive: object = None,
+    ) -> None:
+        """Atomically validate all four synthetic DTOs before displaying."""
+        try:
+            state = self._offline_controller.replace(
+                expected_revision, node=node, privacy=privacy,
+                policy=policy, receive=receive,
+            )
+        except OfflineLifecycleError:
+            self.clear_offline_node_snapshot()
+            self.clear_offline_privacy_readiness()
+            self.clear_offline_policy_report()
+            self.clear_public_receive_vector()
+            raise
+        self.clear_offline_node_snapshot()
+        self.clear_offline_privacy_readiness()
+        self.clear_offline_policy_report()
+        self.clear_public_receive_vector()
+        if state.node == "UNVERIFIED":
+            self.present_offline_node_snapshot(node)
+        if state.privacy == "RESEARCH_ONLY":
+            self.present_offline_privacy_readiness(privacy)
+        if state.policy == "MODEL_ONLY":
+            self.present_offline_policy_report(policy)
+        if state.receive == "PUBLIC_FIXTURE":
+            self.present_public_receive_vector(receive)
 
     def present_offline_node_snapshot(self, snapshot: object) -> None:
         """Display a non-authorizing, unverified projection; no node/RPC access.
