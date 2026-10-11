@@ -8,6 +8,8 @@ have been qualified on both macOS and Windows.
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
+
+from wam_privacy_wallet.application.node_status import NodeOverview
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -196,6 +198,18 @@ class MainWindow(QMainWindow):
             caution.setObjectName("smallText")
             caution.setWordWrap(True)
             column.addWidget(caution)
+        elif title == "Node":
+            self.node_diagnostic_status = QLabel("NO DIAGNOSTIC SNAPSHOT · NO RPC")
+            column.addWidget(self._status_card("LOCAL OFFLINE DIAGNOSTIC", self.node_diagnostic_status))
+            self.node_diagnostic_notice = QLabel(
+                "UNVERIFIED DATA ONLY · NOT A CONNECTION OR WALLET AUTHORIZATION"
+            )
+            self.node_diagnostic_notice.setObjectName("smallText")
+            self.node_diagnostic_notice.setWordWrap(True)
+            column.addWidget(self.node_diagnostic_notice)
+            placeholder = QLabel("REAL WAM CORE INTEGRATION · BLOCKED")
+            placeholder.setObjectName("notice")
+            column.addWidget(placeholder)
         else:
             placeholder = QLabel("NOT IMPLEMENTED · REVIEW REQUIRED")
             placeholder.setObjectName("notice")
@@ -216,6 +230,40 @@ class MainWindow(QMainWindow):
         value.setObjectName("statusValue")
         contents.addWidget(value)
         return frame
+
+    def present_offline_node_snapshot(self, snapshot: object) -> None:
+        """Display a non-authorizing, unverified projection; no node/RPC access.
+
+        Caller must supply an exact immutable application NodeOverview. This
+        presentation method never keeps the snapshot or the original profile.
+        A caller-created object does not establish trusted Core provenance.
+        """
+        if (
+            type(snapshot) is not NodeOverview
+            or type(snapshot.network) is not str
+            or snapshot.network != "regtest"
+            or type(snapshot.height) is not int
+            or not 0 <= snapshot.height <= 100_000_000
+            or type(snapshot.status) is not str
+            or snapshot.status != "READ_ONLY_SNAPSHOT"
+            or type(snapshot.notice) is not str
+            or snapshot.notice != "EXPERIMENTAL_NO_REAL_FUNDS"
+        ):
+            raise ValueError("APP_GUI_DIAGNOSTIC_REJECTED")
+        self.node_diagnostic_status.setText(
+            f"UNVERIFIED · regtest height {snapshot.height} · NO RPC"
+        )
+        self.node_diagnostic_notice.setText(
+            "POINT-IN-TIME READ-ONLY PROJECTION · NOT A NODE CONNECTION "
+            "OR WALLET AUTHORIZATION"
+        )
+
+    def clear_offline_node_snapshot(self) -> None:
+        """Clear the view without retaining a profile or transport handle."""
+        self.node_diagnostic_status.setText("NO DIAGNOSTIC SNAPSHOT · NO RPC")
+        self.node_diagnostic_notice.setText(
+            "UNVERIFIED DATA ONLY · NOT A CONNECTION OR WALLET AUTHORIZATION"
+        )
 
     def _select_page(self, index: int) -> None:
         if 0 <= index < self.page_stack.count():
