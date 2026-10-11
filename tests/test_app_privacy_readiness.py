@@ -14,6 +14,7 @@ from tools.check_reuse_manifest import validate_manifest
 from tools.check_security_gate_ledger import validate_security_gates
 
 ROOT = Path(__file__).resolve().parents[1]
+_UNSET = object()  # Distinguish an omitted fixture from an explicit invalid None.
 
 
 class OfflinePrivacyReadinessTests(unittest.TestCase):
@@ -26,10 +27,10 @@ class OfflinePrivacyReadinessTests(unittest.TestCase):
             (ROOT / "compat/g0_security_gate_ledger.json").read_text(encoding="utf-8")
         )
 
-    def deny(self, manifest=None, ledger=None):
-        if manifest is None:
+    def deny(self, manifest=_UNSET, ledger=_UNSET):
+        if manifest is _UNSET:
             manifest = self.manifest
-        if ledger is None:
+        if ledger is _UNSET:
             ledger = self.ledger
         with self.assertRaisesRegex(PrivacyReadinessError, "^APP_PRIVACY_EVIDENCE_DENIED$"):
             research_readiness(manifest, ledger)
