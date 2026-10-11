@@ -77,6 +77,67 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
             with self.assertRaisesRegex(ContractGateError, "^CI_REQUIRED_SUITE_ALL_SKIPPED"):
                 run_single(self.pattern, self.folder)
 
+    def test_expected_failure_is_not_accepted_as_success(self):
+        """A failed security assertion marked xfail must fail the CI contract."""
+        (self.folder / self.pattern).write_text("# synthetic suite\n", encoding="utf-8")
+        class SyntheticExpectedFailure(unittest.TestCase):
+            @unittest.expectedFailure
+            def test_security_contract(self):
+                self.fail("synthetic expected failure")
+        suite = unittest.defaultTestLoader.loadTestsFromTestCase(SyntheticExpectedFailure)
+        with (self._with_suite(suite), self._fixture_floor(),
+              contextlib.redirect_stderr(io.StringIO())):
+            with self.assertRaisesRegex(
+                ContractGateError, "^CI_REQUIRED_SUITE_EXPECTED_FAILURE:"
+            ):
+                run_single(self.pattern, self.folder)
+
+    def test_unexpected_success_remains_denied(self):
+        """An xfail that unexpectedly passes is already a failure in unittest."""
+        (self.folder / self.pattern).write_text("# synthetic suite\n", encoding="utf-8")
+        class SyntheticUnexpectedSuccess(unittest.TestCase):
+            @unittest.expectedFailure
+            def test_critical(self):
+                self.assertTrue(True)
+        suite = unittest.defaultTestLoader.loadTestsFromTestCase(SyntheticUnexpectedSuccess)
+        with (self._with_suite(suite), self._fixture_floor(),
+              contextlib.redirect_stderr(io.StringIO())):
+            with self.assertRaisesRegex(ContractGateError, "^CI_REQUIRED_SUITE_FAILED:"):
+                run_single(self.pattern, self.folder)
+
+    def test_failing_subtest_remains_denied(self):
+        """A subTest failure must not be hidden by a passing sibling."""
+        (self.folder / self.pattern).write_text("# synthetic suite\n", encoding="utf-8")
+        class SyntheticSubtest(unittest.TestCase):
+            def test_multiple(self):
+                with self.subTest(case="pass"):
+                    self.assertTrue(True)
+                with self.subTest(case="fail"):
+                    self.assertTrue(False)
+        suite = unittest.defaultTestLoader.loadTestsFromTestCase(SyntheticSubtest)
+        with (self._with_suite(suite), self._fixture_floor(),
+              contextlib.redirect_stderr(io.StringIO())):
+            with self.assertRaisesRegex(ContractGateError, "^CI_REQUIRED_SUITE_FAILED:"):
+                run_single(self.pattern, self.folder)
+
+    def test_mixed_pass_and_expected_failure_is_denied(self):
+        """A passing sibling cannot mask a failed expectedFailure case."""
+        (self.folder / self.pattern).write_text("# synthetic suite\n", encoding="utf-8")
+        class SyntheticMixed(unittest.TestCase):
+            def test_pass(self):
+                self.assertTrue(True)
+
+            @unittest.expectedFailure
+            def test_failed_but_expected(self):
+                self.fail("synthetic failure")
+        suite = unittest.defaultTestLoader.loadTestsFromTestCase(SyntheticMixed)
+        with (self._with_suite(suite), self._fixture_floor(),
+              contextlib.redirect_stderr(io.StringIO())):
+            with self.assertRaisesRegex(
+                ContractGateError, "^CI_REQUIRED_SUITE_EXPECTED_FAILURE:"
+            ):
+                run_single(self.pattern, self.folder)
+
     def test_minimum_case_floors_pinned_for_all_mandatory_suites(self):
         expected = {
             "test_scaffold.py": 5,
@@ -97,7 +158,7 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
     "test_provenance_intake.py": 13,
     "test_rpc_qualification_prep.py": 13,
     "test_reorg_qualification_prep.py": 13,
-    "test_ci_contract_gate.py": 10,
+    "test_ci_contract_gate.py": 14,
         }
         self.assertEqual(MINIMUM_CASES, expected)
         self.assertEqual(MANDATORY_SUITES, tuple(expected))
