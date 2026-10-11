@@ -45,6 +45,8 @@ GUI_TEST_IDS = frozenset({
 })
 # Security-critical original non-GUI identities; additive to original suite floors.
 CRITICAL_NON_GUI_IDS = frozenset({
+    "test_verify_core_release_offline.OfficialReleaseReviewCliTests.test_cli_success_is_non_authorizing_json_and_no_core_spawn",
+    "test_verify_core_release_offline.OfficialReleaseReviewCliTests.test_forced_execution_claim_is_always_rejected",
     "test_real_regtest_harness.HarnessTests.test_digest_mismatch_cannot_spawn",
     "test_regtest_artifact_preflight.RegtestBinaryArtifactPreflightTests.test_matching_synthetic_file_never_counts_as_real_node",
     "test_two_node_schema.ParallelTwoNodeSchemaTests.test_schema_version_is_exact_one_and_no_execution_authority",
@@ -106,7 +108,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 597
+FULL_MIN_CASES = 609
 
 
 def _cases(suite: unittest.TestSuite):
