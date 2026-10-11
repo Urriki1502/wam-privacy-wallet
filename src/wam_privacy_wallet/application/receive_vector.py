@@ -16,6 +16,8 @@ UPSTREAM_REPOSITORY = "Urriki1502/wam-silent-payments"
 UPSTREAM_COMMIT_SHA = "ac55f13423620252bdbf848c7e8a280c3b84721e"
 UPSTREAM_VECTOR_PATH = "tests/vectors/wsp1-wallet.json"
 UPSTREAM_VECTOR_BLOB_SHA = "67c77f1c60ed574d81e20147689d9fafc8797991"
+# Independently recorded digest of the one public address in that fixture.
+PUBLIC_VECTOR_SHA256 = "5a0f212b2e6153242f68576d3b7e7649e17dbfe98a8235448849e59870dfaaf4"
 UPSTREAM_CODEC_PATH = "src/wam_sp/codec.py"
 UPSTREAM_CODEC_BLOB_SHA = "ec28511113f055ce587f3bfabcd97608a3dfed56"
 EXPECTED_HRP = "wamrtsp"
@@ -31,7 +33,7 @@ _CODEC_FILE = (
     / "wsp_public"
     / "codec.py"
 )
-_FIXED_FINGERPRINT = sha256(_PUBLIC_ONLY_VECTOR.encode("ascii")).hexdigest()[:16]
+_FIXED_FINGERPRINT = PUBLIC_VECTOR_SHA256[:16]
 
 
 class ReceiveVectorError(ValueError):
@@ -77,6 +79,8 @@ def inspect_pinned_public_vector(
         or type(source_commit) is not str
         or source_commit != UPSTREAM_COMMIT_SHA
     ):
+        _deny()
+    if sha256(public_address.encode("ascii")).hexdigest() != PUBLIC_VECTOR_SHA256:
         _deny()
     try:
         raw = _CODEC_FILE.read_bytes()
