@@ -264,5 +264,34 @@ class GuiShellSmokeTests(unittest.TestCase):
         self.assertEqual(self.window.node_status.text(), "DISCONNECTED · NO RPC")
 
 
+    def test_explicit_pinned_research_demo_renders_only_untrusted_model(self) -> None:
+        self.window.run_fixed_offline_policy_demo()
+        self.window.navigation.setCurrentRow(3)
+        self.assertIn("UNTRUSTED", self.window.privacy_policy_status.text())
+        self.assertIn("NOT AUTHORIZED", self.window.privacy_policy_status.text())
+        self.assertIn("NO RPC / SIGN / SEND", self.window.privacy_policy_notice.text())
+        self.assertEqual(self.window.node_status.text(), "DISCONNECTED · NO RPC")
+        self.assertEqual(self.window.session_status.text(), "NO WALLET LOADED")
+        self.assertEqual(self.window.findChildren(QPushButton), [])
+
+    def test_rejected_demo_clears_previous_evidence_without_secret_leak(self) -> None:
+        from unittest.mock import patch
+        from wam_privacy_wallet.application.synthetic_policy_demo import SyntheticDemoError
+        self.window.run_fixed_offline_policy_demo()
+        with patch(
+            "wam_privacy_wallet.application.synthetic_policy_demo.run_fixed_synthetic_privacy_demo",
+            side_effect=SyntheticDemoError("PRIVATE_SECRET"),
+        ):
+            with self.assertRaisesRegex(
+                ValueError, "^APP_GUI_SYNTHETIC_MODEL_DENIED$"
+            ) as failed:
+                self.window.run_fixed_offline_policy_demo()
+            self.assertIsNone(failed.exception.__cause__)
+        self.assertEqual(self.window.privacy_policy_status.text(), "NO SYNTHETIC POLICY EVIDENCE")
+        self.assertNotIn("PRIVATE_SECRET", self.window.privacy_policy_notice.text())
+        self.assertEqual(self.window.node_status.text(), "DISCONNECTED · NO RPC")
+
+
+
 if __name__ == "__main__":
     unittest.main()
