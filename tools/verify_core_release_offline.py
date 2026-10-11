@@ -52,6 +52,9 @@ def _review_only_receipt(
             or _HEX.fullmatch(inventory.node_sha256) is None
             or type(inventory.node_byte_count) is not int
             or inventory.node_byte_count <= 0
+            or inventory.node_entry != ("wam-coin-v0.1.11/bin/wamd.exe"
+                                        if signed.archive_name.endswith(".zip")
+                                        else "wam-coin-v0.1.11/bin/wamd")
             or inventory.status != "UNTRUSTED_ARCHIVE_INVENTORY"
             or any(getattr(item, flag) is not False
                    for item in (signed, inventory)
