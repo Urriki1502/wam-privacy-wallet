@@ -147,7 +147,7 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
             "test_read_rpc.py": 11,
             "test_real_regtest_harness.py": 13,
             "test_regtest_cookie_descriptor.py": 14,
-            "test_two_node_private_workspace.py": 12,
+            "test_two_node_private_workspace.py": 13,
             "test_regtest_attestation.py": 10,
             "test_regtest_gateway.py": 10,
             "test_reuse_manifest.py": 6,
