@@ -90,6 +90,8 @@ class MainWindow(QMainWindow):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._offline_controller = OfflinePresentationController()
+        # Internal Qt projection writes must not recursively mutate revision.
+        self._managed_render_depth = 0
         self.setObjectName("wamPrivacyWalletWindow")
         self.setWindowTitle("WAM Privacy Wallet — Experimental")
         self.setMinimumSize(960, 620)
@@ -273,13 +275,21 @@ class MainWindow(QMainWindow):
         """Immutable offline evidence state; never confers wallet authority."""
         return self._offline_controller.state
 
+    def _clear_managed_panels(self) -> None:
+        """Internal view reset: does not independently advance a revision."""
+        self._managed_render_depth += 1
+        try:
+            self.clear_offline_node_snapshot()
+            self.clear_offline_privacy_readiness()
+            self.clear_offline_policy_report()
+            self.clear_public_receive_vector()
+        finally:
+            self._managed_render_depth -= 1
+
     def clear_offline_presentation(self) -> None:
         """Invalidate revisions and clear every research evidence panel."""
         self._offline_controller.reset()
-        self.clear_offline_node_snapshot()
-        self.clear_offline_privacy_readiness()
-        self.clear_offline_policy_report()
-        self.clear_public_receive_vector()
+        self._clear_managed_panels()
 
     def replace_offline_presentation(
         self, expected_revision: object, *, node: object = None,
@@ -292,15 +302,10 @@ class MainWindow(QMainWindow):
                 policy=policy, receive=receive,
             )
         except OfflineLifecycleError:
-            self.clear_offline_node_snapshot()
-            self.clear_offline_privacy_readiness()
-            self.clear_offline_policy_report()
-            self.clear_public_receive_vector()
+            self._clear_managed_panels()
             raise
-        self.clear_offline_node_snapshot()
-        self.clear_offline_privacy_readiness()
-        self.clear_offline_policy_report()
-        self.clear_public_receive_vector()
+        self._clear_managed_panels()
+        self._managed_render_depth += 1
         try:
             if state.node == "UNVERIFIED":
                 self.present_offline_node_snapshot(node)
@@ -314,11 +319,10 @@ class MainWindow(QMainWindow):
             # Presentation can fail after the controller committed a revision.
             # Never leave a partial GUI with a falsely accepted state.
             self._offline_controller.reset()
-            self.clear_offline_node_snapshot()
-            self.clear_offline_privacy_readiness()
-            self.clear_offline_policy_report()
-            self.clear_public_receive_vector()
+            self._clear_managed_panels()
             raise OfflineLifecycleError("APP_OFFLINE_RENDER_DENIED") from None
+        finally:
+            self._managed_render_depth -= 1
 
     def present_offline_node_snapshot(self, snapshot: object) -> None:
         """Display a non-authorizing, unverified projection; no node/RPC access.
@@ -339,6 +343,11 @@ class MainWindow(QMainWindow):
             or snapshot.notice != "EXPERIMENTAL_NO_REAL_FUNDS"
         ):
             raise ValueError("APP_GUI_DIAGNOSTIC_REJECTED")
+        if not self._managed_render_depth:
+            self.replace_offline_presentation(
+                self._offline_controller.state.revision, node=snapshot
+            )
+            return
         self.node_diagnostic_status.setText(
             f"UNVERIFIED · regtest height {snapshot.height} · NO RPC"
         )
@@ -349,6 +358,9 @@ class MainWindow(QMainWindow):
 
     def clear_offline_node_snapshot(self) -> None:
         """Clear the view without retaining a profile or transport handle."""
+        if not self._managed_render_depth:
+            self.clear_offline_presentation()
+            return
         self.node_diagnostic_status.setText("NO DIAGNOSTIC SNAPSHOT · NO RPC")
         self.node_diagnostic_notice.setText(
             "UNVERIFIED DATA ONLY · NOT A CONNECTION OR WALLET AUTHORIZATION"
@@ -377,6 +389,11 @@ class MainWindow(QMainWindow):
             raise ValueError("APP_GUI_PRIVACY_GATE_REJECTED")
         # Fixed vocabulary prevents accidental display of untrusted manifest
         # blocker text, paths, RPC settings, keys, or authority-like claims.
+        if not self._managed_render_depth:
+            self.replace_offline_presentation(
+                self._offline_controller.state.revision, privacy=snapshot
+            )
+            return
         self.privacy_readiness_status.setText(
             "RESEARCH ONLY · 0 ACTIVE WALLET CAPABILITIES"
         )
@@ -388,6 +405,9 @@ class MainWindow(QMainWindow):
 
     def clear_offline_privacy_readiness(self) -> None:
         """Reset to the non-authorizing preview without storing evidence."""
+        if not self._managed_render_depth:
+            self.clear_offline_presentation()
+            return
         self.privacy_readiness_status.setText("RESEARCH INVENTORY · NOT LOADED")
         self.privacy_readiness_notice.setText(
             "WSP-1, PAYJOIN AND NETWORK PRIVACY · NO ACTIVE INTEGRATION"
@@ -410,6 +430,11 @@ class MainWindow(QMainWindow):
             or type(report.send) is not str or report.send != "BLOCKED"
         ):
             raise ValueError("APP_GUI_SYNTHETIC_POLICY_DENIED")
+        if not self._managed_render_depth:
+            self.replace_offline_presentation(
+                self._offline_controller.state.revision, policy=report
+            )
+            return
         self.privacy_policy_status.setText(
             "SIMULATED MODELS · UNTRUSTED · NOT AUTHORIZED"
         )
@@ -435,6 +460,9 @@ class MainWindow(QMainWindow):
 
     def clear_offline_policy_report(self) -> None:
         """Reset only the synthetic model panel; never persist the input."""
+        if not self._managed_render_depth:
+            self.clear_offline_presentation()
+            return
         self.privacy_policy_status.setText("NO SYNTHETIC POLICY EVIDENCE")
         self.privacy_policy_notice.setText(
             "PAYJOIN & NETWORK POLICY · NOT AUTHORIZED"
@@ -459,6 +487,11 @@ class MainWindow(QMainWindow):
             or type(preview.signer) is not str or preview.signer != "BLOCKED"
         ):
             raise ValueError("APP_GUI_RECEIVE_VECTOR_DENIED")
+        if not self._managed_render_depth:
+            self.replace_offline_presentation(
+                self._offline_controller.state.revision, receive=preview
+            )
+            return
         self.receive_vector_status.setText(
             f"SYNTHETIC REGTEST · PUBLIC FINGERPRINT {_FIXED_FINGERPRINT}"
         )
@@ -469,6 +502,9 @@ class MainWindow(QMainWindow):
 
     def clear_public_receive_vector(self) -> None:
         """Remove the optional preview; no wallet object is ever retained."""
+        if not self._managed_render_depth:
+            self.clear_offline_presentation()
+            return
         self.receive_vector_status.setText("NO PUBLIC SAMPLE · NO ADDRESS GENERATED")
         self.receive_vector_notice.setText(
             "NOT A RECEIVING ADDRESS · NO QR / COPY · SCANNER AND SIGNER BLOCKED"
