@@ -344,7 +344,7 @@ class OfflineIntegrationStatusTests(unittest.TestCase):
             OfflineRescanSegments,
         )
         report = OfflineRescanSegments(
-            "OFFLINE_RESCAN_UNTRUSTED", "CONTIGUOUS_UNVERIFIED",
+            "CONTIGUOUS_UNVERIFIED",
             "REVALIDATE_BEFORE_RESCAN", 5, 3, 5, 1, 0, 2, 4,
         )
         state = presentation().replace(0, rescan=report)
