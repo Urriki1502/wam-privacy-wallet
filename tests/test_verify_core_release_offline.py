@@ -159,6 +159,10 @@ class OfficialReleaseReviewCliTests(unittest.TestCase):
 
     def test_empty_binary_receipt_is_denied(self):
         changed = inventory()
+        object.__setattr__(changed, "node_entry", "../wallet.dat")
+        with self.assertRaisesRegex(CoreReleaseSignatureError, "^CORE_RECEIPT_AUTHORITY_DENIED$"):
+            cli._review_only_receipt(signed(), changed)
+        changed = inventory()
         object.__setattr__(changed, "node_byte_count", 0)
         with self.assertRaisesRegex(
             CoreReleaseSignatureError, "^CORE_RECEIPT_AUTHORITY_DENIED$"
