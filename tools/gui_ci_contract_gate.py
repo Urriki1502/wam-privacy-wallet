@@ -38,13 +38,16 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_scanner_window_contract.OfflineScanWindowTests.test_immutable_summary_and_no_io_or_wsp_imports",
     "test_offline_recovery_disposition.OfflineRecoveryDispositionTests.test_no_caller_can_claim_verified_writer_identity_or_integrity",
     "test_offline_recovery_disposition.OfflineRecoveryDispositionTests.test_readonly_policy_never_uses_file_socket_or_subprocess",
+    "test_offline_recovery_transition.OfflineRecoveryTransitionTests.test_legacy_version_two_to_three_does_not_prove_rescan",
+    "test_offline_recovery_transition.OfflineRecoveryTransitionTests.test_downgrade_to_legacy_is_fail_closed",
+    "test_offline_recovery_transition.OfflineRecoveryTransitionTests.test_no_file_socket_subprocess_or_wsp_imports",
     "test_offline_integration_status.OfflineIntegrationStatusTests.test_all_three_synthetic_evidence_types_never_make_a_wallet",
     "test_offline_integration_status.OfflineIntegrationStatusTests.test_in_place_scan_authority_forgery_denied",
     "test_offline_integration_status.OfflineIntegrationStatusTests.test_in_place_storage_writer_claim_denied",
     "test_offline_integration_status.OfflineIntegrationStatusTests.test_no_network_file_subprocess_or_operational_engine",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 380
+FULL_MIN_CASES = 396
 
 
 def _cases(suite: unittest.TestSuite):
