@@ -80,3 +80,33 @@ cases and 15 pinned GUI identities**. Earlier 303/378 PASS runs qualify only
 their old commit SHAs; new exact-head Wallet CI and CodeQL must be re-read
 before acceptance. This change does not touch WAM Core, WSP-1 runtime,
 scanner, storage writer or any real key/funds.
+
+## Reentrant Qt transaction poisoning (11 Oct 2026)
+
+Security review of the single-writer GUI identified a *reentrant callback*
+interleaving not covered by earlier render/clear exception tests: a Qt widget
+callback could invoke public `clear_offline_presentation()` or
+`replace_offline_presentation()` while an outer transaction was already
+clearing or rendering research labels. A nested update could otherwise alter
+the revision, and a swallowed nested failure could allow the outer accepted
+snapshot to survive in an inconsistent visual state.
+
+The GUI now maintains a **per-window active transition guard**. Any nested
+public clear/replace is rejected with fixed, redacted
+`APP_OFFLINE_REENTRANT_DENIED` and permanently poisons the enclosing
+transaction until it rolls back. Even when the inner callback *catches* the
+error, the outer transaction detects the poison, invalidates the accepted
+revision, retries best-effort all-panel cleanup and raises the redacted
+`APP_OFFLINE_RENDER_DENIED`. A later valid update can proceed with a fresh
+revision; no source DTO is retained. The guard has no persistence and grants
+no wallet, WSP scanner, Core execution or signer authority.
+
+Three deterministic GUI tests inject (1) nested clear during rendering,
+(2) nested replace during panel clearing, and (3) nested replace during
+explicit clear followed by an ordinary valid update. They assert fixed errors,
+revision invalidation and that unaffected panels remain cleared. The
+required additive GUI discovery threshold is **308** full tests,
+with **40** GUI cases. All previously pinned GUI and native mandatory
+IDs remain required. Earlier green runs belong to previous Git commit SHAs;
+only new exact-head Wallet CI 8/8 and CodeQL Python/Actions 2/2 qualify this
+change. Owner decides final acceptance; no outside reviewer required.
