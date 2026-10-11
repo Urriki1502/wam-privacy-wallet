@@ -45,6 +45,9 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_offline_recovery_transition.OfflineRecoveryTransitionTests.test_legacy_version_two_to_three_does_not_prove_rescan",
     "test_offline_recovery_transition.OfflineRecoveryTransitionTests.test_downgrade_to_legacy_is_fail_closed",
     "test_offline_recovery_transition.OfflineRecoveryTransitionTests.test_no_file_socket_subprocess_or_wsp_imports",
+    "test_offline_resume_review.OfflineResumeReviewTests.test_matching_crash_never_auto_resumes",
+    "test_offline_resume_review.OfflineResumeReviewTests.test_legacy_to_v3_never_proves_migration",
+    "test_offline_resume_review.OfflineResumeReviewTests.test_no_file_socket_process_or_wsp_imports",
     "test_offline_integration_status.OfflineIntegrationStatusTests.test_all_three_synthetic_evidence_types_never_make_a_wallet",
     "test_offline_integration_status.OfflineIntegrationStatusTests.test_in_place_scan_authority_forgery_denied",
     "test_offline_integration_status.OfflineIntegrationStatusTests.test_in_place_storage_writer_claim_denied",
@@ -53,7 +56,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_offline_integration_status.OfflineIntegrationStatusTests.test_conflicting_storage_and_presentation_recovery_denied",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 406
+FULL_MIN_CASES = 425
 
 
 def _cases(suite: unittest.TestSuite):
