@@ -6,7 +6,7 @@ qualification. No network, subprocess, wallet, datadir, keys or secrets.
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 from pathlib import Path
 import sys
@@ -27,11 +27,15 @@ class LocalHashEvidence:
     """Local hash match only. No attestation or permission is represented."""
 
     sha256: str
-    profile_network: str = "regtest"
-    status: str = "LOCAL_SHA256_MATCH_ONLY"
-    real_regtest_qualified: bool = False
-    publisher_identity_verified: bool = False
-    release_allowed: bool = False
+    # All status/authority claims are non-configurable, even at construction.
+    # This remains a data contract, not a sandbox against hostile Python code.
+    profile_network: str = field(default="regtest", init=False)
+    status: str = field(default="LOCAL_SHA256_MATCH_ONLY", init=False)
+    real_regtest_qualified: bool = field(default=False, init=False)
+    publisher_identity_verified: bool = field(default=False, init=False)
+    binary_source_equivalence_verified: bool = field(default=False, init=False)
+    execution_allowed: bool = field(default=False, init=False)
+    release_allowed: bool = field(default=False, init=False)
 
 
 def evaluate_local_binary(binary: object, expected_sha256: object) -> LocalHashEvidence:
@@ -86,6 +90,8 @@ def main(argv: list[str] | None = None) -> int:
         "sha256": evidence.sha256,
         "real_regtest_qualified": evidence.real_regtest_qualified,
         "publisher_identity_verified": evidence.publisher_identity_verified,
+        "binary_source_equivalence_verified": evidence.binary_source_equivalence_verified,
+        "execution_allowed": evidence.execution_allowed,
         "release_allowed": evidence.release_allowed,
     }, sort_keys=True))
     return 0
