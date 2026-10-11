@@ -12,6 +12,7 @@ from typing import Literal
 
 from .node_status import NodeOverview
 from .recovery_transition import OfflineRecoveryTransition
+from .offline_resume_review import OfflineResumeReview
 from .policy_evidence import SyntheticPolicyReport
 from .privacy_readiness import PrivacyResearchSnapshot
 from .receive_vector import ReceiveVectorPreview, _FIXED_FINGERPRINT
@@ -35,6 +36,10 @@ class OfflinePresentationState:
     recovery: Literal[
         "ABSENT", "REVIEW_ONLY_NOT_VERIFIED", "RESCAN_REQUIRED",
         "MIGRATION_RESCAN_REQUIRED",
+    ] = "ABSENT"
+    resume: Literal[
+        "ABSENT", "REVALIDATE_BEFORE_RESCAN", "REWIND_RESCAN_REVIEW",
+        "MIGRATION_RESCAN_REVIEW",
     ] = "ABSENT"
 
 
@@ -131,6 +136,34 @@ def _valid_recovery(value: object) -> bool:
     return cases.get(value.reason) == value.decision
 
 
+def _valid_resume(value: object) -> bool:
+    """Strict scalar shape check: a resume preview never grants authority."""
+    if type(value) is not OfflineResumeReview:
+        return False
+    if (
+        type(value.revision) is not int or not 1 <= value.revision < 2**63
+        or type(value.interrupted_height) is not int
+        or type(value.claimed_checkpoint_height) is not int
+        or not 0 <= value.claimed_checkpoint_height <= value.interrupted_height <= 100_000_000
+        or type(value.action) is not str or type(value.reason) is not str
+        or type(value.status) is not str
+        or value.status != "OFFLINE_RESUME_UNTRUSTED"
+        or value.scanner_enabled is not False
+        or value.wallet_enabled is not False
+        or value.resume_authorized is not False
+        or value.checkpoint_durable is not False
+        or value.chain_verified is not False
+        or value.release_allowed is not False
+    ):
+        return False
+    cases = {
+        "REVALIDATE_BEFORE_RESCAN": "UNVERIFIED_INTERRUPTION",
+        "REWIND_RESCAN_REVIEW": "REORG_OR_ROLLBACK_SUSPECTED",
+        "MIGRATION_RESCAN_REVIEW": "SCHEMA_MIGRATION_REQUIRED",
+    }
+    return cases.get(value.action) == value.reason
+
+
 class OfflinePresentationController:
     """Whole-view replacements with revision checks and fail-closed rejection.
 
@@ -163,6 +196,7 @@ class OfflinePresentationController:
         policy: object = None,
         receive: object = None,
         recovery: object = None,
+        resume: object = None,
     ) -> OfflinePresentationState:
         if type(expected_revision) is not int or expected_revision != self._state.revision:
             self._reject()
@@ -172,6 +206,7 @@ class OfflinePresentationController:
             or (policy is not None and not _valid_policy(policy))
             or (receive is not None and not _valid_receive(receive))
             or (recovery is not None and not _valid_recovery(recovery))
+            or (resume is not None and not _valid_resume(resume))
         ):
             self._reject()
         self._state = OfflinePresentationState(
@@ -182,5 +217,6 @@ class OfflinePresentationController:
             "PUBLIC_FIXTURE" if receive is not None else "ABSENT",
             "BLOCKED", "OFFLINE_REGTEST_ONLY", "NO_WALLET_LOADED", "REPLACED",
             recovery.decision if recovery is not None else "ABSENT",
+            resume.action if resume is not None else "ABSENT",
         )
         return self._state
