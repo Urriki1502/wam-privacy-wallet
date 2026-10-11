@@ -140,6 +140,17 @@ def _stop_process(process: subprocess.Popen[bytes]) -> None:
         process.wait(timeout=8)
 
 
+def _require_reviewed_core_launch() -> None:
+    """Fail-closed launch interlock until #36 has a reviewed binding solution.
+
+    File SHA256 by pathname is insufficient to prove that the bytes later
+    executed by Popen(path) are the bytes checked. No environment variable,
+    command-line flag or user-provided digest can override this interlock.
+    Tests may patch the interlock *only with Popen mocked*, never real Core.
+    """
+    raise RealRegtestError("CORE_EXECUTION_REVIEW_REQUIRED") from None
+
+
 def check_real_regtest(
     binary: str | os.PathLike[str],
     sha256: str,
@@ -154,6 +165,7 @@ def check_real_regtest(
     if type(startup_timeout) not in (int, float) or not 1 <= startup_timeout <= 120:
         raise RealRegtestError("CORE_TIMEOUT_INVALID")
     executable = verify_binary(binary, sha256)
+    _require_reviewed_core_launch()
     with tempfile.TemporaryDirectory(prefix="wam-regtest-check-") as workspace:
         datadir = Path(workspace).resolve()
         rpc_port = _free_local_port()
