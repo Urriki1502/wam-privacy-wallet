@@ -54,6 +54,8 @@ def _valid_presentation(s: object) -> bool:
         and type(s.authority) is str and s.authority == "BLOCKED"
         and type(s.network) is str and s.network == "OFFLINE_REGTEST_ONLY"
         and type(s.wallet) is str and s.wallet == "NO_WALLET_LOADED"
+        and type(s.rescan) is str
+        and s.rescan in ("ABSENT", "NO_SEGMENTS", "CONTIGUOUS_UNVERIFIED", "REPLAY_NOT_APPLIED")
         and type(s.resume) is str
         and s.resume in ("ABSENT", "REVALIDATE_BEFORE_RESCAN",
                          "REWIND_RESCAN_REVIEW", "MIGRATION_RESCAN_REVIEW")
@@ -65,7 +67,7 @@ def _valid_presentation(s: object) -> bool:
         # Cleared/rejected/initial revisions cannot retain display evidence.
         and (
             s.transition == "REPLACED"
-            or (s.node, s.privacy, s.policy, s.receive, s.recovery, s.resume) == ("ABSENT",) * 6
+            or (s.node, s.privacy, s.policy, s.receive, s.recovery, s.resume, s.rescan) == ("ABSENT",) * 7
         )
         and (
             (s.transition == "INITIAL" and s.revision == 0)
@@ -149,6 +151,7 @@ def inspect_offline_integration(
         presentation.receive != "ABSENT",
         presentation.recovery != "ABSENT",
         presentation.resume != "ABSENT",
+        presentation.rescan != "ABSENT",
     ))
     return OfflineIntegrationStatus(
         revision=presentation.revision,
