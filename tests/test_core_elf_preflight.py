@@ -6,6 +6,7 @@ No subprocess, dynamic loader or WAM Core execution in these tests.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 import struct
 import sys
 import unittest
@@ -13,6 +14,7 @@ from contextlib import contextmanager
 from unittest.mock import patch
 
 from wam_privacy_wallet.node import core_elf_preflight as elf
+from tools import verify_core_release_sealed as cli
 
 _HEADER = struct.Struct("<HHIQQQIHHHHHH")
 _PH = struct.Struct("<IIQQQQQQ")
@@ -172,6 +174,39 @@ class SealedElfStaticTests(unittest.TestCase):
         with _kernel_fd(_binary(stack_exec=True)) as fd:
             with self.assertRaisesRegex(elf.SealedElfError, "^CORE_ELF_SEGMENT_DENIED$"):
                 elf.inspect_sealed_linux_elf(fd)
+
+
+class RedactedSignedElfCliBoundaryTests(unittest.TestCase):
+    def test_elf_denial_survives_memfd_cleanup_without_leaking_binary(self):
+        closed = []
+        class Review:
+            _descriptor = 9
+            def audit(self):
+                return True
+        @contextmanager
+        def metadata():
+            try:
+                root = Path.cwd()
+                yield {"key": root / "key", "checksums": root / "sums",
+                       "signature": root / "sig"}
+            finally:
+                closed.append("metadata")
+        @contextmanager
+        def snapshot(**kwargs):
+            try:
+                yield Review()
+            finally:
+                closed.append("fd")
+        with patch.object(cli, "official_release_metadata", side_effect=metadata), \
+             patch.object(cli, "sealed_signed_linux_wamd", side_effect=snapshot), \
+             patch.object(cli, "inspect_sealed_linux_elf",
+                          side_effect=elf.SealedElfError("CORE_ELF_HEADER_DENIED")):
+            with self.assertRaisesRegex(elf.SealedElfError, "^CORE_ELF_HEADER_DENIED$"):
+                cli.verify_signed_linux_memfd(
+                    archive=str(Path.cwd() / "official.tar.gz"),
+                    gpg=str(Path.cwd() / "gpg"),
+                )
+        self.assertEqual(closed, ["fd", "metadata"])
 
 
 if __name__ == "__main__":
