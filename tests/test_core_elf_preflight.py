@@ -154,7 +154,7 @@ class SealedElfStaticTests(unittest.TestCase):
             self._unsupported()
             return
         with _kernel_fd(_binary(load_flags=7)) as fd:
-            with self.assertRaisesRegex(elf.SealedElfError, "^CORE_ELF_SEGMENT_DENIED$"):
+            with self.assertRaisesRegex(elf.SealedElfError, "^CORE_ELF_WX_LOAD_DENIED$"):
                 elf.inspect_sealed_linux_elf(fd)
 
     def test_bad_interpreter_string_denied_without_leak(self):
@@ -172,7 +172,7 @@ class SealedElfStaticTests(unittest.TestCase):
             self._unsupported()
             return
         with _kernel_fd(_binary(stack_exec=True)) as fd:
-            with self.assertRaisesRegex(elf.SealedElfError, "^CORE_ELF_SEGMENT_DENIED$"):
+            with self.assertRaisesRegex(elf.SealedElfError, "^CORE_ELF_EXECUTABLE_STACK_DENIED$"):
                 elf.inspect_sealed_linux_elf(fd)
 
 
