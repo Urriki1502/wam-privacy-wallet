@@ -51,3 +51,36 @@ reduce it: inspect the specific job log and fix the integration defect.
 5. This bundle is **not** a substitute for reviewing each security-sensitive
    source PR. Treat its own code review and exact-head qualification as another
    gate, not an automatic shortcut to release.
+
+## Cross-module research interaction gate — review revision 2
+
+The original five-PR union above was verified separately at
+`85dc11dbe563f588298e5553a9548de3292fc941` with **28/28 mandatory
+suites and 356/356 full-discovery tests**. A *new*, additive sixth piece
+was then introduced on this integration branch (not one of the five source
+PRs): `application/offline_integration_status.py`.
+
+This is a **read-only aggregation of three already-untrusted scalar DTOs**:
+offline GUI presentation, synthetic scanner window, and synthetic storage
+recovery disposition. Invalid or inconsistent claims fail closed with fixed
+redacted errors. A normal-looking aggregate still reports
+`REVIEW_ONLY_UNTRUSTED` and keeps Core, scanner, storage, signer, send and
+release authority **false**. It never retains keys, endpoints, raw blocks,
+database paths, RPC handles, credentials or source DTOs. It is not a
+wallet coordinator or operating state machine.
+
+The accompanying **20 cross-module regressions** include correctly typed
+but internally forged states (cleared/rejected panel persistence, illegal
+revision progression, fake Core/release authority), mutated scanner RPC flags,
+incoherent window counts, misrepresented recovery outcomes/lock states,
+immutable output, sensitive-field nonretention and no file/socket/process
+access.
+
+**Current exact-HEAD acceptance targets (supersede the table above for this
+new candidate):** 29/29 mandatory suites, 376/376 full-discovery cases
+(minimum floor 376), 13 GUI pinned IDs, preflight >=10, integration status
+>=20; retain **every** original regression. Previously green 28/356
+logs DO NOT qualify any updated HEAD. Obtain new 8/8 Wallet CI job evidence
+including Win x86/x64, macOS and three GUI hosts, then independently verify
+CodeQL Python and Actions and an eligible reviewer before considering any
+merge. Governance #35, WAM Core #36 and frozen/held PR boundaries still apply.
