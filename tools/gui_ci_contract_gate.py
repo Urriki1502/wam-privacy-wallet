@@ -50,6 +50,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_probe_existing_regtest.ExistingRegtestCliTests.test_block_height_only_fetches_parent_directly_over_node_rpc",
     "test_probe_two_node_regtest.TwoNodeRegtestWireTests.test_same_tip_different_parent_rejected_across_nodes",
     "test_probe_two_node_regtest.TwoNodeRegtestWireTests.test_same_tip_parent_reorg_mid_block_denied",
+    "test_core_elf_preflight.RedactedSignedElfCliBoundaryTests.test_elf_denial_survives_memfd_cleanup_without_leaking_binary",
     "test_core_elf_preflight.SealedElfStaticTests.test_real_kernel_sealed_x86_64_elf_headers",
     "test_core_elf_preflight.SealedElfStaticTests.test_sealed_but_executable_memfd_is_denied",
     "test_core_signed_linux_memfd.SignedLinuxCoreMemfdTests.test_real_kernel_memfd_has_no_execute_bits_and_signed_byte_hash",
@@ -125,7 +126,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 704
+FULL_MIN_CASES = 705
 
 
 def _cases(suite: unittest.TestSuite):
