@@ -23,6 +23,10 @@ class PinnedSyntheticPolicyDemoTests(unittest.TestCase):
 
     def test_vendor_code_is_byte_identical_to_pinned_upstream_blobs(self):
         self.assertEqual(len(demo._PINNED_FILES), 4)
+        # Windows checkout must not silently CRLF-convert SHA-pinned blobs.
+        attrs = (demo._SOURCE_ROOT.parents[1] / ".gitattributes").read_text(encoding="utf-8")
+        for path in demo._PINNED_FILES:
+            self.assertIn(f"src/wam_privacy_wallet/{path} text eol=lf", attrs)
         for path, expected in demo._PINNED_FILES.items():
             with self.subTest(source=path):
                 data = (demo._SOURCE_ROOT / path).read_bytes()
