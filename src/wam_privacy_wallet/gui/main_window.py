@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 
-from wam_privacy_wallet.application.presentation_lifecycle import OfflinePresentationController, OfflineLifecycleError, _valid_recovery, _valid_resume, _valid_rescan
+from wam_privacy_wallet.application.presentation_lifecycle import OfflinePresentationController, OfflineLifecycleError, _valid_recovery, _valid_resume, _valid_rescan, _valid_reorg
 from wam_privacy_wallet.application.node_status import NodeOverview
 from wam_privacy_wallet.application.privacy_readiness import PrivacyResearchSnapshot
 from wam_privacy_wallet.application.policy_evidence import SyntheticPolicyReport
@@ -280,6 +280,16 @@ class MainWindow(QMainWindow):
             self.rescan_segments_notice.setObjectName("smallText")
             self.rescan_segments_notice.setWordWrap(True)
             column.addWidget(self.rescan_segments_notice)
+            self.reorg_review_status = QLabel("NO REORG RECONCILIATION EVIDENCE")
+            column.addWidget(self._status_card(
+                "CHECKPOINT / REORG · SYNTHETIC REVIEW", self.reorg_review_status
+            ))
+            self.reorg_review_notice = QLabel(
+                "NO TRUSTED CURSOR · NO SCANNER / WALLET / RELEASE"
+            )
+            self.reorg_review_notice.setObjectName("smallText")
+            self.reorg_review_notice.setWordWrap(True)
+            column.addWidget(self.reorg_review_notice)
             placeholder = QLabel("REAL BACKUP, RESTORE AND MIGRATION · BLOCKED")
             placeholder.setObjectName("notice")
             column.addWidget(placeholder)
@@ -313,7 +323,7 @@ class MainWindow(QMainWindow):
         """Attempt ALL panel resets and signal any failure without leaking Qt details.
 
         Partial cleanup is never silently accepted; a broken label setter must
-        not stop the other six panels from being cleared.
+        not stop the other seven panels from being cleared.
         """
         self._managed_render_depth += 1
         failed = False
@@ -326,6 +336,7 @@ class MainWindow(QMainWindow):
                 self.clear_offline_recovery_review,
                 self.clear_offline_resume_review,
                 self.clear_offline_rescan_segments,
+                self.clear_offline_reorg_reconciliation,
             ):
                 try:
                     clear()
@@ -345,14 +356,14 @@ class MainWindow(QMainWindow):
         self, expected_revision: object, *, node: object = None,
         privacy: object = None, policy: object = None, receive: object = None,
         recovery: object = None, resume: object = None,
-        rescan: object = None,
+        rescan: object = None, reorg: object = None,
     ) -> None:
-        """Atomically validate all seven synthetic DTOs before displaying."""
+        """Atomically validate all eight synthetic DTOs before displaying."""
         try:
             state = self._offline_controller.replace(
                 expected_revision, node=node, privacy=privacy,
                 policy=policy, receive=receive, recovery=recovery, resume=resume,
-                rescan=rescan,
+                rescan=rescan, reorg=reorg,
             )
         except OfflineLifecycleError:
             # Validation already rejected the revision; still clear every
@@ -382,6 +393,8 @@ class MainWindow(QMainWindow):
                     self.present_offline_resume_review(resume)
                 if state.rescan != "ABSENT":
                     self.present_offline_rescan_segments(rescan)
+                if state.reorg != "ABSENT":
+                    self.present_offline_reorg_reconciliation(reorg)
             finally:
                 self._managed_render_depth -= 1
         except Exception:
@@ -490,6 +503,38 @@ class MainWindow(QMainWindow):
         self.rescan_segments_status.setText("NO RESCAN SEGMENT EVIDENCE")
         self.rescan_segments_notice.setText(
             "NO DURABLE CHECKPOINT · NO SCANNER · NO WALLET"
+        )
+
+    def present_offline_reorg_reconciliation(self, report: object) -> None:
+        """Display fixed reconciliation warning, never derive a rescan cursor."""
+        if not _valid_reorg(report):
+            raise ValueError("APP_GUI_REORG_REVIEW_DENIED")
+        if not self._managed_render_depth:
+            self.replace_offline_presentation(
+                self._offline_controller.state.revision, reorg=report
+            )
+            return
+        messages = {
+            "NO_PROGRESS_EVIDENCE": "NO VERIFIED RESCAN PROGRESS",
+            "CONTIGUOUS_BUT_UNVERIFIED": "CONTIGUOUS CLAIM · NOT AUTHENTICATED",
+            "REPLAY_NOT_DOUBLE_COUNTED": "REPLAY CLAIM · NOT COMMITTED",
+            "ROLLBACK_RESCAN_REVIEW": "ROLLBACK REVIEW · NO SAFE CURSOR",
+            "MIGRATION_RESCAN_REVIEW": "MIGRATION REVIEW · NO SAFE CURSOR",
+        }
+        self.reorg_review_status.setText(messages[report.verdict])
+        self.reorg_review_notice.setText(
+            "UNTRUSTED CROSS-SOURCE RECONCILIATION · "
+            "NO RESCAN / RESTART AUTHORIZATION"
+        )
+
+    def clear_offline_reorg_reconciliation(self) -> None:
+        """Remove untrusted reconciliation view via the single writer."""
+        if not self._managed_render_depth:
+            self.clear_offline_presentation()
+            return
+        self.reorg_review_status.setText("NO REORG RECONCILIATION EVIDENCE")
+        self.reorg_review_notice.setText(
+            "NO TRUSTED CURSOR · NO SCANNER / WALLET / RELEASE"
         )
 
     def present_offline_node_snapshot(self, snapshot: object) -> None:
