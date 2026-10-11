@@ -30,9 +30,15 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_security_gate_ledger.SecurityGateLedgerTests.test_cannot_auto_promote_global_authority",
     "test_rpc_qualification_prep.RpcQualificationPreparationTests.test_fake_approval_release_or_core_execution_denied",
     "test_ci_contract_gate.MandatoryOfflineContractGateTests.test_minimum_case_floors_pinned_for_all_mandatory_suites",
+    "test_scanner_response_shape.ScannerResponseShapeTests.test_no_files_sockets_subprocess_or_wsp_imports",
+    "test_scanner_response_shape.ScannerResponseShapeTests.test_wrong_hash_or_previous_hash_or_height_rejected",
+    "test_scanner_window_contract.OfflineScanWindowTests.test_changing_reported_tip_denied",
+    "test_scanner_window_contract.OfflineScanWindowTests.test_immutable_summary_and_no_io_or_wsp_imports",
+    "test_offline_recovery_disposition.OfflineRecoveryDispositionTests.test_no_caller_can_claim_verified_writer_identity_or_integrity",
+    "test_offline_recovery_disposition.OfflineRecoveryDispositionTests.test_readonly_policy_never_uses_file_socket_or_subprocess",
 })
-# Existing 284-case floor + 10 lifecycle contracts + 9 lifecycle GUI cases.
-FULL_MIN_CASES = 303
+# Full floor is the additive union of original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18.
+FULL_MIN_CASES = 356
 
 
 def _cases(suite: unittest.TestSuite):
