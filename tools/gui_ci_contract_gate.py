@@ -16,6 +16,10 @@ GUI_TEST_IDS = frozenset({
 # Security-critical original non-GUI identities; additive to original suite floors.
 CRITICAL_NON_GUI_IDS = frozenset({
     "test_real_regtest_harness.HarnessTests.test_digest_mismatch_cannot_spawn",
+    "test_real_regtest_harness.HarnessTests.test_verified_binary_still_cannot_spawn_before_binding_review",
+    "test_real_regtest_harness.HarnessTests.test_launch_gate_precedes_workspace_creation_and_socket_bind",
+    "test_core_artifact_staging.CoreArtifactStagingTests.test_verified_synthetic_snapshot_never_authorizes_core_execution",
+    "test_core_artifact_staging.CoreArtifactStagingTests.test_postcopy_metadata_race_rejected",
     "test_regtest_artifact_preflight.RegtestBinaryArtifactPreflightTests.test_matching_synthetic_file_never_counts_as_real_node",
     "test_two_node_schema.ParallelTwoNodeSchemaTests.test_schema_version_is_exact_one_and_no_execution_authority",
     "test_security_gate_ledger.SecurityGateLedgerTests.test_cannot_auto_promote_global_authority",
@@ -23,7 +27,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_ci_contract_gate.MandatoryOfflineContractGateTests.test_minimum_case_floors_pinned_for_all_mandatory_suites",
 })
 # Existing 267-case GUI baseline + 12 public-vector tests + 5 Receive GUI tests.
-FULL_MIN_CASES = 284
+FULL_MIN_CASES = 303
 
 
 def _cases(suite: unittest.TestSuite):
