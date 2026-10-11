@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 
-from wam_privacy_wallet.application.presentation_lifecycle import OfflinePresentationController, OfflineLifecycleError, _valid_recovery, _valid_resume
+from wam_privacy_wallet.application.presentation_lifecycle import OfflinePresentationController, OfflineLifecycleError, _valid_recovery, _valid_resume, _valid_rescan
 from wam_privacy_wallet.application.node_status import NodeOverview
 from wam_privacy_wallet.application.privacy_readiness import PrivacyResearchSnapshot
 from wam_privacy_wallet.application.policy_evidence import SyntheticPolicyReport
@@ -270,6 +270,16 @@ class MainWindow(QMainWindow):
             self.resume_review_notice.setObjectName("smallText")
             self.resume_review_notice.setWordWrap(True)
             column.addWidget(self.resume_review_notice)
+            self.rescan_segments_status = QLabel("NO RESCAN SEGMENT EVIDENCE")
+            column.addWidget(self._status_card(
+                "RESCAN SEGMENTS · SIMULATED ACCOUNTING", self.rescan_segments_status
+            ))
+            self.rescan_segments_notice = QLabel(
+                "NO DURABLE CHECKPOINT · NO SCANNER · NO WALLET"
+            )
+            self.rescan_segments_notice.setObjectName("smallText")
+            self.rescan_segments_notice.setWordWrap(True)
+            column.addWidget(self.rescan_segments_notice)
             placeholder = QLabel("REAL BACKUP, RESTORE AND MIGRATION · BLOCKED")
             placeholder.setObjectName("notice")
             column.addWidget(placeholder)
@@ -303,7 +313,7 @@ class MainWindow(QMainWindow):
         """Attempt ALL panel resets and signal any failure without leaking Qt details.
 
         Partial cleanup is never silently accepted; a broken label setter must
-        not stop the other five panels from being cleared.
+        not stop the other six panels from being cleared.
         """
         self._managed_render_depth += 1
         failed = False
@@ -315,6 +325,7 @@ class MainWindow(QMainWindow):
                 self.clear_public_receive_vector,
                 self.clear_offline_recovery_review,
                 self.clear_offline_resume_review,
+                self.clear_offline_rescan_segments,
             ):
                 try:
                     clear()
@@ -334,12 +345,14 @@ class MainWindow(QMainWindow):
         self, expected_revision: object, *, node: object = None,
         privacy: object = None, policy: object = None, receive: object = None,
         recovery: object = None, resume: object = None,
+        rescan: object = None,
     ) -> None:
-        """Atomically validate all six synthetic DTOs before displaying."""
+        """Atomically validate all seven synthetic DTOs before displaying."""
         try:
             state = self._offline_controller.replace(
                 expected_revision, node=node, privacy=privacy,
                 policy=policy, receive=receive, recovery=recovery, resume=resume,
+                rescan=rescan,
             )
         except OfflineLifecycleError:
             # Validation already rejected the revision; still clear every
@@ -367,6 +380,8 @@ class MainWindow(QMainWindow):
                     self.present_offline_recovery_review(recovery)
                 if state.resume != "ABSENT":
                     self.present_offline_resume_review(resume)
+                if state.rescan != "ABSENT":
+                    self.present_offline_rescan_segments(rescan)
             finally:
                 self._managed_render_depth -= 1
         except Exception:
@@ -446,6 +461,35 @@ class MainWindow(QMainWindow):
         self.resume_review_status.setText("RESUME DISABLED · NO RESTART EVIDENCE")
         self.resume_review_notice.setText(
             "NO AUTOMATIC RESUME · NO DATABASE WRITER OR LIVE SCANNER"
+        )
+
+    def present_offline_rescan_segments(self, report: object) -> None:
+        """Render only fixed research labels, never cursor/hash or permission."""
+        if not _valid_rescan(report):
+            raise ValueError("APP_GUI_RESCAN_SEGMENTS_DENIED")
+        if not self._managed_render_depth:
+            self.replace_offline_presentation(
+                self._offline_controller.state.revision, rescan=report
+            )
+            return
+        text = {
+            "NO_SEGMENTS": "NO SEGMENTS · NOTHING SCANNED",
+            "CONTIGUOUS_UNVERIFIED": "CONTIGUOUS FIXTURE · NOT COMMITTED",
+            "REPLAY_NOT_APPLIED": "REPLAY DETECTED · NOT DOUBLE COUNTED",
+        }
+        self.rescan_segments_status.setText(text[report.disposition])
+        self.rescan_segments_notice.setText(
+            "UNTRUSTED IN-MEMORY ACCOUNTING · NO DURABLE CHECKPOINT / LIVE SCANNER"
+        )
+
+    def clear_offline_rescan_segments(self) -> None:
+        """Invalidate rescan evidence with the same whole-panel lifecycle."""
+        if not self._managed_render_depth:
+            self.clear_offline_presentation()
+            return
+        self.rescan_segments_status.setText("NO RESCAN SEGMENT EVIDENCE")
+        self.rescan_segments_notice.setText(
+            "NO DURABLE CHECKPOINT · NO SCANNER · NO WALLET"
         )
 
     def present_offline_node_snapshot(self, snapshot: object) -> None:
