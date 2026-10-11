@@ -40,7 +40,7 @@ MINIMUM_CASES = {
     "test_app_synthetic_policy_demo.py": 8,
     "test_app_receive_public_vector.py": 12,
     "test_scanner_response_shape.py": 14,
-    "test_scanner_window_contract.py": 18,
+    "test_scanner_window_contract.py": 19,
 }
 MANDATORY_SUITES = tuple(MINIMUM_CASES)
 
