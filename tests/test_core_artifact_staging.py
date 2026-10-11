@@ -168,6 +168,50 @@ class CoreArtifactStagingTests(unittest.TestCase):
                 with stage_untrusted_core_artifact(source, self.digest):
                     self.fail("Unexpected source")
 
+    def test_same_size_staged_byte_mutation_during_review_is_detected(self):
+        with self.assertRaisesRegex(
+            CoreArtifactStagingError, "^CORE_STAGE_SNAPSHOT_CHANGED$"
+        ):
+            with stage_untrusted_core_artifact(self.candidate, self.digest) as receipt:
+                os.chmod(receipt.snapshot_path, 0o600)
+                receipt.snapshot_path.write_bytes(b"x" * receipt.byte_count)
+
+    def test_stage_path_replacement_during_review_is_detected(self):
+        with self.assertRaisesRegex(
+            CoreArtifactStagingError, "^CORE_STAGE_SNAPSHOT_CHANGED$"
+        ):
+            with stage_untrusted_core_artifact(self.candidate, self.digest) as receipt:
+                os.chmod(receipt.snapshot_path, 0o600)
+                receipt.snapshot_path.unlink()
+                receipt.snapshot_path.write_bytes(self.candidate.read_bytes())
+
+    def test_windows_reparse_file_metadata_is_denied_even_if_regular(self):
+        from types import SimpleNamespace
+        from wam_privacy_wallet.node.core_artifact_staging import _same_stat
+        normal = dict(
+            st_mode=stat.S_IFREG | 0o600, st_dev=11, st_ino=12, st_size=8,
+            st_mtime_ns=22, st_nlink=1, st_file_attributes=0,
+        )
+        safe = SimpleNamespace(**normal)
+        reparse = SimpleNamespace(**{
+            **normal, "st_file_attributes": getattr(
+                stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400
+            )
+        })
+        self.assertTrue(_same_stat(safe, safe))
+        self.assertFalse(_same_stat(safe, reparse))
+        self.assertFalse(_same_stat(reparse, safe))
+
+    def test_pathlike_hooks_are_not_invoked(self):
+        class HostilePath:
+            def __fspath__(self):
+                raise AssertionError("UNTRUSTED_PATHLIKE_CODE_EXECUTED")
+        with self.assertRaisesRegex(
+            CoreArtifactStagingError, "^CORE_STAGE_SOURCE_DENIED$"
+        ):
+            with stage_untrusted_core_artifact(HostilePath(), self.digest):
+                self.fail("Unexpected acceptance")
+
     def test_nothing_is_left_in_operator_workspace_after_stage(self):
         first = set(self.root.iterdir())
         with stage_untrusted_core_artifact(self.candidate, self.digest) as x:
