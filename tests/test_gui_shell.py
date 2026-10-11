@@ -845,6 +845,96 @@ class GuiShellSmokeTests(unittest.TestCase):
         self.assertNotIn("SECRET_QT_RESUME_FAILURE",
                          self.window.resume_review_notice.text())
 
+    def _synthetic_segment_report(self, *, replay=False, empty=False):
+        from wam_privacy_wallet.application.offline_rescan_segments import (
+            inspect_offline_rescan_segments,
+        )
+        resume = self._synthetic_resume_preview()
+        segment = {
+            "start_height": 3, "end_height": 5,
+            "parent_hash": "a" * 64, "end_hash": "b" * 64,
+            "transaction_count": 2, "attempt": 1,
+        }
+        batch = () if empty else (segment, dict(segment)) if replay else (segment,)
+        return inspect_offline_rescan_segments(
+            resume=resume, expected_revision=resume.revision,
+            start_height=3, segments=batch,
+        )
+
+    def test_rescan_segments_gui_starts_disabled_without_buttons(self) -> None:
+        self.window.navigation.setCurrentRow(5)
+        self.assertIn("NO RESCAN SEGMENT", self.window.rescan_segments_status.text())
+        self.assertIn("NO DURABLE CHECKPOINT", self.window.rescan_segments_notice.text())
+        self.assertEqual(self.window.findChildren(QPushButton), [])
+
+    def test_contiguous_segment_review_does_not_claim_checkpoint(self) -> None:
+        report = self._synthetic_segment_report()
+        self.window.present_offline_rescan_segments(report)
+        self.assertEqual(self.window.offline_presentation_state.rescan,
+                         "CONTIGUOUS_UNVERIFIED")
+        self.assertIn("NOT COMMITTED", self.window.rescan_segments_status.text())
+        self.assertEqual(self.window.session_status.text(), "NO WALLET LOADED")
+        self.assertNotIn("b" * 64, self.window.rescan_segments_notice.text())
+
+    def test_exact_segment_replay_displays_not_double_counted(self) -> None:
+        report = self._synthetic_segment_report(replay=True)
+        self.window.present_offline_rescan_segments(report)
+        self.assertIn("NOT DOUBLE COUNTED", self.window.rescan_segments_status.text())
+        self.assertEqual(report.observed_block_count, 2)
+        self.assertEqual(report.replay_count, 1)
+        self.assertEqual(self.window.offline_presentation_state.authority, "BLOCKED")
+
+    def test_rescan_segment_forged_authority_or_counts_are_denied(self) -> None:
+        from dataclasses import replace
+        good = self._synthetic_segment_report()
+        self.window.present_offline_rescan_segments(good)
+        snapshot = self.window.offline_presentation_state
+        forged = replace(good)
+        object.__setattr__(forged, "scanner_enabled", True)
+        for candidate in (
+            forged, replace(good, observed_block_count=0),
+            replace(good, disposition="REPLAY_NOT_APPLIED"),
+            {"private_key": "SHOULD_NOT_LEAK"},
+        ):
+            with self.subTest(t=type(candidate).__name__), self.assertRaisesRegex(
+                ValueError, "^APP_GUI_RESCAN_SEGMENTS_DENIED$"
+            ):
+                self.window.present_offline_rescan_segments(candidate)
+            self.assertEqual(self.window.offline_presentation_state, snapshot)
+        self.assertEqual(self.window.findChildren(QPushButton), [])
+
+    def test_segment_review_same_writer_and_direct_clear(self) -> None:
+        resume = self._synthetic_resume_preview()
+        segment = self._synthetic_segment_report()
+        self.window.replace_offline_presentation(0, resume=resume, rescan=segment)
+        self.assertEqual((self.window.offline_presentation_state.resume,
+                          self.window.offline_presentation_state.rescan),
+                         ("REVALIDATE_BEFORE_RESCAN", "CONTIGUOUS_UNVERIFIED"))
+        self.window.clear_offline_rescan_segments()
+        self.assertEqual((self.window.offline_presentation_state.revision,
+                          self.window.offline_presentation_state.rescan), (2, "ABSENT"))
+        self.assertIn("NO RESCAN SEGMENT", self.window.rescan_segments_status.text())
+        self.assertIn("RESUME DISABLED", self.window.resume_review_status.text())
+
+    def test_rescan_segment_renderer_failure_resets_and_redacts(self) -> None:
+        from unittest.mock import patch
+        from wam_privacy_wallet.application.presentation_lifecycle import OfflineLifecycleError
+        with patch.object(MainWindow, "present_offline_rescan_segments",
+                          side_effect=RuntimeError("SECRET_RESCAN_RENDER")):
+            with self.assertRaisesRegex(
+                OfflineLifecycleError, "^APP_OFFLINE_RENDER_DENIED$"
+            ) as error:
+                self.window.replace_offline_presentation(
+                    0, rescan=self._synthetic_segment_report()
+                )
+            self.assertIsNone(error.exception.__cause__)
+        state = self.window.offline_presentation_state
+        self.assertEqual((state.revision, state.transition, state.rescan),
+                         (2, "CLEARED", "ABSENT"))
+        self.assertIn("NO RESCAN SEGMENT", self.window.rescan_segments_status.text())
+        self.assertNotIn("SECRET_RESCAN_RENDER",
+                         self.window.rescan_segments_notice.text())
+
     def test_lifecycle_render_failure_clears_and_invalidates(self) -> None:
         # A renderer can fail *after* a validated state was committed.
         # That must never leave an accepted revision or stale panel visible.
