@@ -16,6 +16,10 @@ _NAMES = (
     "test_offline_safety_notice_and_no_funds_state",
     "test_no_payment_actions_are_exposed",
     "test_window_is_portable_qt_widget",
+    "test_lifecycle_valid_then_invalid_clears_all_panels",
+    "test_lifecycle_stale_revision_clears_receive_and_node",
+    "test_lifecycle_reset_invalidates_revision_and_all_panels",
+    "test_lifecycle_replacement_does_not_retain_omitted_evidence",
 )
 
 
@@ -62,11 +66,11 @@ class GuiGateSyntheticTests(unittest.TestCase):
         self.assertEqual(self._run(0), 1)
 
     def test_partial_gui_cases_denied(self):
-        self._gui(names=_NAMES[:3])
+        self._gui(names=_NAMES[:7])
         self.assertEqual(self._run(0), 1)
 
     def test_replaced_gui_case_same_count_denied(self):
-        self._gui(names=(*_NAMES[:3], "test_replacement"))
+        self._gui(names=(*_NAMES[:7], "test_replacement"))
         self.assertEqual(self._run(0), 1)
 
     def test_gui_import_error_denied(self):
@@ -81,17 +85,17 @@ class GuiGateSyntheticTests(unittest.TestCase):
         self._gui(skipped=(_NAMES[0],))
         self.assertEqual(self._run(), 1)
 
-    def test_four_pinned_gui_cases_pass(self):
+    def test_eight_pinned_gui_cases_pass(self):
         self._gui()
         self.assertEqual(self._run(), 0)
 
     def test_additional_gui_case_allowed(self):
         self._gui(names=(*_NAMES, "test_extra"))
-        self.assertEqual(self._run(5), 0)
+        self.assertEqual(self._run(9), 0)
 
     def test_full_discovery_count_floor_denies_loss(self):
         self._gui()
-        self.assertEqual(self._run(5), 1)
+        self.assertEqual(self._run(9), 1)
 
     def test_extra_full_suite_counts(self):
         self._gui()
@@ -171,7 +175,7 @@ class GuiGateSyntheticTests(unittest.TestCase):
     def test_non_gui_import_error_denied(self):
         self._gui()
         self._write("test_other.py", "raise ImportError('synthetic')\n")
-        self.assertEqual(self._run(4), 1)
+        self.assertEqual(self._run(8), 1)
 
 
 if __name__ == "__main__":
