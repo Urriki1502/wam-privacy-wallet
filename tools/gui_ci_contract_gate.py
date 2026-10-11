@@ -17,6 +17,8 @@ GUI_TEST_IDS = frozenset({
     "test_gui_shell.GuiShellSmokeTests.test_lifecycle_reset_invalidates_revision_and_all_panels",
     "test_gui_shell.GuiShellSmokeTests.test_lifecycle_replacement_does_not_retain_omitted_evidence",
     "test_gui_shell.GuiShellSmokeTests.test_lifecycle_render_failure_clears_and_invalidates",
+    "test_gui_shell.GuiShellSmokeTests.test_lifecycle_clear_failure_invalidates_revision_and_other_panels",
+    "test_gui_shell.GuiShellSmokeTests.test_reset_clear_failure_attempts_all_panels_and_stays_blocked",
     "test_gui_shell.GuiShellSmokeTests.test_legacy_presenter_replaces_managed_snapshot_atomically",
     "test_gui_shell.GuiShellSmokeTests.test_legacy_clear_invalidates_all_panels_and_prior_revision",
     "test_gui_shell.GuiShellSmokeTests.test_legacy_invalid_input_does_not_mutate_accepted_state",
@@ -42,7 +44,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_offline_integration_status.OfflineIntegrationStatusTests.test_no_network_file_subprocess_or_operational_engine",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 378
+FULL_MIN_CASES = 380
 
 
 def _cases(suite: unittest.TestSuite):
