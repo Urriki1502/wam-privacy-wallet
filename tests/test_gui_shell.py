@@ -570,6 +570,152 @@ class GuiShellSmokeTests(unittest.TestCase):
         self.assertEqual(self.window.session_status.text(), "NO WALLET LOADED")
         self.assertEqual(self.window.findChildren(QPushButton), [])
 
+    def _synthetic_recovery_review(self, *, old_version=3, new_version=3,
+                                  old_height=5, new_height=5,
+                                  old_hash=None, new_hash=None):
+        from wam_privacy_wallet.application.recovery_transition import (
+            evaluate_offline_recovery_transition,
+        )
+        A, B = "a" * 64, "b" * 64
+        old_hash = A if old_hash is None else old_hash
+        new_hash = A if new_hash is None else new_hash
+
+        def fixture(version, height, blockhash):
+            return {
+                "schema": "wam-wallet-storage-review/v1",
+                "profile": "WSP-1", "network": "regtest",
+                "genesis": WAM_REGTEST_GENESIS,
+                "store_schema_version": version,
+                "checkpoint_height": height,
+                "checkpoint_hash": blockhash,
+                "reported_height": height, "reported_tip": blockhash,
+                "writer_lock": "UNATTESTED",
+                "db_integrity": "UNATTESTED",
+                "wallet_identity": "UNATTESTED",
+            }
+
+        return evaluate_offline_recovery_transition(
+            old=fixture(old_version, old_height, old_hash),
+            candidate=fixture(new_version, new_height, new_hash),
+            old_revision=5, new_revision=6,
+        )
+
+    def test_recovery_page_has_no_backup_restore_or_signing_actions(self) -> None:
+        self.window.navigation.setCurrentRow(5)
+        self.assertEqual(self.window.current_page_title, "Recovery")
+        self.assertEqual(self.window.recovery_review_status.text(),
+                         "NO OFFLINE RECOVERY EVIDENCE")
+        self.assertIn("NO WALLET RESTORED", self.window.recovery_review_notice.text())
+        self.assertIn("BLOCKED", self.window.recovery_review_notice.text())
+        self.assertEqual(self.window.findChildren(QPushButton), [])
+
+    def test_recovery_matching_snapshot_renders_untrusted_only(self) -> None:
+        preview = self._synthetic_recovery_review()
+        self.window.present_offline_recovery_review(preview)
+        state = self.window.offline_presentation_state
+        self.assertEqual((state.revision, state.recovery),
+                         (1, "REVIEW_ONLY_NOT_VERIFIED"))
+        self.assertIn("UNTRUSTED CHECKPOINT", self.window.recovery_review_status.text())
+        self.assertNotIn("a" * 64, self.window.recovery_review_notice.text())
+        self.assertEqual(state.authority, "BLOCKED")
+        self.assertEqual(state.wallet, "NO_WALLET_LOADED")
+        self.assertEqual(self.window.session_status.text(), "NO WALLET LOADED")
+
+    def test_recovery_rescan_and_migration_use_fixed_vocabularies(self) -> None:
+        from wam_privacy_wallet.application.recovery_transition import (
+            OfflineRecoveryTransition,
+        )
+        scenarios = (
+            (self._synthetic_recovery_review(new_hash="b" * 64),
+             "RESCAN REQUIRED · NOT PERFORMED"),
+            (self._synthetic_recovery_review(old_version=2),
+             "MIGRATION + RESCAN REQUIRED · NOT PERFORMED"),
+        )
+        for preview, expected in scenarios:
+            self.window.present_offline_recovery_review(preview)
+            self.assertEqual(self.window.recovery_review_status.text(), expected)
+            self.assertNotIn("a" * 64, self.window.recovery_review_status.text())
+            self.assertEqual(self.window.offline_presentation_state.recovery,
+                             preview.decision)
+            self.assertEqual(self.window.offline_presentation_state.authority,
+                             "BLOCKED")
+
+    def test_recovery_direct_presenter_invalidates_other_managed_panels(self) -> None:
+        self.window.present_public_receive_vector(rv.inspect_pinned_public_vector())
+        self.assertIn("PUBLIC FINGERPRINT", self.window.receive_vector_status.text())
+        self.window.present_offline_recovery_review(self._synthetic_recovery_review())
+        state = self.window.offline_presentation_state
+        self.assertEqual(state.revision, 2)
+        self.assertEqual(state.receive, "ABSENT")
+        self.assertEqual(self.window.receive_vector_status.text(),
+                         "NO PUBLIC SAMPLE · NO ADDRESS GENERATED")
+        self.window.present_offline_node_snapshot(NodeOverview(
+            "regtest", 3, "READ_ONLY_SNAPSHOT", "EXPERIMENTAL_NO_REAL_FUNDS"
+        ))
+        self.assertEqual(self.window.offline_presentation_state.recovery, "ABSENT")
+        self.assertEqual(self.window.recovery_review_status.text(),
+                         "NO OFFLINE RECOVERY EVIDENCE")
+        self.assertEqual(self.window.findChildren(QPushButton), [])
+
+    def test_recovery_forged_authority_or_reason_is_denied(self) -> None:
+        from dataclasses import replace
+        source = self._synthetic_recovery_review()
+        self.window.present_offline_recovery_review(source)
+        prior = self.window.offline_presentation_state
+        cases = [replace(source, decision="RESCAN_REQUIRED")]
+        tampered = replace(source)
+        object.__setattr__(tampered, "wallet_enabled", True)
+        cases.append(tampered)
+        for bad in cases:
+            with self.subTest(bad=bad.reason), self.assertRaisesRegex(
+                ValueError, "^APP_GUI_RECOVERY_REVIEW_DENIED$"
+            ):
+                self.window.present_offline_recovery_review(bad)
+        self.assertEqual(self.window.offline_presentation_state, prior)
+        self.assertIn("UNTRUSTED", self.window.recovery_review_status.text())
+        self.assertFalse(any((
+            self.window.findChildren(QPushButton),
+        )))
+
+    def test_recovery_clear_and_stale_revision_rejects_prior_evidence(self) -> None:
+        from wam_privacy_wallet.application.presentation_lifecycle import OfflineLifecycleError
+        self.window.present_offline_recovery_review(self._synthetic_recovery_review())
+        self.window.clear_offline_recovery_review()
+        s = self.window.offline_presentation_state
+        self.assertEqual((s.revision, s.transition, s.recovery),
+                         (2, "CLEARED", "ABSENT"))
+        self.assertEqual(self.window.recovery_review_status.text(),
+                         "NO OFFLINE RECOVERY EVIDENCE")
+        with self.assertRaises(OfflineLifecycleError):
+            self.window.replace_offline_presentation(
+                1, recovery=self._synthetic_recovery_review()
+            )
+        self.assertEqual(self.window.offline_presentation_state.transition,
+                         "REJECTED")
+        self.assertEqual(self.window.recovery_review_status.text(),
+                         "NO OFFLINE RECOVERY EVIDENCE")
+
+    def test_recovery_render_fault_invalidates_managed_revision(self) -> None:
+        from unittest.mock import patch
+        from wam_privacy_wallet.application.presentation_lifecycle import OfflineLifecycleError
+        preview = self._synthetic_recovery_review()
+        with patch.object(MainWindow, "present_offline_recovery_review",
+                          side_effect=RuntimeError("HIDDEN_QT_DETAIL")):
+            with self.assertRaisesRegex(
+                OfflineLifecycleError, "^APP_OFFLINE_RENDER_DENIED$"
+            ) as raised:
+                self.window.replace_offline_presentation(
+                    0, recovery=preview
+                )
+            self.assertIsNone(raised.exception.__cause__)
+        state = self.window.offline_presentation_state
+        self.assertEqual((state.revision, state.transition, state.recovery),
+                         (2, "CLEARED", "ABSENT"))
+        self.assertEqual(self.window.recovery_review_status.text(),
+                         "NO OFFLINE RECOVERY EVIDENCE")
+        self.assertNotIn("HIDDEN_QT_DETAIL",
+                         self.window.recovery_review_notice.text())
+
     def test_lifecycle_render_failure_clears_and_invalidates(self) -> None:
         # A renderer can fail *after* a validated state was committed.
         # That must never leave an accepted revision or stale panel visible.
