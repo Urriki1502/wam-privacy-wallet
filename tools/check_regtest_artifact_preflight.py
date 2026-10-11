@@ -6,9 +6,10 @@ qualification. No network, subprocess, wallet, datadir, keys or secrets.
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
+from dataclasses import InitVar, dataclass, field
 import json
 from pathlib import Path
+import re
 import sys
 
 from wam_privacy_wallet.node.attestation import WAM_REGTEST_GENESIS
@@ -22,16 +23,37 @@ class ArtifactPreflightError(ValueError):
     """Stable failure code, no binary path or filesystem detail in the message."""
 
 
+_LOCAL_EVIDENCE_TOKEN = object()
+
+
 @dataclass(frozen=True, slots=True)
 class LocalHashEvidence:
     """Local hash match only. No attestation or permission is represented."""
 
     sha256: str
-    profile_network: str = "regtest"
-    status: str = "LOCAL_SHA256_MATCH_ONLY"
-    real_regtest_qualified: bool = False
-    publisher_identity_verified: bool = False
-    release_allowed: bool = False
+    _token: InitVar[object] = None
+    # All status/authority claims are non-configurable, even at construction.
+    # This remains a data contract, not a sandbox against hostile Python code.
+    profile_network: str = field(default="regtest", init=False)
+    status: str = field(default="LOCAL_SHA256_MATCH_ONLY", init=False)
+    real_regtest_qualified: bool = field(default=False, init=False)
+    publisher_identity_verified: bool = field(default=False, init=False)
+    binary_source_equivalence_verified: bool = field(default=False, init=False)
+    execution_allowed: bool = field(default=False, init=False)
+    release_allowed: bool = field(default=False, init=False)
+
+    def __post_init__(self, _token: object) -> None:
+        # Prevent malformed or noncanonical strings from masquerading as
+        # evidence DTOs. A canonical SHA format is NOT proof of a real file,
+        # publisher provenance, executable identity or launch permission.
+        if type(self.sha256) is not str or re.fullmatch(
+            r"[0-9a-f]{64}", self.sha256, flags=re.ASCII
+        ) is None:
+            raise ValueError("G1_LOCAL_EVIDENCE_DIGEST_INVALID")
+        if _token is not _LOCAL_EVIDENCE_TOKEN:
+            # Prevent accidental construction of a false hash-match receipt.
+            # Not an adversarial Python-process security boundary.
+            raise ValueError("G1_LOCAL_EVIDENCE_CONSTRUCTION_DENIED")
 
 
 def evaluate_local_binary(binary: object, expected_sha256: object) -> LocalHashEvidence:
@@ -65,7 +87,7 @@ def evaluate_local_binary(binary: object, expected_sha256: object) -> LocalHashE
                         "CORE_BINARY_NOT_REGULAR", "CORE_BINARY_UNAVAILABLE"):
             code = "CORE_BINARY_UNAVAILABLE"
         raise ArtifactPreflightError("G1_" + code) from None
-    return LocalHashEvidence(sha256=expected_sha256)
+    return LocalHashEvidence(sha256=expected_sha256, _token=_LOCAL_EVIDENCE_TOKEN)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -86,6 +108,8 @@ def main(argv: list[str] | None = None) -> int:
         "sha256": evidence.sha256,
         "real_regtest_qualified": evidence.real_regtest_qualified,
         "publisher_identity_verified": evidence.publisher_identity_verified,
+        "binary_source_equivalence_verified": evidence.binary_source_equivalence_verified,
+        "execution_allowed": evidence.execution_allowed,
         "release_allowed": evidence.release_allowed,
     }, sort_keys=True))
     return 0

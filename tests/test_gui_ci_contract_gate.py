@@ -16,6 +16,36 @@ _NAMES = (
     "test_offline_safety_notice_and_no_funds_state",
     "test_no_payment_actions_are_exposed",
     "test_window_is_portable_qt_widget",
+    "test_lifecycle_valid_then_invalid_clears_all_panels",
+    "test_lifecycle_stale_revision_clears_receive_and_node",
+    "test_lifecycle_reset_invalidates_revision_and_all_panels",
+    "test_lifecycle_replacement_does_not_retain_omitted_evidence",
+    "test_lifecycle_render_failure_clears_and_invalidates",
+    "test_reentrant_clear_during_render_cannot_survive_swallowed_error",
+    "test_reentrant_replace_during_clear_poisoned_even_when_callback_catches",
+    "test_reentrant_replace_during_explicit_clear_stays_blocked_then_recovers",
+    "test_lifecycle_clear_failure_invalidates_revision_and_other_panels",
+    "test_reset_clear_failure_attempts_all_panels_and_stays_blocked",
+    "test_recovery_page_has_no_backup_restore_or_signing_actions",
+    "test_recovery_forged_authority_or_reason_is_denied",
+    "test_recovery_clear_and_stale_revision_rejects_prior_evidence",
+    "test_recovery_render_fault_invalidates_managed_revision",
+    "test_resume_panel_starts_blocked_with_no_user_actions",
+    "test_resume_forged_claims_rejected_without_changing_display",
+    "test_resume_clear_invalidates_old_revision_and_evidence",
+    "test_resume_renderer_fault_resets_and_redacts_without_privilege",
+    "test_rescan_segments_gui_starts_disabled_without_buttons",
+    "test_rescan_segment_forged_authority_or_counts_are_denied",
+    "test_segment_review_same_writer_and_direct_clear",
+    "test_rescan_segment_renderer_failure_resets_and_redacts",
+    "test_reorg_panel_defaults_to_no_evidence_and_no_actions",
+    "test_reorg_forged_counts_or_authority_are_rejected",
+    "test_reorg_atomic_recovery_resume_rescan_and_clear",
+    "test_reorg_renderer_fault_redacts_and_invalidates_revision",
+    "test_legacy_presenter_replaces_managed_snapshot_atomically",
+    "test_legacy_clear_invalidates_all_panels_and_prior_revision",
+    "test_legacy_invalid_input_does_not_mutate_accepted_state",
+    "test_legacy_demo_routes_through_controller_single_writer",
 )
 
 
@@ -62,11 +92,11 @@ class GuiGateSyntheticTests(unittest.TestCase):
         self.assertEqual(self._run(0), 1)
 
     def test_partial_gui_cases_denied(self):
-        self._gui(names=_NAMES[:3])
+        self._gui(names=_NAMES[:8])
         self.assertEqual(self._run(0), 1)
 
     def test_replaced_gui_case_same_count_denied(self):
-        self._gui(names=(*_NAMES[:3], "test_replacement"))
+        self._gui(names=(*_NAMES[:8], "test_replacement"))
         self.assertEqual(self._run(0), 1)
 
     def test_gui_import_error_denied(self):
@@ -81,17 +111,18 @@ class GuiGateSyntheticTests(unittest.TestCase):
         self._gui(skipped=(_NAMES[0],))
         self.assertEqual(self._run(), 1)
 
-    def test_four_pinned_gui_cases_pass(self):
+    def test_fifteen_pinned_gui_cases_pass(self):
         self._gui()
         self.assertEqual(self._run(), 0)
 
     def test_additional_gui_case_allowed(self):
         self._gui(names=(*_NAMES, "test_extra"))
-        self.assertEqual(self._run(5), 0)
+        self.assertEqual(self._run(10), 0)
 
     def test_full_discovery_count_floor_denies_loss(self):
         self._gui()
-        self.assertEqual(self._run(5), 1)
+        # A drop below the current pinned GUI identity count must fail.
+        self.assertEqual(self._run(len(_NAMES) + 1), 1)
 
     def test_extra_full_suite_counts(self):
         self._gui()
@@ -171,7 +202,7 @@ class GuiGateSyntheticTests(unittest.TestCase):
     def test_non_gui_import_error_denied(self):
         self._gui()
         self._write("test_other.py", "raise ImportError('synthetic')\n")
-        self.assertEqual(self._run(4), 1)
+        self.assertEqual(self._run(8), 1)
 
 
 if __name__ == "__main__":

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 
+from wam_privacy_wallet.application.presentation_lifecycle import OfflinePresentationController, OfflineLifecycleError, _valid_recovery, _valid_resume, _valid_rescan, _valid_reorg
 from wam_privacy_wallet.application.node_status import NodeOverview
 from wam_privacy_wallet.application.privacy_readiness import PrivacyResearchSnapshot
 from wam_privacy_wallet.application.policy_evidence import SyntheticPolicyReport
@@ -88,6 +89,13 @@ class MainWindow(QMainWindow):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self._offline_controller = OfflinePresentationController()
+        # Internal Qt projection writes must not recursively mutate revision.
+        self._managed_render_depth = 0
+        # Nested Qt callbacks may re-enter public updates. Poison the
+        # enclosing transition even when the callback swallows its error.
+        self._managed_transition_active = False
+        self._managed_transition_interrupted = False
         self.setObjectName("wamPrivacyWalletWindow")
         self.setWindowTitle("WAM Privacy Wallet — Experimental")
         self.setMinimumSize(960, 620)
@@ -245,6 +253,50 @@ class MainWindow(QMainWindow):
             placeholder = QLabel("SCANNING, SIGNING AND SENDING · BLOCKED")
             placeholder.setObjectName("notice")
             column.addWidget(placeholder)
+        elif title == "Recovery":
+            self.recovery_review_status = QLabel("NO OFFLINE RECOVERY EVIDENCE")
+            column.addWidget(self._status_card(
+                "RECOVERY STATE · SYNTHETIC ONLY", self.recovery_review_status
+            ))
+            self.recovery_review_notice = QLabel(
+                "NO WALLET RESTORED · NO DATABASE OPENED · SCANNER / SIGNER BLOCKED"
+            )
+            self.recovery_review_notice.setObjectName("smallText")
+            self.recovery_review_notice.setWordWrap(True)
+            column.addWidget(self.recovery_review_notice)
+            self.resume_review_status = QLabel("RESUME DISABLED · NO RESTART EVIDENCE")
+            column.addWidget(self._status_card(
+                "RESTART / RESCAN · SYNTHETIC REVIEW", self.resume_review_status
+            ))
+            self.resume_review_notice = QLabel(
+                "NO AUTOMATIC RESUME · NO DATABASE WRITER OR LIVE SCANNER"
+            )
+            self.resume_review_notice.setObjectName("smallText")
+            self.resume_review_notice.setWordWrap(True)
+            column.addWidget(self.resume_review_notice)
+            self.rescan_segments_status = QLabel("NO RESCAN SEGMENT EVIDENCE")
+            column.addWidget(self._status_card(
+                "RESCAN SEGMENTS · SIMULATED ACCOUNTING", self.rescan_segments_status
+            ))
+            self.rescan_segments_notice = QLabel(
+                "NO DURABLE CHECKPOINT · NO SCANNER · NO WALLET"
+            )
+            self.rescan_segments_notice.setObjectName("smallText")
+            self.rescan_segments_notice.setWordWrap(True)
+            column.addWidget(self.rescan_segments_notice)
+            self.reorg_review_status = QLabel("NO REORG RECONCILIATION EVIDENCE")
+            column.addWidget(self._status_card(
+                "CHECKPOINT / REORG · SYNTHETIC REVIEW", self.reorg_review_status
+            ))
+            self.reorg_review_notice = QLabel(
+                "NO TRUSTED CURSOR · NO SCANNER / WALLET / RELEASE"
+            )
+            self.reorg_review_notice.setObjectName("smallText")
+            self.reorg_review_notice.setWordWrap(True)
+            column.addWidget(self.reorg_review_notice)
+            placeholder = QLabel("REAL BACKUP, RESTORE AND MIGRATION · BLOCKED")
+            placeholder.setObjectName("notice")
+            column.addWidget(placeholder)
         else:
             placeholder = QLabel("NOT IMPLEMENTED · REVIEW REQUIRED")
             placeholder.setObjectName("notice")
@@ -266,6 +318,264 @@ class MainWindow(QMainWindow):
         contents.addWidget(value)
         return frame
 
+    @property
+    def offline_presentation_state(self):
+        """Immutable offline evidence state; never confers wallet authority."""
+        return self._offline_controller.state
+
+    def _clear_managed_panels(self) -> None:
+        """Attempt ALL panel resets and signal any failure without leaking Qt details.
+
+        Partial cleanup is never silently accepted; a broken label setter must
+        not stop the other seven panels from being cleared.
+        """
+        self._managed_render_depth += 1
+        failed = False
+        try:
+            for clear in (
+                self.clear_offline_node_snapshot,
+                self.clear_offline_privacy_readiness,
+                self.clear_offline_policy_report,
+                self.clear_public_receive_vector,
+                self.clear_offline_recovery_review,
+                self.clear_offline_resume_review,
+                self.clear_offline_rescan_segments,
+                self.clear_offline_reorg_reconciliation,
+            ):
+                try:
+                    clear()
+                except Exception:
+                    failed = True
+        finally:
+            self._managed_render_depth -= 1
+        if failed:
+            raise OfflineLifecycleError("APP_OFFLINE_RENDER_DENIED") from None
+
+    def _begin_managed_transition(self) -> None:
+        """Reject nested public transactions without mutating their revision."""
+        if self._managed_transition_active:
+            self._managed_transition_interrupted = True
+            raise OfflineLifecycleError("APP_OFFLINE_REENTRANT_DENIED") from None
+        self._managed_transition_active = True
+        self._managed_transition_interrupted = False
+
+    def _assert_managed_transition_clean(self) -> None:
+        """A swallowed nested exception still poisons the outer operation."""
+        if self._managed_transition_interrupted:
+            raise OfflineLifecycleError("APP_OFFLINE_REENTRANT_DENIED") from None
+
+    def _end_managed_transition(self) -> None:
+        self._managed_transition_active = False
+        self._managed_transition_interrupted = False
+
+    def clear_offline_presentation(self) -> None:
+        """Invalidate revision before cleanup; reject reentrant view resets."""
+        self._begin_managed_transition()
+        try:
+            self._offline_controller.reset()
+            try:
+                self._clear_managed_panels()
+                self._assert_managed_transition_clean()
+            except Exception:
+                # A faulty/reentrant Qt callback cannot restore a stale view.
+                try:
+                    self._clear_managed_panels()
+                except Exception:
+                    pass
+                raise OfflineLifecycleError("APP_OFFLINE_RENDER_DENIED") from None
+        finally:
+            self._end_managed_transition()
+
+    def replace_offline_presentation(
+        self, expected_revision: object, *, node: object = None,
+        privacy: object = None, policy: object = None, receive: object = None,
+        recovery: object = None, resume: object = None,
+        rescan: object = None, reorg: object = None,
+    ) -> None:
+        """Atomically validate all eight synthetic DTOs before displaying."""
+        self._begin_managed_transition()
+        try:
+            try:
+                state = self._offline_controller.replace(
+                    expected_revision, node=node, privacy=privacy,
+                    policy=policy, receive=receive, recovery=recovery, resume=resume,
+                    rescan=rescan, reorg=reorg,
+                )
+            except OfflineLifecycleError:
+                # Validation already rejected the revision; still clear every
+                # panel even if a broken widget raises while clearing.
+                try:
+                    self._clear_managed_panels()
+                except OfflineLifecycleError:
+                    pass
+                raise
+            try:
+                # Reset is part of the guarded transition: previously a failure
+                # here escaped before the controller revision was invalidated.
+                self._clear_managed_panels()
+                self._managed_render_depth += 1
+                try:
+                    if state.node == "UNVERIFIED":
+                        self.present_offline_node_snapshot(node)
+                    if state.privacy == "RESEARCH_ONLY":
+                        self.present_offline_privacy_readiness(privacy)
+                    if state.policy == "MODEL_ONLY":
+                        self.present_offline_policy_report(policy)
+                    if state.receive == "PUBLIC_FIXTURE":
+                        self.present_public_receive_vector(receive)
+                    if state.recovery != "ABSENT":
+                        self.present_offline_recovery_review(recovery)
+                    if state.resume != "ABSENT":
+                        self.present_offline_resume_review(resume)
+                    if state.rescan != "ABSENT":
+                        self.present_offline_rescan_segments(rescan)
+                    if state.reorg != "ABSENT":
+                        self.present_offline_reorg_reconciliation(reorg)
+                finally:
+                    self._managed_render_depth -= 1
+                self._assert_managed_transition_clean()
+            except Exception:
+                # Presentation or reset can fail after a revision was accepted.
+                # Invalidate it, attempt every panel reset, and redact the error.
+                self._offline_controller.reset()
+                try:
+                    self._clear_managed_panels()
+                except OfflineLifecycleError:
+                    pass
+                raise OfflineLifecycleError("APP_OFFLINE_RENDER_DENIED") from None
+        finally:
+            self._end_managed_transition()
+
+    def present_offline_recovery_review(self, preview: object) -> None:
+        """Display only fixed vocabulary from a synthetic recovery transition.
+
+        Never show hashes, paths, checkpoint identifiers or raw input strings.
+        Recovery decisions DO NOT grant persistence, scanner or wallet rights.
+        """
+        if not _valid_recovery(preview):
+            raise ValueError("APP_GUI_RECOVERY_REVIEW_DENIED")
+        if not self._managed_render_depth:
+            self.replace_offline_presentation(
+                self._offline_controller.state.revision, recovery=preview
+            )
+            return
+        messages = {
+            "REVIEW_ONLY_NOT_VERIFIED":
+                "UNTRUSTED CHECKPOINT · RECOVERY NOT VERIFIED",
+            "RESCAN_REQUIRED": "RESCAN REQUIRED · NOT PERFORMED",
+            "MIGRATION_RESCAN_REQUIRED":
+                "MIGRATION + RESCAN REQUIRED · NOT PERFORMED",
+        }
+        self.recovery_review_status.setText(messages[preview.decision])
+        self.recovery_review_notice.setText(
+            "SYNTHETIC REVIEW ONLY · NO WALLET RESTORED · "
+            "SCANNER / SIGNER / SEND BLOCKED"
+        )
+
+    def clear_offline_recovery_review(self) -> None:
+        """Invalidate all research panels on direct clear; no wallet IO."""
+        if not self._managed_render_depth:
+            self.clear_offline_presentation()
+            return
+        self.recovery_review_status.setText("NO OFFLINE RECOVERY EVIDENCE")
+        self.recovery_review_notice.setText(
+            "NO WALLET RESTORED · NO DATABASE OPENED · SCANNER / SIGNER BLOCKED"
+        )
+
+    def present_offline_resume_review(self, preview: object) -> None:
+        """Show fixed crash/restart guidance, never grant resumable authority."""
+        if not _valid_resume(preview):
+            raise ValueError("APP_GUI_RESUME_REVIEW_DENIED")
+        if not self._managed_render_depth:
+            self.replace_offline_presentation(
+                self._offline_controller.state.revision, resume=preview
+            )
+            return
+        text = {
+            "REVALIDATE_BEFORE_RESCAN":
+                "REVALIDATE CHECKPOINT · RESUME NOT AUTHORIZED",
+            "REWIND_RESCAN_REVIEW":
+                "REWIND / RESCAN REVIEW · NOT STARTED",
+            "MIGRATION_RESCAN_REVIEW":
+                "MIGRATION + RESCAN REVIEW · NOT STARTED",
+        }
+        self.resume_review_status.setText(text[preview.action])
+        self.resume_review_notice.setText(
+            "SYNTHETIC INTERRUPTION ONLY · NO NODE / DB / SCANNER · "
+            "NO AUTOMATIC RESUME"
+        )
+
+    def clear_offline_resume_review(self) -> None:
+        """Clear non-persistent resume research evidence through single writer."""
+        if not self._managed_render_depth:
+            self.clear_offline_presentation()
+            return
+        self.resume_review_status.setText("RESUME DISABLED · NO RESTART EVIDENCE")
+        self.resume_review_notice.setText(
+            "NO AUTOMATIC RESUME · NO DATABASE WRITER OR LIVE SCANNER"
+        )
+
+    def present_offline_rescan_segments(self, report: object) -> None:
+        """Render only fixed research labels, never cursor/hash or permission."""
+        if not _valid_rescan(report):
+            raise ValueError("APP_GUI_RESCAN_SEGMENTS_DENIED")
+        if not self._managed_render_depth:
+            self.replace_offline_presentation(
+                self._offline_controller.state.revision, rescan=report
+            )
+            return
+        text = {
+            "NO_SEGMENTS": "NO SEGMENTS · NOTHING SCANNED",
+            "CONTIGUOUS_UNVERIFIED": "CONTIGUOUS FIXTURE · NOT COMMITTED",
+            "REPLAY_NOT_APPLIED": "REPLAY DETECTED · NOT DOUBLE COUNTED",
+        }
+        self.rescan_segments_status.setText(text[report.disposition])
+        self.rescan_segments_notice.setText(
+            "UNTRUSTED IN-MEMORY ACCOUNTING · NO DURABLE CHECKPOINT / LIVE SCANNER"
+        )
+
+    def clear_offline_rescan_segments(self) -> None:
+        """Invalidate rescan evidence with the same whole-panel lifecycle."""
+        if not self._managed_render_depth:
+            self.clear_offline_presentation()
+            return
+        self.rescan_segments_status.setText("NO RESCAN SEGMENT EVIDENCE")
+        self.rescan_segments_notice.setText(
+            "NO DURABLE CHECKPOINT · NO SCANNER · NO WALLET"
+        )
+
+    def present_offline_reorg_reconciliation(self, report: object) -> None:
+        """Display fixed reconciliation warning, never derive a rescan cursor."""
+        if not _valid_reorg(report):
+            raise ValueError("APP_GUI_REORG_REVIEW_DENIED")
+        if not self._managed_render_depth:
+            self.replace_offline_presentation(
+                self._offline_controller.state.revision, reorg=report
+            )
+            return
+        messages = {
+            "NO_PROGRESS_EVIDENCE": "NO VERIFIED RESCAN PROGRESS",
+            "CONTIGUOUS_BUT_UNVERIFIED": "CONTIGUOUS CLAIM · NOT AUTHENTICATED",
+            "REPLAY_NOT_DOUBLE_COUNTED": "REPLAY CLAIM · NOT COMMITTED",
+            "ROLLBACK_RESCAN_REVIEW": "ROLLBACK REVIEW · NO SAFE CURSOR",
+            "MIGRATION_RESCAN_REVIEW": "MIGRATION REVIEW · NO SAFE CURSOR",
+        }
+        self.reorg_review_status.setText(messages[report.verdict])
+        self.reorg_review_notice.setText(
+            "UNTRUSTED CROSS-SOURCE RECONCILIATION · "
+            "NO RESCAN / RESTART AUTHORIZATION"
+        )
+
+    def clear_offline_reorg_reconciliation(self) -> None:
+        """Remove untrusted reconciliation view via the single writer."""
+        if not self._managed_render_depth:
+            self.clear_offline_presentation()
+            return
+        self.reorg_review_status.setText("NO REORG RECONCILIATION EVIDENCE")
+        self.reorg_review_notice.setText(
+            "NO TRUSTED CURSOR · NO SCANNER / WALLET / RELEASE"
+        )
+
     def present_offline_node_snapshot(self, snapshot: object) -> None:
         """Display a non-authorizing, unverified projection; no node/RPC access.
 
@@ -285,6 +595,11 @@ class MainWindow(QMainWindow):
             or snapshot.notice != "EXPERIMENTAL_NO_REAL_FUNDS"
         ):
             raise ValueError("APP_GUI_DIAGNOSTIC_REJECTED")
+        if not self._managed_render_depth:
+            self.replace_offline_presentation(
+                self._offline_controller.state.revision, node=snapshot
+            )
+            return
         self.node_diagnostic_status.setText(
             f"UNVERIFIED · regtest height {snapshot.height} · NO RPC"
         )
@@ -295,6 +610,9 @@ class MainWindow(QMainWindow):
 
     def clear_offline_node_snapshot(self) -> None:
         """Clear the view without retaining a profile or transport handle."""
+        if not self._managed_render_depth:
+            self.clear_offline_presentation()
+            return
         self.node_diagnostic_status.setText("NO DIAGNOSTIC SNAPSHOT · NO RPC")
         self.node_diagnostic_notice.setText(
             "UNVERIFIED DATA ONLY · NOT A CONNECTION OR WALLET AUTHORIZATION"
@@ -323,6 +641,11 @@ class MainWindow(QMainWindow):
             raise ValueError("APP_GUI_PRIVACY_GATE_REJECTED")
         # Fixed vocabulary prevents accidental display of untrusted manifest
         # blocker text, paths, RPC settings, keys, or authority-like claims.
+        if not self._managed_render_depth:
+            self.replace_offline_presentation(
+                self._offline_controller.state.revision, privacy=snapshot
+            )
+            return
         self.privacy_readiness_status.setText(
             "RESEARCH ONLY · 0 ACTIVE WALLET CAPABILITIES"
         )
@@ -334,6 +657,9 @@ class MainWindow(QMainWindow):
 
     def clear_offline_privacy_readiness(self) -> None:
         """Reset to the non-authorizing preview without storing evidence."""
+        if not self._managed_render_depth:
+            self.clear_offline_presentation()
+            return
         self.privacy_readiness_status.setText("RESEARCH INVENTORY · NOT LOADED")
         self.privacy_readiness_notice.setText(
             "WSP-1, PAYJOIN AND NETWORK PRIVACY · NO ACTIVE INTEGRATION"
@@ -356,6 +682,11 @@ class MainWindow(QMainWindow):
             or type(report.send) is not str or report.send != "BLOCKED"
         ):
             raise ValueError("APP_GUI_SYNTHETIC_POLICY_DENIED")
+        if not self._managed_render_depth:
+            self.replace_offline_presentation(
+                self._offline_controller.state.revision, policy=report
+            )
+            return
         self.privacy_policy_status.setText(
             "SIMULATED MODELS · UNTRUSTED · NOT AUTHORIZED"
         )
@@ -381,6 +712,9 @@ class MainWindow(QMainWindow):
 
     def clear_offline_policy_report(self) -> None:
         """Reset only the synthetic model panel; never persist the input."""
+        if not self._managed_render_depth:
+            self.clear_offline_presentation()
+            return
         self.privacy_policy_status.setText("NO SYNTHETIC POLICY EVIDENCE")
         self.privacy_policy_notice.setText(
             "PAYJOIN & NETWORK POLICY · NOT AUTHORIZED"
@@ -405,6 +739,11 @@ class MainWindow(QMainWindow):
             or type(preview.signer) is not str or preview.signer != "BLOCKED"
         ):
             raise ValueError("APP_GUI_RECEIVE_VECTOR_DENIED")
+        if not self._managed_render_depth:
+            self.replace_offline_presentation(
+                self._offline_controller.state.revision, receive=preview
+            )
+            return
         self.receive_vector_status.setText(
             f"SYNTHETIC REGTEST · PUBLIC FINGERPRINT {_FIXED_FINGERPRINT}"
         )
@@ -415,6 +754,9 @@ class MainWindow(QMainWindow):
 
     def clear_public_receive_vector(self) -> None:
         """Remove the optional preview; no wallet object is ever retained."""
+        if not self._managed_render_depth:
+            self.clear_offline_presentation()
+            return
         self.receive_vector_status.setText("NO PUBLIC SAMPLE · NO ADDRESS GENERATED")
         self.receive_vector_notice.setText(
             "NOT A RECEIVING ADDRESS · NO QR / COPY · SCANNER AND SIGNER BLOCKED"
