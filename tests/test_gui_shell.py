@@ -501,6 +501,75 @@ class GuiShellSmokeTests(unittest.TestCase):
                          "NO PUBLIC SAMPLE · NO ADDRESS GENERATED")
         self.assertEqual(self.window.session_status.text(), "NO WALLET LOADED")
 
+    def test_lifecycle_clear_failure_invalidates_revision_and_other_panels(self) -> None:
+        # A Qt setter may fail while clearing OLD content, before new content
+        # is rendered. The controller must not retain an accepted revision.
+        from unittest.mock import patch
+        from wam_privacy_wallet.application.presentation_lifecycle import OfflineLifecycleError
+
+        self.window.replace_offline_presentation(
+            0, receive=rv.inspect_pinned_public_vector()
+        )
+        self.assertIn("PUBLIC FINGERPRINT", self.window.receive_vector_status.text())
+        original = MainWindow.clear_offline_node_snapshot
+        calls = []
+
+        def fail_once(window):
+            calls.append(1)
+            if len(calls) == 1:
+                raise RuntimeError("SECRET_QT_CLEAR_DETAIL")
+            return original(window)
+
+        with patch.object(MainWindow, "clear_offline_node_snapshot",
+                          autospec=True, side_effect=fail_once):
+            with self.assertRaisesRegex(
+                OfflineLifecycleError, "^APP_OFFLINE_RENDER_DENIED$"
+            ) as failure:
+                self.window.replace_offline_presentation(
+                    1, node=NodeOverview(
+                        "regtest", 7, "READ_ONLY_SNAPSHOT",
+                        "EXPERIMENTAL_NO_REAL_FUNDS",
+                    )
+                )
+            self.assertIsNone(failure.exception.__cause__)
+
+        state = self.window.offline_presentation_state
+        self.assertEqual((state.revision, state.transition), (3, "CLEARED"))
+        self.assertEqual((state.node, state.receive), ("ABSENT", "ABSENT"))
+        self.assertGreaterEqual(len(calls), 2)
+        self.assertEqual(self.window.node_diagnostic_status.text(),
+                         "NO DIAGNOSTIC SNAPSHOT · NO RPC")
+        self.assertEqual(self.window.receive_vector_status.text(),
+                         "NO PUBLIC SAMPLE · NO ADDRESS GENERATED")
+        with self.assertRaises(OfflineLifecycleError):
+            self.window.replace_offline_presentation(1)
+        self.assertEqual(self.window.session_status.text(), "NO WALLET LOADED")
+
+    def test_reset_clear_failure_attempts_all_panels_and_stays_blocked(self) -> None:
+        # An error in one widget cannot prevent other panel resets; the
+        # user-visible exception contains only the stable error code.
+        from unittest.mock import patch
+        from wam_privacy_wallet.application.presentation_lifecycle import OfflineLifecycleError
+
+        self.window.replace_offline_presentation(
+            0, receive=rv.inspect_pinned_public_vector()
+        )
+        with patch.object(MainWindow, "clear_offline_node_snapshot",
+                          side_effect=RuntimeError("PRIVATE_QT_DETAIL")):
+            with self.assertRaisesRegex(
+                OfflineLifecycleError, "^APP_OFFLINE_RENDER_DENIED$"
+            ) as failure:
+                self.window.clear_offline_presentation()
+            self.assertIsNone(failure.exception.__cause__)
+
+        state = self.window.offline_presentation_state
+        self.assertEqual((state.revision, state.transition), (2, "CLEARED"))
+        self.assertEqual((state.node, state.receive), ("ABSENT", "ABSENT"))
+        self.assertEqual(self.window.receive_vector_status.text(),
+                         "NO PUBLIC SAMPLE · NO ADDRESS GENERATED")
+        self.assertEqual(self.window.session_status.text(), "NO WALLET LOADED")
+        self.assertEqual(self.window.findChildren(QPushButton), [])
+
     def test_lifecycle_render_failure_clears_and_invalidates(self) -> None:
         # A renderer can fail *after* a validated state was committed.
         # That must never leave an accepted revision or stale panel visible.
