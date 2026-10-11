@@ -30,6 +30,12 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_signed_release.CoreSignedReleaseTests.test_unsigned_checksums_are_never_acceptance_evidence",
     "test_core_signed_release.CoreSignedReleaseTests.test_post_signature_archive_digest_mismatch_denied",
     "test_core_signed_release.CoreSignedReleaseTests.test_gpg_invocation_never_uses_shell_or_user_gnupghome",
+    "test_core_archive_inventory.CoreArchiveInventoryTests.test_linux_tar_contains_readonly_node_hash_and_counts",
+    "test_core_archive_inventory.CoreArchiveInventoryTests.test_reject_tar_symlink_and_hardlink",
+    "test_core_archive_inventory.CoreArchiveInventoryTests.test_reject_zip_unix_symlink",
+    "test_core_archive_inventory.CoreArchiveInventoryTests.test_zip_compression_ratio_denies_bomb",
+    "test_core_archive_inventory.CoreArchiveInventoryTests.test_bogus_archive_digest_denied_before_container_inspection",
+    "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
     "test_regtest_artifact_preflight.RegtestBinaryArtifactPreflightTests.test_matching_synthetic_file_never_counts_as_real_node",
     "test_two_node_schema.ParallelTwoNodeSchemaTests.test_schema_version_is_exact_one_and_no_execution_authority",
     "test_security_gate_ledger.SecurityGateLedgerTests.test_cannot_auto_promote_global_authority",
@@ -37,7 +43,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_ci_contract_gate.MandatoryOfflineContractGateTests.test_minimum_case_floors_pinned_for_all_mandatory_suites",
 })
 # Existing 267-case GUI baseline + 12 public-vector tests + 5 Receive GUI tests.
-FULL_MIN_CASES = 341
+FULL_MIN_CASES = 364
 
 
 def _cases(suite: unittest.TestSuite):
