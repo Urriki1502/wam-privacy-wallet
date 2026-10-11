@@ -384,5 +384,333 @@ class GuiShellSmokeTests(unittest.TestCase):
         self.assertEqual(self.window.node_status.text(), "DISCONNECTED · NO RPC")
 
 
+    def test_lifecycle_valid_then_invalid_clears_all_panels(self) -> None:
+        from wam_privacy_wallet.application.presentation_lifecycle import OfflineLifecycleError
+        self.window.replace_offline_presentation(0, node=NodeOverview(
+            "regtest", 42, "READ_ONLY_SNAPSHOT", "EXPERIMENTAL_NO_REAL_FUNDS"))
+        self.assertIn("UNVERIFIED", self.window.node_diagnostic_status.text())
+        with self.assertRaises(OfflineLifecycleError):
+            self.window.replace_offline_presentation(1, node={"private": "DO_NOT_ECHO"})
+        self.assertEqual(self.window.node_diagnostic_status.text(), "NO DIAGNOSTIC SNAPSHOT · NO RPC")
+        self.assertEqual(self.window.offline_presentation_state.transition, "REJECTED")
+        self.assertEqual(self.window.node_status.text(), "DISCONNECTED · NO RPC")
+
+    def test_lifecycle_stale_revision_clears_receive_and_node(self) -> None:
+        from wam_privacy_wallet.application.presentation_lifecycle import OfflineLifecycleError
+        self.window.replace_offline_presentation(0, node=NodeOverview(
+            "regtest", 42, "READ_ONLY_SNAPSHOT", "EXPERIMENTAL_NO_REAL_FUNDS"),
+            receive=rv.inspect_pinned_public_vector())
+        self.assertIn("PUBLIC FINGERPRINT", self.window.receive_vector_status.text())
+        with self.assertRaises(OfflineLifecycleError):
+            self.window.replace_offline_presentation(0)
+        self.assertEqual(self.window.receive_vector_status.text(),
+                         "NO PUBLIC SAMPLE · NO ADDRESS GENERATED")
+        self.assertEqual(self.window.node_diagnostic_status.text(),
+                         "NO DIAGNOSTIC SNAPSHOT · NO RPC")
+
+    def test_lifecycle_reset_invalidates_revision_and_all_panels(self) -> None:
+        from wam_privacy_wallet.application.presentation_lifecycle import OfflineLifecycleError
+        self.window.replace_offline_presentation(0, receive=rv.inspect_pinned_public_vector())
+        self.window.clear_offline_presentation()
+        self.assertEqual(self.window.offline_presentation_state.transition, "CLEARED")
+        self.assertEqual(self.window.receive_vector_status.text(),
+                         "NO PUBLIC SAMPLE · NO ADDRESS GENERATED")
+        with self.assertRaises(OfflineLifecycleError):
+            self.window.replace_offline_presentation(1)
+
+    def test_lifecycle_replacement_does_not_retain_omitted_evidence(self) -> None:
+        self.window.replace_offline_presentation(0, receive=rv.inspect_pinned_public_vector())
+        self.window.replace_offline_presentation(1)
+        self.assertEqual(self.window.offline_presentation_state.receive, "ABSENT")
+        self.assertEqual(self.window.receive_vector_status.text(),
+                         "NO PUBLIC SAMPLE · NO ADDRESS GENERATED")
+        self.assertEqual(self.window.session_status.text(), "NO WALLET LOADED")
+        self.assertEqual(self.window.findChildren(QPushButton), [])
+
+
+    def test_legacy_presenter_replaces_managed_snapshot_atomically(self) -> None:
+        # Legacy direct calls now run through the same single-writer revision.
+        from wam_privacy_wallet.application.node_status import NodeOverview
+        from wam_privacy_wallet.application.policy_evidence import (
+            SyntheticPolicyReport,
+        )
+        self.window.replace_offline_presentation(
+            0, node=NodeOverview(
+                "regtest", 10, "READ_ONLY_SNAPSHOT",
+                "EXPERIMENTAL_NO_REAL_FUNDS",
+            ), receive=rv.inspect_pinned_public_vector()
+        )
+        self.assertEqual(self.window.offline_presentation_state.revision, 1)
+        self.window.present_offline_policy_report(SyntheticPolicyReport(
+            "PIN_RECORDED_UNATTESTED", "MODEL_PASS_UNTRUSTED",
+            "MODEL_PASS_UNTRUSTED", "MODEL_ONLY_NO_AUTHORITY",
+            "BLOCKED", "BLOCKED", "BLOCKED",
+        ))
+        state = self.window.offline_presentation_state
+        self.assertEqual((state.revision, state.policy), (2, "MODEL_ONLY"))
+        self.assertEqual((state.node, state.receive), ("ABSENT", "ABSENT"))
+        self.assertEqual(self.window.node_diagnostic_status.text(),
+                         "NO DIAGNOSTIC SNAPSHOT · NO RPC")
+        self.assertEqual(self.window.receive_vector_status.text(),
+                         "NO PUBLIC SAMPLE · NO ADDRESS GENERATED")
+
+    def test_legacy_clear_invalidates_all_panels_and_prior_revision(self) -> None:
+        from wam_privacy_wallet.application.presentation_lifecycle import (
+            OfflineLifecycleError,
+        )
+        self.window.replace_offline_presentation(
+            0, receive=rv.inspect_pinned_public_vector()
+        )
+        self.window.clear_public_receive_vector()
+        state = self.window.offline_presentation_state
+        self.assertEqual((state.revision, state.transition), (2, "CLEARED"))
+        self.assertEqual((state.node, state.receive), ("ABSENT", "ABSENT"))
+        with self.assertRaises(OfflineLifecycleError):
+            self.window.replace_offline_presentation(1)
+        self.assertEqual(self.window.offline_presentation_state.transition,
+                         "REJECTED")
+
+    def test_legacy_invalid_input_does_not_mutate_accepted_state(self) -> None:
+        self.window.present_public_receive_vector(
+            rv.inspect_pinned_public_vector()
+        )
+        before = self.window.offline_presentation_state
+        self.assertEqual(before.receive, "PUBLIC_FIXTURE")
+        with self.assertRaisesRegex(
+            ValueError, "^APP_GUI_RECEIVE_VECTOR_DENIED$"
+        ):
+            self.window.present_public_receive_vector(
+                {"secret": "MUST_NOT_LOG"}
+            )
+        self.assertEqual(self.window.offline_presentation_state, before)
+        self.assertIn("PUBLIC FINGERPRINT",
+                      self.window.receive_vector_status.text())
+        self.assertNotIn("MUST_NOT_LOG",
+                         self.window.receive_vector_notice.text())
+
+    def test_legacy_demo_routes_through_controller_single_writer(self) -> None:
+        self.window.run_fixed_public_receive_demo()
+        state = self.window.offline_presentation_state
+        self.assertEqual((state.revision, state.receive), (1, "PUBLIC_FIXTURE"))
+        self.assertEqual(state.authority, "BLOCKED")
+        self.window.run_fixed_offline_policy_demo()
+        state = self.window.offline_presentation_state
+        self.assertEqual((state.revision, state.policy), (2, "MODEL_ONLY"))
+        self.assertEqual(state.receive, "ABSENT")
+        self.assertEqual(self.window.receive_vector_status.text(),
+                         "NO PUBLIC SAMPLE · NO ADDRESS GENERATED")
+        self.assertEqual(self.window.session_status.text(), "NO WALLET LOADED")
+
+    def test_lifecycle_clear_failure_invalidates_revision_and_other_panels(self) -> None:
+        # A Qt setter may fail while clearing OLD content, before new content
+        # is rendered. The controller must not retain an accepted revision.
+        from unittest.mock import patch
+        from wam_privacy_wallet.application.presentation_lifecycle import OfflineLifecycleError
+
+        self.window.replace_offline_presentation(
+            0, receive=rv.inspect_pinned_public_vector()
+        )
+        self.assertIn("PUBLIC FINGERPRINT", self.window.receive_vector_status.text())
+        original = MainWindow.clear_offline_node_snapshot
+        calls = []
+
+        def fail_once(window):
+            calls.append(1)
+            if len(calls) == 1:
+                raise RuntimeError("SECRET_QT_CLEAR_DETAIL")
+            return original(window)
+
+        with patch.object(MainWindow, "clear_offline_node_snapshot",
+                          autospec=True, side_effect=fail_once):
+            with self.assertRaisesRegex(
+                OfflineLifecycleError, "^APP_OFFLINE_RENDER_DENIED$"
+            ) as failure:
+                self.window.replace_offline_presentation(
+                    1, node=NodeOverview(
+                        "regtest", 7, "READ_ONLY_SNAPSHOT",
+                        "EXPERIMENTAL_NO_REAL_FUNDS",
+                    )
+                )
+            self.assertIsNone(failure.exception.__cause__)
+
+        state = self.window.offline_presentation_state
+        self.assertEqual((state.revision, state.transition), (3, "CLEARED"))
+        self.assertEqual((state.node, state.receive), ("ABSENT", "ABSENT"))
+        self.assertGreaterEqual(len(calls), 2)
+        self.assertEqual(self.window.node_diagnostic_status.text(),
+                         "NO DIAGNOSTIC SNAPSHOT · NO RPC")
+        self.assertEqual(self.window.receive_vector_status.text(),
+                         "NO PUBLIC SAMPLE · NO ADDRESS GENERATED")
+        with self.assertRaises(OfflineLifecycleError):
+            self.window.replace_offline_presentation(1)
+        self.assertEqual(self.window.session_status.text(), "NO WALLET LOADED")
+
+    def test_reset_clear_failure_attempts_all_panels_and_stays_blocked(self) -> None:
+        # An error in one widget cannot prevent other panel resets; the
+        # user-visible exception contains only the stable error code.
+        from unittest.mock import patch
+        from wam_privacy_wallet.application.presentation_lifecycle import OfflineLifecycleError
+
+        self.window.replace_offline_presentation(
+            0, receive=rv.inspect_pinned_public_vector()
+        )
+        with patch.object(MainWindow, "clear_offline_node_snapshot",
+                          side_effect=RuntimeError("PRIVATE_QT_DETAIL")):
+            with self.assertRaisesRegex(
+                OfflineLifecycleError, "^APP_OFFLINE_RENDER_DENIED$"
+            ) as failure:
+                self.window.clear_offline_presentation()
+            self.assertIsNone(failure.exception.__cause__)
+
+        state = self.window.offline_presentation_state
+        self.assertEqual((state.revision, state.transition), (2, "CLEARED"))
+        self.assertEqual((state.node, state.receive), ("ABSENT", "ABSENT"))
+        self.assertEqual(self.window.receive_vector_status.text(),
+                         "NO PUBLIC SAMPLE · NO ADDRESS GENERATED")
+        self.assertEqual(self.window.session_status.text(), "NO WALLET LOADED")
+        self.assertEqual(self.window.findChildren(QPushButton), [])
+
+    def test_reentrant_clear_during_render_cannot_survive_swallowed_error(self) -> None:
+        from unittest.mock import patch
+        from wam_privacy_wallet.application.presentation_lifecycle import OfflineLifecycleError
+        original = MainWindow.present_offline_node_snapshot
+        observed = []
+
+        def reenter(window, snapshot):
+            try:
+                window.clear_offline_presentation()
+            except OfflineLifecycleError as exc:
+                observed.append(str(exc))
+            else:
+                observed.append("UNEXPECTEDLY_ACCEPTED")
+            return original(window, snapshot)
+
+        with patch.object(MainWindow, "present_offline_node_snapshot",
+                          autospec=True, side_effect=reenter):
+            with self.assertRaisesRegex(
+                OfflineLifecycleError, "^APP_OFFLINE_RENDER_DENIED$"
+            ) as exc:
+                self.window.replace_offline_presentation(
+                    0, node=NodeOverview("regtest", 4, "READ_ONLY_SNAPSHOT",
+                                          "EXPERIMENTAL_NO_REAL_FUNDS")
+                )
+            self.assertIsNone(exc.exception.__cause__)
+        self.assertEqual(observed, ["APP_OFFLINE_REENTRANT_DENIED"])
+        state = self.window.offline_presentation_state
+        self.assertEqual((state.revision, state.transition, state.node),
+                         (2, "CLEARED", "ABSENT"))
+        self.assertEqual(self.window.node_diagnostic_status.text(),
+                         "NO DIAGNOSTIC SNAPSHOT · NO RPC")
+        self.assertEqual(self.window.session_status.text(), "NO WALLET LOADED")
+
+    def test_reentrant_replace_during_clear_poisoned_even_when_callback_catches(self) -> None:
+        from unittest.mock import patch
+        from wam_privacy_wallet.application.presentation_lifecycle import OfflineLifecycleError
+        original = MainWindow.clear_offline_node_snapshot
+        observed = []
+
+        def reenter(window):
+            if not observed:
+                try:
+                    window.replace_offline_presentation(
+                        window.offline_presentation_state.revision,
+                        node=NodeOverview("regtest", 99, "READ_ONLY_SNAPSHOT",
+                                          "EXPERIMENTAL_NO_REAL_FUNDS")
+                    )
+                except OfflineLifecycleError as exc:
+                    observed.append(str(exc))
+                else:
+                    observed.append("UNEXPECTEDLY_ACCEPTED")
+            return original(window)
+
+        with patch.object(MainWindow, "clear_offline_node_snapshot",
+                          autospec=True, side_effect=reenter):
+            with self.assertRaisesRegex(
+                OfflineLifecycleError, "^APP_OFFLINE_RENDER_DENIED$"
+            ):
+                self.window.replace_offline_presentation(
+                    0, node=NodeOverview("regtest", 1, "READ_ONLY_SNAPSHOT",
+                                          "EXPERIMENTAL_NO_REAL_FUNDS")
+                )
+        self.assertEqual(observed, ["APP_OFFLINE_REENTRANT_DENIED"])
+        state = self.window.offline_presentation_state
+        self.assertEqual((state.revision, state.transition, state.node),
+                         (2, "CLEARED", "ABSENT"))
+        self.assertEqual(self.window.node_diagnostic_status.text(),
+                         "NO DIAGNOSTIC SNAPSHOT · NO RPC")
+
+    def test_reentrant_replace_during_explicit_clear_stays_blocked_then_recovers(self) -> None:
+        from unittest.mock import patch
+        from wam_privacy_wallet.application.presentation_lifecycle import OfflineLifecycleError
+        self.window.present_public_receive_vector(rv.inspect_pinned_public_vector())
+        original = MainWindow.clear_offline_node_snapshot
+        observed = []
+
+        def reenter(window):
+            if not observed:
+                try:
+                    window.replace_offline_presentation(
+                        window.offline_presentation_state.revision
+                    )
+                except OfflineLifecycleError as exc:
+                    observed.append(str(exc))
+                else:
+                    observed.append("UNEXPECTEDLY_ACCEPTED")
+            return original(window)
+
+        with patch.object(MainWindow, "clear_offline_node_snapshot",
+                          autospec=True, side_effect=reenter):
+            with self.assertRaisesRegex(
+                OfflineLifecycleError, "^APP_OFFLINE_RENDER_DENIED$"
+            ):
+                self.window.clear_offline_presentation()
+        self.assertEqual(observed, ["APP_OFFLINE_REENTRANT_DENIED"])
+        cleared = self.window.offline_presentation_state
+        self.assertEqual((cleared.revision, cleared.transition, cleared.receive),
+                         (2, "CLEARED", "ABSENT"))
+        self.assertEqual(self.window.receive_vector_status.text(),
+                         "NO PUBLIC SAMPLE · NO ADDRESS GENERATED")
+        # Internal reentry poison must not persist into a later valid update.
+        self.window.replace_offline_presentation(
+            2, node=NodeOverview("regtest", 3, "READ_ONLY_SNAPSHOT",
+                                  "EXPERIMENTAL_NO_REAL_FUNDS")
+        )
+        self.assertEqual(self.window.offline_presentation_state.revision, 3)
+        self.assertEqual(self.window.offline_presentation_state.node, "UNVERIFIED")
+        self.assertEqual(self.window.session_status.text(), "NO WALLET LOADED")
+
+    def test_lifecycle_render_failure_clears_and_invalidates(self) -> None:
+        # A renderer can fail *after* a validated state was committed.
+        # That must never leave an accepted revision or stale panel visible.
+        from unittest.mock import patch
+        from wam_privacy_wallet.application.presentation_lifecycle import OfflineLifecycleError
+        self.window.replace_offline_presentation(
+            0, receive=rv.inspect_pinned_public_vector()
+        )
+        self.assertIn("PUBLIC FINGERPRINT", self.window.receive_vector_status.text())
+        with patch.object(MainWindow, "present_offline_node_snapshot",
+                          side_effect=RuntimeError("PRIVATE_RENDER_DETAIL")):
+            with self.assertRaisesRegex(
+                OfflineLifecycleError, "^APP_OFFLINE_RENDER_DENIED$"
+            ) as failure:
+                self.window.replace_offline_presentation(
+                    1, node=NodeOverview(
+                        "regtest", 42, "READ_ONLY_SNAPSHOT",
+                        "EXPERIMENTAL_NO_REAL_FUNDS",
+                    ),
+                )
+            self.assertIsNone(failure.exception.__cause__)
+        state = self.window.offline_presentation_state
+        self.assertEqual((state.transition, state.revision), ("CLEARED", 3))
+        self.assertEqual((state.node, state.receive), ("ABSENT", "ABSENT"))
+        self.assertEqual(self.window.node_diagnostic_status.text(),
+                         "NO DIAGNOSTIC SNAPSHOT · NO RPC")
+        self.assertEqual(self.window.receive_vector_status.text(),
+                         "NO PUBLIC SAMPLE · NO ADDRESS GENERATED")
+        self.assertEqual(self.window.session_status.text(), "NO WALLET LOADED")
+        self.assertNotIn("PRIVATE_RENDER_DETAIL", self.window.node_diagnostic_notice.text())
+        self.assertEqual(self.window.findChildren(QPushButton), [])
+
+
 if __name__ == "__main__":
     unittest.main()
