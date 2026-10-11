@@ -70,7 +70,11 @@ def prepare_private_two_node_workspace(
         raise TwoNodeWorkspaceError("REGTEST_WORKSPACE_POLICY_DENIED") from None
 
     try:
-        with tempfile.TemporaryDirectory(prefix="wam-2node-regtest-stage-") as temp:
+        scratch = tempfile.TemporaryDirectory(prefix="wam-2node-regtest-stage-")
+    except (OSError, TypeError, ValueError):
+        raise TwoNodeWorkspaceError("REGTEST_WORKSPACE_IO_DENIED") from None
+    with scratch as temp:
+        try:
             root = Path(temp)
             root.chmod(0o700)
             result: list[NodeWorkspace] = []
@@ -95,8 +99,10 @@ def prepare_private_two_node_workspace(
                 result.append(NodeWorkspace(
                     node.label, data_dir, conf_path, node.rpc_port, node.p2p_port,
                 ))
-            yield TwoNodeWorkspace(nodes=(result[0], result[1]))
-    except TwoNodeWorkspaceError:
-        raise
-    except (OSError, TypeError, UnicodeError, IndexError, ValueError):
-        raise TwoNodeWorkspaceError("REGTEST_WORKSPACE_IO_DENIED") from None
+        except TwoNodeWorkspaceError:
+            raise
+        except (OSError, TypeError, UnicodeError, IndexError, ValueError):
+            raise TwoNodeWorkspaceError("REGTEST_WORKSPACE_IO_DENIED") from None
+        # Outside staging error handler: the consumer's exception is not a
+        # staging failure and must propagate unmodified after temp cleanup.
+        yield TwoNodeWorkspace(nodes=(result[0], result[1]))
