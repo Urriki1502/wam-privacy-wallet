@@ -26,7 +26,7 @@ MINIMUM_CASES = {
     "test_reuse_manifest.py": 6,
     "test_app_diagnostic_boundary.py": 5,
     "test_security_gate_ledger.py": 6,
-    "test_regtest_artifact_preflight.py": 7,
+    "test_regtest_artifact_preflight.py": 10,
     "test_two_node_topology.py": 12,
     "test_two_node_policy.py": 19,
     "test_two_node_schema.py": 18,
@@ -40,6 +40,9 @@ MINIMUM_CASES = {
     "test_app_synthetic_policy_demo.py": 8,
     "test_app_receive_public_vector.py": 12,
     "test_app_presentation_lifecycle.py": 10,
+    "test_scanner_response_shape.py": 14,
+    "test_scanner_window_contract.py": 18,
+    "test_offline_recovery_disposition.py": 18,
 }
 MANDATORY_SUITES = tuple(MINIMUM_CASES)
 
