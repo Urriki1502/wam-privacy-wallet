@@ -110,3 +110,49 @@ release manifest), exact candidate binary digest, source/build mapping,
 platform distribution and approved regtest genesis/profile. Then design a
 platform-qualified launcher binding those bytes to the process image while
 preserving the deny-mainnet gate. Until then issue #36 stays BLOCKED.
+
+## Signed WAM v0.1.11 distribution verification (offline / no Core execution)
+
+**New independent provenance anchor found:** the WAM project's HTTPS
+`https://wamcoin.org/security/` publishes its release-signing fingerprint:
+`4BD4 A8D3 AFD4 3F5C BCB5 00E2 3798 462F E00A DBA4`.
+The official v0.1.11 release contains `SHA256SUMS` and detached
+`SHA256SUMS.asc` signatures. The fingerprint is **pinned in repository
+code**, never accepted from the candidate's payload or CLI options.
+This origin still deserves operator/DEV review for compromise/revocation,
+rather than treating a website screenshot as permanent publisher trust.
+
+The new `node/core_signed_release.py` does the following *without running
+WAM Core*: takes separately obtained local release signing key, SHA256SUMS,
+SHA256SUMS.asc, exact WAM **node distribution archive** and a separately
+trusted **absolute path to installed GnuPG**. It copies bounded signed
+metadata to a disposable GnuPG homedir, requires exactly the WAM pinned
+primary key fingerprint, imports the key only into that disposable keyring,
+performs an actual local `gpg --verify` over those exact checksum bytes,
+requires a cryptographic `VALIDSIG` from the pinned key and `GOODSIG`,
+parses a bounded duplicate-free checksum list, and hashes the selected
+nonexecuting archive through the staging layer. Invalid signature, missing
+tool, wrong key, malformed checksum, unsupported version/platform, duplicate
+entries or wrong binary-archive digest **fail closed**.
+
+**Allowed v0.1.11 node archives only:**
+- `wam-coin-v0.1.11-x86_64-linux-gnu.tar.gz`
+- `wam-coin-v0.1.11-arm64-apple-darwin.tar.gz`
+- `wam-coin-v0.1.11-x86_64-w64-mingw32.zip`
+
+No official Windows x86 node archive or macOS x64 archive is assumed; these
+native CI environments remain useful for *contract testing* only. GnuPG
+itself must be a trusted, OS-verified local tool; accepting an attacker-owned
+executable at a caller-selected path would undermine the signature result.
+All tests use synthetic local files and mock the GnuPG protocol; **they do
+not assert a live v0.1.11 signature has actually been verified on CI**.
+The resulting `SIGNED_DISTRIBUTION_ONLY` receipt is *not an extracted
+`wamd` binary attestation*, not a process-image proof, and not a launch
+permit. Every mainnet, wallet, executable and funds permission remains false.
+
+**Acceptance target:** 20 additional security cases in mandatory suite 27,
+total >=341 full-discovery cases (26 existing GUI cases), complete native
+Wallet CI 8/8 and CodeQL Python + Actions 2/2 on the exact modified SHA.
+The existing unconditional Core launch interlock is **not** removed.
+The actual signed distribution must still be reviewed by DEV WAM, including
+revocation and source/build provenance, before considering genuine runtime.
