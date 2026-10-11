@@ -716,6 +716,135 @@ class GuiShellSmokeTests(unittest.TestCase):
         self.assertNotIn("HIDDEN_QT_DETAIL",
                          self.window.recovery_review_notice.text())
 
+    def _synthetic_resume_preview(self, *, scenario="normal"):
+        from wam_privacy_wallet.application.offline_resume_review import (
+            review_offline_resume,
+        )
+        A, B = "a" * 64, "b" * 64
+
+        def metadata(version=3, checkpoint=3, digest=A):
+            return {
+                "schema": "wam-wallet-storage-review/v1",
+                "profile": "WSP-1", "network": "regtest",
+                "genesis": WAM_REGTEST_GENESIS,
+                "store_schema_version": version,
+                "checkpoint_height": checkpoint,
+                "checkpoint_hash": digest,
+                "reported_height": checkpoint,
+                "reported_tip": digest,
+                "writer_lock": "UNATTESTED", "db_integrity": "UNATTESTED",
+                "wallet_identity": "UNATTESTED",
+            }
+
+        old = metadata()
+        after = metadata()
+        if scenario == "rollback":
+            old = metadata(checkpoint=4, digest=B)
+        elif scenario == "migration":
+            old = metadata(version=2)
+        return review_offline_resume(
+            before=old, after=after, old_revision=4, new_revision=5,
+            interrupted_height=5, interruption="CRASH",
+        )
+
+    def test_resume_panel_starts_blocked_with_no_user_actions(self) -> None:
+        self.window.navigation.setCurrentRow(5)
+        self.assertEqual(self.window.current_page_title, "Recovery")
+        self.assertIn("RESUME DISABLED", self.window.resume_review_status.text())
+        self.assertIn("NO AUTOMATIC RESUME", self.window.resume_review_notice.text())
+        self.assertEqual(self.window.findChildren(QPushButton), [])
+
+    def test_resume_normal_restart_never_promotes_wallet_or_scanner(self) -> None:
+        preview = self._synthetic_resume_preview()
+        self.window.present_offline_resume_review(preview)
+        state = self.window.offline_presentation_state
+        self.assertEqual((state.revision, state.resume),
+                         (1, "REVALIDATE_BEFORE_RESCAN"))
+        self.assertEqual(state.authority, "BLOCKED")
+        self.assertEqual(state.wallet, "NO_WALLET_LOADED")
+        self.assertIn("RESUME NOT AUTHORIZED", self.window.resume_review_status.text())
+        self.assertNotIn("a" * 64, self.window.resume_review_status.text())
+        self.assertEqual(self.window.session_status.text(), "NO WALLET LOADED")
+
+    def test_resume_rollback_and_migration_have_fixed_safe_messages(self) -> None:
+        for scenario, label in (
+            ("rollback", "REWIND / RESCAN REVIEW · NOT STARTED"),
+            ("migration", "MIGRATION + RESCAN REVIEW · NOT STARTED"),
+        ):
+            with self.subTest(scenario=scenario):
+                self.window.present_offline_resume_review(
+                    self._synthetic_resume_preview(scenario=scenario)
+                )
+                self.assertEqual(self.window.resume_review_status.text(), label)
+                self.assertNotIn("b" * 64, self.window.resume_review_notice.text())
+                self.assertEqual(self.window.offline_presentation_state.authority,
+                                 "BLOCKED")
+
+    def test_resume_and_recovery_share_single_writer_atomic_swap(self) -> None:
+        self.window.replace_offline_presentation(
+            0, recovery=self._synthetic_recovery_review(),
+            resume=self._synthetic_resume_preview(),
+        )
+        state = self.window.offline_presentation_state
+        self.assertEqual((state.revision, state.recovery, state.resume),
+                         (1, "REVIEW_ONLY_NOT_VERIFIED", "REVALIDATE_BEFORE_RESCAN"))
+        self.window.present_offline_node_snapshot(NodeOverview(
+            "regtest", 2, "READ_ONLY_SNAPSHOT", "EXPERIMENTAL_NO_REAL_FUNDS"
+        ))
+        cleared = self.window.offline_presentation_state
+        self.assertEqual((cleared.revision, cleared.recovery, cleared.resume),
+                         (2, "ABSENT", "ABSENT"))
+        self.assertIn("RESUME DISABLED", self.window.resume_review_status.text())
+        self.assertIn("NO OFFLINE RECOVERY", self.window.recovery_review_status.text())
+
+    def test_resume_forged_claims_rejected_without_changing_display(self) -> None:
+        from dataclasses import replace
+        good = self._synthetic_resume_preview()
+        self.window.present_offline_resume_review(good)
+        original = self.window.offline_presentation_state
+        bad_action = replace(good, action="REWIND_RESCAN_REVIEW")
+        bad_authority = replace(good)
+        object.__setattr__(bad_authority, "resume_authorized", True)
+        for bad in (bad_action, bad_authority, {"secret": "DO_NOT_LEAK"}):
+            with self.subTest(bad=type(bad).__name__), self.assertRaisesRegex(
+                ValueError, "^APP_GUI_RESUME_REVIEW_DENIED$"
+            ):
+                self.window.present_offline_resume_review(bad)
+            self.assertEqual(self.window.offline_presentation_state, original)
+        self.assertEqual(self.window.findChildren(QPushButton), [])
+
+    def test_resume_clear_invalidates_old_revision_and_evidence(self) -> None:
+        from wam_privacy_wallet.application.presentation_lifecycle import OfflineLifecycleError
+        self.window.present_offline_resume_review(self._synthetic_resume_preview())
+        self.window.clear_offline_resume_review()
+        state = self.window.offline_presentation_state
+        self.assertEqual((state.revision, state.transition, state.resume),
+                         (2, "CLEARED", "ABSENT"))
+        self.assertIn("RESUME DISABLED", self.window.resume_review_status.text())
+        with self.assertRaises(OfflineLifecycleError):
+            self.window.replace_offline_presentation(1,
+                resume=self._synthetic_resume_preview())
+        self.assertEqual(self.window.offline_presentation_state.transition, "REJECTED")
+
+    def test_resume_renderer_fault_resets_and_redacts_without_privilege(self) -> None:
+        from unittest.mock import patch
+        from wam_privacy_wallet.application.presentation_lifecycle import OfflineLifecycleError
+        with patch.object(MainWindow, "present_offline_resume_review",
+                          side_effect=RuntimeError("SECRET_QT_RESUME_FAILURE")):
+            with self.assertRaisesRegex(
+                OfflineLifecycleError, "^APP_OFFLINE_RENDER_DENIED$"
+            ) as failure:
+                self.window.replace_offline_presentation(
+                    0, resume=self._synthetic_resume_preview()
+                )
+            self.assertIsNone(failure.exception.__cause__)
+        state = self.window.offline_presentation_state
+        self.assertEqual((state.revision, state.resume, state.transition),
+                         (2, "ABSENT", "CLEARED"))
+        self.assertIn("RESUME DISABLED", self.window.resume_review_status.text())
+        self.assertNotIn("SECRET_QT_RESUME_FAILURE",
+                         self.window.resume_review_notice.text())
+
     def test_lifecycle_render_failure_clears_and_invalidates(self) -> None:
         # A renderer can fail *after* a validated state was committed.
         # That must never leave an accepted revision or stale panel visible.
