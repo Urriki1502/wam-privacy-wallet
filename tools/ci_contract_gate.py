@@ -33,7 +33,7 @@ MINIMUM_CASES = {
     "test_provenance_intake.py": 13,
     "test_rpc_qualification_prep.py": 13,
     "test_reorg_qualification_prep.py": 13,
-    "test_ci_contract_gate.py": 10,
+    "test_ci_contract_gate.py": 14,
 }
 MANDATORY_SUITES = tuple(MINIMUM_CASES)
 
@@ -62,6 +62,10 @@ def run_single(pattern: str, test_dir: Path) -> int:
     result = unittest.TextTestRunner(verbosity=2).run(suite)
     if not result.wasSuccessful() or loader.errors:
         raise ContractGateError(f"CI_REQUIRED_SUITE_FAILED: {pattern}")
+    # unittest reports a failing @expectedFailure case as successful.
+    # A mandatory offline contract must never pass on an expected failure.
+    if result.expectedFailures:
+        raise ContractGateError(f"CI_REQUIRED_SUITE_EXPECTED_FAILURE: {pattern}")
     if result.testsRun <= len(result.skipped):
         raise ContractGateError(f"CI_REQUIRED_SUITE_ALL_SKIPPED: {pattern}")
     return count
