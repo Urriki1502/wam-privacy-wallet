@@ -101,3 +101,20 @@ MUST NOT be reused as qualification of the newest HEAD.
 
 All prior real-Core, CodeQL, independent review and main ruleset blockers
 remain unaltered. This negative test does not enable a scanner or node.
+
+## 11 Oct review finding — forged empty-window transaction count
+
+Targeted review found that a manually forged `OfflineScanWindowSummary`
+could claim zero processed blocks but nonzero transactions, which could
+not be produced by `validate_offline_scan_window`. The downstream
+`inspect_offline_integration` now rejects this inconsistent research
+metadata before producing a combined status. This prevents contradictory
+display evidence; **it does not prove the data source or enable scanning**.
+
+Added one deterministic negative regression to
+`tests/test_offline_integration_status.py` and raised the mandatory
+integration suite floor to **21**. The current integration candidate
+requires **29 mandatory suites and a full GUI-host discovery floor >=378**
+(21 new cross-module cases); all earlier 29/377 checks belong to a
+previous HEAD. Requalify all eight Wallet CI jobs and both CodeQL jobs
+on the latest SHA, retaining the exact-head reviewer gate.
