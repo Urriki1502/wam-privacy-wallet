@@ -59,7 +59,7 @@ class CoreSignedReleaseTests(unittest.TestCase):
         )
         return [(0, listing), (0, ""), (0, status)]
 
-    def run(self, **updates):
+    def verify_fixture(self, **updates):
         args = {
             "signing_key": self.key,
             "sha256sums": self.sum,
@@ -80,7 +80,7 @@ class CoreSignedReleaseTests(unittest.TestCase):
         with patch.object(mod, "_run_gpg", side_effect=self.valid_results()) as gpg, \
              patch.object(subprocess, "Popen",
                           side_effect=AssertionError("LIVE_CORE_FORBIDDEN")) as core:
-            r = self.run()
+            r = self.verify_fixture()
         self.assertEqual(gpg.call_count, 3)
         core.assert_not_called()
         self.assertEqual(r.status, "SIGNED_DISTRIBUTION_ONLY")
@@ -97,7 +97,7 @@ class CoreSignedReleaseTests(unittest.TestCase):
             with self.assertRaisesRegex(
                 CoreReleaseSignatureError, "^CORE_RELEASE_SIGNATURE_DENIED$"
             ):
-                self.run(archive=self.root / "missing")
+                self.verify_fixture(archive=self.root / "missing")
 
     def test_gpg_listed_primary_key_must_match_fixed_fingerprint(self):
         for listing in (
@@ -141,7 +141,7 @@ class CoreSignedReleaseTests(unittest.TestCase):
         with patch.object(mod, "_run_gpg",
                           side_effect=self.valid_results()[:2] + [(1, "")]):
             with self.assertRaises(CoreReleaseSignatureError):
-                self.run()
+                self.verify_fixture()
 
     def test_forged_signature_key_primary_is_denied(self):
         fake = "pub:...\nfpr:::::::::" + WRONG + ":\n"
@@ -149,20 +149,20 @@ class CoreSignedReleaseTests(unittest.TestCase):
             with self.assertRaisesRegex(
                 CoreReleaseSignatureError, "^CORE_RELEASE_SIGNER_DENIED$"
             ):
-                self.run()
+                self.verify_fixture()
 
     def test_gpg_command_failure_or_missing_binary_fails_closed(self):
         for executable in (None, "gpg", "./gpg", 1, True):
             with self.subTest(executable=executable), self.assertRaisesRegex(
                 CoreReleaseSignatureError, "^CORE_RELEASE_GPG_UNAVAILABLE$"
             ):
-                self.run(gpg_executable=executable)
+                self.verify_fixture(gpg_executable=executable)
         with patch.object(mod, "_run_gpg",
                           side_effect=CoreReleaseSignatureError(
                               "CORE_RELEASE_GPG_UNAVAILABLE"
                           )):
             with self.assertRaises(CoreReleaseSignatureError):
-                self.run()
+                self.verify_fixture()
 
     def test_only_exact_pinned_core_archive_names_are_accepted(self):
         for name in (
@@ -175,7 +175,7 @@ class CoreSignedReleaseTests(unittest.TestCase):
             with self.subTest(name=name), self.assertRaisesRegex(
                 CoreReleaseSignatureError, "^CORE_RELEASE_ASSET_DENIED$"
             ):
-                self.run(archive_name=name)
+                self.verify_fixture(archive_name=name)
 
     def test_missing_or_duplicated_checksum_entry_denied(self):
         original = self.sum.read_bytes()
@@ -213,14 +213,14 @@ class CoreSignedReleaseTests(unittest.TestCase):
             with self.assertRaisesRegex(
                 CoreReleaseSignatureError, "^CORE_RELEASE_ARCHIVE_DENIED$"
             ):
-                self.run()
+                self.verify_fixture()
 
     def test_no_signed_release_key_or_checksum_file_is_denied(self):
         for field in ("signing_key", "sha256sums", "detached_signature"):
             with self.subTest(field=field), self.assertRaises(
                 CoreReleaseSignatureError
             ):
-                self.run(**{field: self.root / "missing"})
+                self.verify_fixture(**{field: self.root / "missing"})
 
     def test_oversized_signature_key_and_checksum_files_are_denied(self):
         for field, target, size in (
@@ -233,7 +233,7 @@ class CoreSignedReleaseTests(unittest.TestCase):
                 with self.assertRaisesRegex(
                     CoreReleaseSignatureError, "^CORE_RELEASE_FILE_DENIED$"
                 ):
-                    self.run()
+                    self.verify_fixture()
                 # Restore other fixtures to make each subtest isolated.
                 target.write_bytes(b"SYNTHETIC_FILE")
 
@@ -248,11 +248,11 @@ class CoreSignedReleaseTests(unittest.TestCase):
             with self.subTest(field=field), self.assertRaisesRegex(
                 CoreReleaseSignatureError, "^CORE_RELEASE_FILE_DENIED$"
             ):
-                self.run(**{field: link})
+                self.verify_fixture(**{field: link})
 
     def test_no_wallet_keys_addresses_or_raw_key_material_in_result(self):
         with patch.object(mod, "_run_gpg", side_effect=self.valid_results()):
-            r = self.run()
+            r = self.verify_fixture()
         display = repr(r)
         self.assertNotIn(self.sha, display)
         self.assertNotIn("SYNTHETIC", display)
