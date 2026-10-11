@@ -197,6 +197,23 @@ class OfflineIntegrationStatusTests(unittest.TestCase):
                     presentation().state, scan_window=replace(s, **{field: val})
                 )
 
+    def test_empty_window_with_forged_transaction_count_denied(self):
+        # The scanner validator cannot produce this contradictory DTO;
+        # downstream integration must reject a forged exact-type summary.
+        base = OfflineScanWindowSummary(3, 3, 0, 0)
+        good = inspect_offline_integration(
+            presentation().state, scan_window=base
+        )
+        self.assertEqual(good.scan_window, "SYNTHETIC_ONLY")
+        forged = replace(base, transaction_count=1)
+        with self.assertRaisesRegex(
+            OfflineIntegrationStatusError,
+            "^APP_INTEGRATION_SCANNER_DENIED$",
+        ):
+            inspect_offline_integration(
+                presentation().state, scan_window=forged
+            )
+
     def test_bad_storage_decision_on_legacy_denied(self):
         bad = replace(storage(version=2), decision="REVIEW_ONLY_NOT_VERIFIED")
         with self.assertRaisesRegex(
