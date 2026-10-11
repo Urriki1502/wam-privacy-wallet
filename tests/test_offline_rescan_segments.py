@@ -31,9 +31,12 @@ def seg(start=8, end=10, parent=A, digest=B, tx=2, attempt=1, **extra):
     return d
 
 
-def review(*, preview=None, start_height=8, segments=None, revision=5):
+_UNSET = object()
+
+
+def review(*, preview=_UNSET, start_height=8, segments=None, revision=5):
     return inspect_offline_rescan_segments(
-        resume=resume() if preview is None else preview,
+        resume=resume() if preview is _UNSET else preview,
         expected_revision=revision,
         start_height=start_height,
         segments=() if segments is None else segments,
