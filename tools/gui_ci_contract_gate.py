@@ -80,10 +80,13 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_offline_integration_status.OfflineIntegrationStatusTests.test_rescan_segment_only_research_state_cannot_grant_scanner",
     "test_offline_integration_status.OfflineIntegrationStatusTests.test_clear_state_with_stale_rescan_preview_is_denied",
     "test_offline_integration_status.OfflineIntegrationStatusTests.test_reorg_reconciliation_only_remains_untrusted",
+    "test_regtest_scanner_wire.RegtestScannerReadBridgeTests.test_real_loopback_http_fetches_block_without_mock_callback",
+    "test_regtest_scanner_wire.RegtestScannerReadBridgeTests.test_reorg_during_block_rpc_denied_after_read",
+    "test_regtest_scanner_wire.RegtestScannerReadBridgeTests.test_live_transport_does_not_launch_core_or_load_wsp",
     "test_offline_integration_status.OfflineIntegrationStatusTests.test_mismatched_reorg_segment_or_recovery_fails_atomic_replacement",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 502
+FULL_MIN_CASES = 517
 
 
 def _cases(suite: unittest.TestSuite):
