@@ -103,8 +103,8 @@ jobs:
       - name: Check Python syntax
         run: python -m compileall -q src tests
 
-      - name: Run complete scaffold and GUI test discovery
-        run: python -m unittest discover -s tests -v
+      - name: Run fail-closed GUI and full test discovery
+        run: python -m tools.gui_ci_contract_gate
 
   upstream-pinned-readonly:
     name: Verify pinned WAM Core source and current main (GET only)
