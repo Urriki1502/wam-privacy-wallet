@@ -310,6 +310,35 @@ class OfflineIntegrationStatusTests(unittest.TestCase):
             inspect_offline_integration(display, storage=storage())
         self.assertFalse(inspect_offline_integration(display).release_allowed)
 
+    def test_resume_only_research_panel_cannot_authorize_scanning(self):
+        from wam_privacy_wallet.application.offline_resume_review import (
+            OfflineResumeReview,
+        )
+        preview = OfflineResumeReview(
+            "REVALIDATE_BEFORE_RESCAN", "UNVERIFIED_INTERRUPTION", 5, 7, 3
+        )
+        state = presentation().replace(0, resume=preview)
+        output = inspect_offline_integration(state)
+        self.assertEqual((state.revision, state.resume),
+                         (1, "REVALIDATE_BEFORE_RESCAN"))
+        self.assertEqual(output.presentation, "SYNTHETIC_ONLY")
+        self.assertFalse(any((
+            output.scanner_enabled, output.wallet_enabled
+            if hasattr(output, "wallet_enabled") else output.release_allowed,
+            output.release_allowed,
+        )))
+
+    def test_rejected_or_cleared_presentation_cannot_retain_resume(self):
+        for original in (presentation().reset(),
+                         presentation().replace(0)):
+            corrupt = replace(original, transition="CLEARED",
+                              resume="REWIND_RESCAN_REVIEW")
+            with self.subTest(revision=original.revision), self.assertRaisesRegex(
+                OfflineIntegrationStatusError,
+                "^APP_INTEGRATION_PRESENTATION_DENIED$"
+            ):
+                inspect_offline_integration(corrupt)
+
     def test_no_network_file_subprocess_or_operational_engine(self):
         s, w, r = presentation().state, scan(), storage()
         with patch("builtins.open", side_effect=AssertionError("NO_FILE")), \
