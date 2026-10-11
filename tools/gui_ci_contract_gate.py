@@ -20,6 +20,11 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_real_regtest_harness.HarnessTests.test_launch_gate_precedes_workspace_creation_and_socket_bind",
     "test_core_artifact_staging.CoreArtifactStagingTests.test_verified_synthetic_snapshot_never_authorizes_core_execution",
     "test_core_artifact_staging.CoreArtifactStagingTests.test_postcopy_metadata_race_rejected",
+    "test_core_artifact_staging.CoreArtifactStagingTests.test_same_size_staged_byte_mutation_during_review_is_detected",
+    "test_core_artifact_staging.CoreArtifactStagingTests.test_windows_reparse_file_metadata_is_denied_even_if_regular",
+    "test_core_candidate_bridge.CoreCandidateBridgeTests.test_wrong_native_platform_is_denied_before_disk_read",
+    "test_core_candidate_bridge.CoreCandidateBridgeTests.test_staged_candidate_requires_identical_host_and_bytes",
+    "test_core_candidate_bridge.CoreCandidateBridgeTests.test_staged_mutation_on_context_exit_is_denied_with_redacted_code",
     "test_regtest_artifact_preflight.RegtestBinaryArtifactPreflightTests.test_matching_synthetic_file_never_counts_as_real_node",
     "test_two_node_schema.ParallelTwoNodeSchemaTests.test_schema_version_is_exact_one_and_no_execution_authority",
     "test_security_gate_ledger.SecurityGateLedgerTests.test_cannot_auto_promote_global_authority",
@@ -27,7 +32,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_ci_contract_gate.MandatoryOfflineContractGateTests.test_minimum_case_floors_pinned_for_all_mandatory_suites",
 })
 # Existing 267-case GUI baseline + 12 public-vector tests + 5 Receive GUI tests.
-FULL_MIN_CASES = 303
+FULL_MIN_CASES = 321
 
 
 def _cases(suite: unittest.TestSuite):
