@@ -1,0 +1,72 @@
+# Forensic-only corroboration of WAM signed Linux ELF program headers.
+# This workflow does NOT execute WAM Core and does NOT qualify regtest launch.
+name: Official WAM ELF loader forensic audit (NO EXEC)
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/core-elf-independent-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Verify signed member and inspect readelf program flags (NO EXEC)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Authenticate official archive before offline static ELF inspection
+        shell: bash
+        env:
+          PYTHONPATH: src
+        run: |
+          set -euo pipefail
+          umask 077
+          dir="$(mktemp -d)"
+          trap 'rm -rf -- "$dir"' EXIT
+          archive='wam-coin-v0.1.11-x86_64-linux-gnu.tar.gz'
+          curl --fail --silent --show-error --retry 0 \
+            --max-time 180 --max-filesize 536870912 \
+            --proto '=https' --tlsv1.2 \
+            --output "$dir/$archive" \
+            "https://wamcoin.org/downloads/v0.1.11/$archive"
+          python -m tools.verify_core_release_official \
+            --archive "$dir/$archive" \
+            --gpg "$(readlink -f "$(command -v gpg)")" \
+            > "$dir/verified.json"
+          python - "$dir/verified.json" <<'PY'
+          import json
+          import pathlib
+          import sys
+          r = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assert r["status"] == "SIGNED_ARCHIVE_REVIEW_ONLY"
+          assert r["archive_sha256"] == "bd010ed615ab8063d5c12aa61236311ece7e9d19896d9541dacba1888dd9987a"
+          assert r["node_sha256"] == "625609c08afef441e9dddd71330dcab1cec112d6fabe361769b9907f0efe7ab4"
+          assert r["core_execution_allowed"] is False
+          PY
+          # Extraction here is explicitly read-only forensic review into a
+          # private *non-executable* data file, never installed, launched or
+          # used by the operational NOEXEC-memfd integration in #83.
+          tar -xOzf "$dir/$archive" 'wam-coin-v0.1.11/bin/wamd' \
+            > "$dir/wamd-elf-review.data"
+          chmod 0400 "$dir/wamd-elf-review.data"
+          test ! -x "$dir/wamd-elf-review.data"
+          printf '625609c08afef441e9dddd71330dcab1cec112d6fabe361769b9907f0efe7ab4  %s\n' "$dir/wamd-elf-review.data" \
+            | sha256sum --check --status
+          echo 'WAM_OFFICIAL_SIGNATURE_AND_MEMBER_SHA256_VERIFIED_READ_ONLY'
+          readelf --wide --file-header "$dir/wamd-elf-review.data" \
+            | grep -E 'Class:|Data:|Machine:|Type:'
+          # GNU binutils readelf is an independent implementation of ELF
+          # parsing from our Python NOEXEC preflight. Report GNU_STACK flags
+          # as evidence only; DO NOT call this a security acceptance check.
+          readelf --wide --program-headers "$dir/wamd-elf-review.data" \
+            | awk '$1 == "GNU_STACK" { print "WAM_GNU_STACK_FLAGS=" $7; found=1; if (index($7,"E")) print "WAM_GNU_STACK_EXEC_REVIEW_REQUIRED" } END { if (!found) { print "WAM_GNU_STACK_NOT_PRESENT"; exit 3 } }'
+          echo 'WAM_CORE_EXECUTED=false; WAM_REAL_REGTEST_QUALIFIED=false'
