@@ -150,6 +150,31 @@ class OfflineScanWindowTests(unittest.TestCase):
             ):
                 fixture(blocks=(payload, block(6, H1, H2)))
 
+    def test_reused_block_hash_or_anchor_hash_is_denied(self):
+        # Link-only validation used to accept a repeated block hash at a
+        # second height, even though it is a single content-addressed block.
+        vectors = (
+            (
+                block(5, H0, H1),
+                block(6, H1, H1),
+            ),
+            (
+                block(5, H0, H0),
+                block(6, H0, H1),
+            ),
+        )
+        for sequence in vectors:
+            final_hash = sequence[-1]["hash"]
+            with self.subTest(final_hash=final_hash), self.assertRaisesRegex(
+                OfflineScanWindowError,
+                "^SCAN_WINDOW_DUPLICATE_BLOCK_HASH$",
+            ):
+                fixture(
+                    blocks=sequence,
+                    reported_tip_before=(6, final_hash),
+                    reported_tip_after=(6, final_hash),
+                )
+
     def test_last_returned_tip_must_match_reported_tip(self):
         with self.assertRaisesRegex(
             OfflineScanWindowError, "^SCAN_WINDOW_TIP_LINK_DENIED$"
