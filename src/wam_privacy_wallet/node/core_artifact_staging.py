@@ -40,10 +40,17 @@ class CoreArtifactStagingEvidence:
     wallet_enabled: bool = field(default=False, init=False)
 
 
+def _source_reparse(info: os.stat_result) -> bool:
+    """Reject Windows reparse-point metadata even for a regular-looking file."""
+    attributes = getattr(info, "st_file_attributes", 0)
+    return bool(attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
+
+
 def _same_stat(left: os.stat_result, right: os.stat_result) -> bool:
-    """Portable conservative identity/size/mtime check, not hostile OS proof."""
+    """Conservative descriptor identity with explicit Windows reparse denial."""
     return (
         stat.S_ISREG(left.st_mode) and stat.S_ISREG(right.st_mode)
+        and not _source_reparse(left) and not _source_reparse(right)
         and left.st_dev == right.st_dev
         and left.st_ino == right.st_ino
         and left.st_size == right.st_size
@@ -67,12 +74,14 @@ def stage_untrusted_core_artifact(
         raise CoreArtifactStagingError("CORE_STAGE_NETWORK_DENIED")
     if type(claimed_sha256) is not str or _SHA.fullmatch(claimed_sha256) is None:
         raise CoreArtifactStagingError("CORE_STAGE_DIGEST_DENIED")
-    if not isinstance(source, (str, os.PathLike)) or type(source) is bool:
+    # Arbitrary __fspath__ user code is outside the trusted API boundary.
+    if type(source) not in (str, Path):
         raise CoreArtifactStagingError("CORE_STAGE_SOURCE_DENIED")
     try:
         candidate = Path(source)
         before = candidate.lstat()
-        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+        if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1
+                or _source_reparse(before)):
             raise CoreArtifactStagingError("CORE_STAGE_SOURCE_DENIED")
         if not 1 <= before.st_size <= _MAX_BYTES:
             raise CoreArtifactStagingError("CORE_STAGE_SIZE_DENIED")
@@ -113,10 +122,26 @@ def stage_untrusted_core_artifact(
                 if staged.hexdigest() != claimed_sha256:
                     raise CoreArtifactStagingError("CORE_STAGE_SNAPSHOT_CHANGED")
                 os.chmod(target, 0o400)
+                snapshot_before = target.lstat()
                 yield CoreArtifactStagingEvidence(
                     snapshot_path=target, sha256=claimed_sha256,
                     byte_count=count,
                 )
+                # The review context is not a launch permit. Nevertheless
+                # detect changes while the caller was inspecting the staged
+                # file, including replacement or same-size byte mutation.
+                try:
+                    snapshot_after = target.lstat()
+                    if not _same_stat(snapshot_before, snapshot_after):
+                        raise CoreArtifactStagingError("CORE_STAGE_SNAPSHOT_CHANGED")
+                    held_digest = hashlib.sha256()
+                    with target.open("rb") as check:
+                        for piece in iter(lambda: check.read(_CHUNK), b""):
+                            held_digest.update(piece)
+                    if held_digest.hexdigest() != claimed_sha256:
+                        raise CoreArtifactStagingError("CORE_STAGE_SNAPSHOT_CHANGED")
+                except OSError:
+                    raise CoreArtifactStagingError("CORE_STAGE_SNAPSHOT_CHANGED") from None
     except CoreArtifactStagingError:
         raise
     except (OSError, TypeError, ValueError):
