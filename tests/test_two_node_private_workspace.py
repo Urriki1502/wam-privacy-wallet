@@ -81,6 +81,17 @@ class PrivateTwoNodeWorkspaceTests(unittest.TestCase):
                 raise RuntimeError("SYNTHETIC_ERROR")
         self.assertFalse(locations[0].exists())
 
+    def test_caller_valueerror_propagates_and_workspace_is_deleted(self):
+        if not self._supported():
+            self._unsupported()
+            return
+        folders = []
+        with self.assertRaisesRegex(ValueError, "^CALLER_FAILURE$"):
+            with prepare_private_two_node_workspace(self.plan) as w:
+                folders.append(w.nodes[0].data_dir.parent)
+                raise ValueError("CALLER_FAILURE")
+        self.assertFalse(folders[0].exists())
+
     def test_configs_are_loopback_regtest_with_explicit_peer_ports_only(self):
         if not self._supported():
             self._unsupported()
