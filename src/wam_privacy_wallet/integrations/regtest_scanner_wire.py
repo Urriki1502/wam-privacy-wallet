@@ -133,27 +133,42 @@ class RegtestScannerReadBridge:
             raise RegtestScannerWireError("SCAN_RPC_PROFILE_DENIED") from None
 
     def read_confirmed(
-        self, height: int, *, expected_previous_hash: str,
+        self, height: int, *, expected_previous_hash: str | None = None,
     ) -> OfflineScannerResponseSummary:
+        """Read a block anchored to the *live* node's parent hash, not a fixture.
+
+        A caller-provided previous hash is an optional additional expectation,
+        NEVER the source of chain ancestry. Before and after the read, both
+        the block and its parent are rechecked at their heights. A dishonest
+        local RPC peer can still forge a self-consistent chain: no authority.
+        """
         if (type(height) is not int or not 1 <= height <= _MAX_HEIGHT
-                or type(expected_previous_hash) is not str
-                or _HASH.fullmatch(expected_previous_hash) is None):
+                or (expected_previous_hash is not None and
+                    (type(expected_previous_hash) is not str
+                     or _HASH.fullmatch(expected_previous_hash) is None))):
             raise RegtestScannerWireError("SCAN_RPC_EXPECTATION_DENIED")
         before = self._profile()
         if height > before.identity.height:
             raise RegtestScannerWireError("SCAN_RPC_HEIGHT_AHEAD")
         try:
+            parent_hash = self._identity_rpc.call("getblockhash", [height - 1])
+            if type(parent_hash) is not str or _HASH.fullmatch(parent_hash) is None:
+                raise RegtestScannerWireError("SCAN_RPC_PARENT_DENIED")
+            if (expected_previous_hash is not None
+                    and parent_hash != expected_previous_hash):
+                raise RegtestScannerWireError("SCAN_RPC_PREVIOUS_MISMATCH")
             blockhash = self._identity_rpc.call("getblockhash", [height])
             if type(blockhash) is not str or _HASH.fullmatch(blockhash) is None:
                 raise RegtestScannerWireError("SCAN_RPC_HASH_DENIED")
             block = self._scanner.call("getblock", [blockhash, 3])
             summary = validate_offline_confirmed_block(
                 block, expected_hash=blockhash,
-                expected_previous_hash=expected_previous_hash, height=height,
+                expected_previous_hash=parent_hash, height=height,
             )
             after = self._profile()
             if (before != after
-                    or self._identity_rpc.call("getblockhash", [height]) != blockhash):
+                    or self._identity_rpc.call("getblockhash", [height]) != blockhash
+                    or self._identity_rpc.call("getblockhash", [height - 1]) != parent_hash):
                 raise RegtestScannerWireError("SCAN_RPC_TIP_CHANGED")
             return summary
         except (LocalRpcError, ScannerResponseShapeError):
