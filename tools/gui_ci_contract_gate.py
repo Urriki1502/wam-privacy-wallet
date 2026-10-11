@@ -16,6 +16,7 @@ GUI_TEST_IDS = frozenset({
     "test_gui_shell.GuiShellSmokeTests.test_lifecycle_stale_revision_clears_receive_and_node",
     "test_gui_shell.GuiShellSmokeTests.test_lifecycle_reset_invalidates_revision_and_all_panels",
     "test_gui_shell.GuiShellSmokeTests.test_lifecycle_replacement_does_not_retain_omitted_evidence",
+    "test_gui_shell.GuiShellSmokeTests.test_lifecycle_render_failure_clears_and_invalidates",
 })
 # Security-critical original non-GUI identities; additive to original suite floors.
 CRITICAL_NON_GUI_IDS = frozenset({
@@ -26,8 +27,8 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_rpc_qualification_prep.RpcQualificationPreparationTests.test_fake_approval_release_or_core_execution_denied",
     "test_ci_contract_gate.MandatoryOfflineContractGateTests.test_minimum_case_floors_pinned_for_all_mandatory_suites",
 })
-# Existing 284-case floor + 10 lifecycle contracts + 4 lifecycle GUI cases.
-FULL_MIN_CASES = 298
+# Existing 284-case floor + 10 lifecycle contracts + 5 lifecycle GUI cases.
+FULL_MIN_CASES = 299
 
 
 def _cases(suite: unittest.TestSuite):
