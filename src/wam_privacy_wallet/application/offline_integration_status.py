@@ -79,6 +79,9 @@ def _valid_scan(s: object) -> bool:
         and 0 <= s.block_count <= 16
         and s.end_height - s.start_height == s.block_count
         and 0 <= s.transaction_count <= 20_000
+        # A synthetically empty scan window cannot report any transactions.
+        # Reject impossible forged DTOs before producing a combined summary.
+        and (s.block_count != 0 or s.transaction_count == 0)
         and type(s.status) is str
         and s.status == "SYNTHETIC_COHERENCE_ONLY"
         and s.chain_identity_verified is False
