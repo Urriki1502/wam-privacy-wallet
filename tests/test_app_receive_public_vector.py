@@ -52,6 +52,12 @@ class OfflinePublicReceiveVectorTests(unittest.TestCase):
         self.assertEqual(rv.UPSTREAM_VECTOR_PATH, "tests/vectors/wsp1-wallet.json")
         self.assertEqual(rv.UPSTREAM_VECTOR_BLOB_SHA,
                          "67c77f1c60ed574d81e20147689d9fafc8797991")
+        self.assertEqual(rv.PUBLIC_VECTOR_SHA256,
+                         "5a0f212b2e6153242f68576d3b7e7649e17dbfe98a8235448849e59870dfaaf4")
+        self.assertEqual(
+            sha256(rv._PUBLIC_ONLY_VECTOR.encode("ascii")).hexdigest(),
+            rv.PUBLIC_VECTOR_SHA256,
+        )
         self.assertEqual(rv.UPSTREAM_CODEC_PATH, "src/wam_sp/codec.py")
         self.assertEqual(rv.UPSTREAM_CODEC_BLOB_SHA,
                          "ec28511113f055ce587f3bfabcd97608a3dfed56")
