@@ -4,7 +4,7 @@ This step **reuses existing WSP-1 source-inventory metadata and WAM Security rev
 
 ## Fixed inputs
 
-- `compat/reuse_candidates.json` — eight review candidates pinned to exact source repository, paths and commit SHA. The current WSP-1 candidate pin is `ac55f13423620252bdbf848c7e8a280c3b84721e`; Silent Wallet is `44e749a5c8fde82f672d0bc9d11e43af4e52c673`.
+- `compat/reuse_candidates.json` — eight review candidates pinned to exact source repository, paths, commit SHA **and expected Git blob SHA**. The current WSP-1 candidate pin is `ac55f13423620252bdbf848c7e8a280c3b84721e`; Silent Wallet is `44e749a5c8fde82f672d0bc9d11e43af4e52c673`.
 - `compat/g0_security_gate_ledger.json` — ten fixed release/security gates, including blocks on WSP dependency adoption, signer, scanner bridge, real Core and privacy policy.
 - These records are supplied **in memory** to `application.privacy_readiness.research_readiness(manifest, ledger)`; the package performs no filesystem, network or WAM Core I/O.
 
