@@ -55,11 +55,14 @@ def segments(*, action="REVALIDATE_BEFORE_RESCAN", start=5, end=7,
     )
 
 
-def check(*, before=None, after=None, batch=None, revision=5):
+_UNSET = object()
+
+
+def check(*, before=_UNSET, after=_UNSET, batch=_UNSET, revision=5):
     return reconcile_offline_reorg(
-        transition=transition() if before is None else before,
-        resume=resume() if after is None else after,
-        segments=segments() if batch is None else batch,
+        transition=transition() if before is _UNSET else before,
+        resume=resume() if after is _UNSET else after,
+        segments=segments() if batch is _UNSET else batch,
         expected_revision=revision,
     )
 
