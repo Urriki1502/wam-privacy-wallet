@@ -14,14 +14,14 @@ _WSP_PIN = "ac55f13423620252bdbf848c7e8a280c3b84721e"
 _SILENT_WALLET_PIN = "44e749a5c8fde82f672d0bc9d11e43af4e52c673"
 _SHA = re.compile(r"[0-9a-f]{40}\Z")
 _CANDIDATES = {
-    "wsp-api": ("Urriki1502/wam-silent-payments", _WSP_PIN, "src/wam_sp/api.py", "REVIEW_GATED"),
-    "wsp-scanner": ("Urriki1502/wam-silent-payments", _WSP_PIN, "src/wam_sp/scanner.py", "REVIEW_GATED"),
-    "wsp-store": ("Urriki1502/wam-silent-payments", _WSP_PIN, "src/wam_sp/store.py", "REVIEW_GATED"),
-    "wsp-signer": ("Urriki1502/wam-silent-payments", _WSP_PIN, "src/wam_sp/offline_signer.py", "BLOCKED"),
-    "wsp-backup": ("Urriki1502/wam-silent-payments", _WSP_PIN, "src/wam_sp/backup.py", "REVIEW_GATED"),
-    "wsp-rpc": ("Urriki1502/wam-silent-payments", _WSP_PIN, "src/wam_sp/rpc.py", "BLOCKED"),
-    "silentwallet-session": ("Urriki1502/wam-silent-wallet", _SILENT_WALLET_PIN, "src/wam_silent_wallet/services/session_service.py", "REVIEW_GATED"),
-    "silentwallet-node": ("Urriki1502/wam-silent-wallet", _SILENT_WALLET_PIN, "src/wam_silent_wallet/services/node_service.py", "BLOCKED"),
+    "wsp-api": ("Urriki1502/wam-silent-payments", _WSP_PIN, "src/wam_sp/api.py", "3c5a285c721982540b8aa9242ac8d882c7981a53", "REVIEW_GATED"),
+    "wsp-scanner": ("Urriki1502/wam-silent-payments", _WSP_PIN, "src/wam_sp/scanner.py", "6565efc474e7798e7231bf2ef4df771ac1f24a22", "REVIEW_GATED"),
+    "wsp-store": ("Urriki1502/wam-silent-payments", _WSP_PIN, "src/wam_sp/store.py", "8d0b6b94afba15519534f057e51b59130bd7cb67", "REVIEW_GATED"),
+    "wsp-signer": ("Urriki1502/wam-silent-payments", _WSP_PIN, "src/wam_sp/offline_signer.py", "45100e327abafd9758f6ba0d00efb78e65f0e241", "BLOCKED"),
+    "wsp-backup": ("Urriki1502/wam-silent-payments", _WSP_PIN, "src/wam_sp/backup.py", "60a1938b0ea612d9ef7423e7e494e09a7afe0fa1", "REVIEW_GATED"),
+    "wsp-rpc": ("Urriki1502/wam-silent-payments", _WSP_PIN, "src/wam_sp/rpc.py", "23624626cd7d04ce6e1915f1a9f5f1bef01b5002", "BLOCKED"),
+    "silentwallet-session": ("Urriki1502/wam-silent-wallet", _SILENT_WALLET_PIN, "src/wam_silent_wallet/services/session_service.py", "ecda81a855ca2f981d7026d4d2d11b11baf8832c", "REVIEW_GATED"),
+    "silentwallet-node": ("Urriki1502/wam-silent-wallet", _SILENT_WALLET_PIN, "src/wam_silent_wallet/services/node_service.py", "5a55d0b83ba5687cf9e86f7b211e3fa84dda6b56", "BLOCKED"),
 }
 _GATES = {
     "CORE-REAL-E2E": ("P0", "BLOCKED"),
@@ -106,12 +106,13 @@ def research_readiness(manifest: object, ledger: object) -> PrivacyResearchSnaps
         if type(name) is not str or name not in _CANDIDATES or name in seen:
             _deny()
         seen.add(name)
-        expected_repo, expected_pin, expected_path, expected_status = _CANDIDATES[name]
+        expected_repo, expected_pin, expected_path, expected_blob, expected_status = _CANDIDATES[name]
         if (
             type(row["repository"]) is not str or row["repository"] != expected_repo
             or type(row["commit_sha"]) is not str or row["commit_sha"] != expected_pin
             or type(row["source_path"]) is not str or row["source_path"] != expected_path
             or type(row["blob_sha"]) is not str or _SHA.fullmatch(row["blob_sha"]) is None
+            or row["blob_sha"] != expected_blob
             or type(row["status"]) is not str or row["status"] != expected_status
             or type(row["blocker"]) is not str or not 12 <= len(row["blocker"]) <= 320
         ):
