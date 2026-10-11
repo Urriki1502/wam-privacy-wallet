@@ -88,9 +88,10 @@ def inspect_sealed_linux_elf(fd: int) -> SealedElfObservation:
             if offset > info.st_size or filesz > info.st_size - offset:
                 raise SealedElfError("CORE_ELF_PROGRAM_DENIED")
             if kind == _PT_LOAD:
-                if filesz > memsz or flags & 0x3 == 0x3:
-                    # W+X LOAD segments cannot be accepted even for review.
-                    raise SealedElfError("CORE_ELF_SEGMENT_DENIED")
+                if filesz > memsz:
+                    raise SealedElfError("CORE_ELF_LOAD_SIZE_DENIED")
+                if flags & 0x3 == 0x3:
+                    raise SealedElfError("CORE_ELF_WX_LOAD_DENIED")
                 load += 1
             elif kind == _PT_DYNAMIC:
                 dynamic += 1
@@ -105,8 +106,12 @@ def inspect_sealed_linux_elf(fd: int) -> SealedElfObservation:
                     raise SealedElfError("CORE_ELF_INTERP_DENIED")
             elif kind == _PT_GNU_STACK:
                 exec_stack = bool(flags & 0x1)
-        if load == 0 or dynamic > 1 or exec_stack:
-            raise SealedElfError("CORE_ELF_SEGMENT_DENIED")
+        if load == 0:
+            raise SealedElfError("CORE_ELF_NO_LOAD_DENIED")
+        if dynamic > 1:
+            raise SealedElfError("CORE_ELF_DYNAMIC_DENIED")
+        if exec_stack:
+            raise SealedElfError("CORE_ELF_EXECUTABLE_STACK_DENIED")
         return SealedElfObservation(
             binary_class="ELF64_LE", architecture="x86_64",
             elf_type="ET_EXEC" if etype == 2 else "ET_DYN",
