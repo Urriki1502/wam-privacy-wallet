@@ -339,6 +339,33 @@ class OfflineIntegrationStatusTests(unittest.TestCase):
             ):
                 inspect_offline_integration(corrupt)
 
+    def test_rescan_segment_only_research_state_cannot_grant_scanner(self):
+        from wam_privacy_wallet.application.offline_rescan_segments import (
+            OfflineRescanSegments,
+        )
+        report = OfflineRescanSegments(
+            "OFFLINE_RESCAN_UNTRUSTED", "CONTIGUOUS_UNVERIFIED",
+            "REVALIDATE_BEFORE_RESCAN", 5, 3, 5, 1, 0, 2, 4,
+        )
+        state = presentation().replace(0, rescan=report)
+        summary = inspect_offline_integration(state)
+        self.assertEqual((state.revision, state.rescan),
+                         (1, "CONTIGUOUS_UNVERIFIED"))
+        self.assertEqual(summary.presentation, "SYNTHETIC_ONLY")
+        self.assertFalse(any((
+            summary.scanner_enabled, summary.storage_verified,
+            summary.signer_enabled, summary.release_allowed,
+        )))
+
+    def test_clear_state_with_stale_rescan_preview_is_denied(self):
+        cleared = presentation().reset()
+        bad = replace(cleared, rescan="REPLAY_NOT_APPLIED")
+        with self.assertRaisesRegex(
+            OfflineIntegrationStatusError,
+            "^APP_INTEGRATION_PRESENTATION_DENIED$",
+        ):
+            inspect_offline_integration(bad)
+
     def test_no_network_file_subprocess_or_operational_engine(self):
         s, w, r = presentation().state, scan(), storage()
         with patch("builtins.open", side_effect=AssertionError("NO_FILE")), \
