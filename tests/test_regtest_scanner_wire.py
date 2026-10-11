@@ -29,19 +29,24 @@ class _FixtureHandler(BaseHTTPRequestHandler):
         self.server.requests.append((self.path, dict(self.headers), request))
         method = request["method"]
         if method == "getblockhash":
-            response = self.server.genesis if request["params"] == [0] else self.server.tip
+            response = (self.server.genesis if request["params"] == [0] else
+                        self.server.parent_hash if self.server.height == 2 and request["params"] == [1]
+                        else self.server.tip)
+            if self.server.height == 2 and request["params"] == [1] and self.server.bad_parent:
+                response = "bad-parent"
         elif method == "getblockcount":
-            response = 1
+            response = self.server.height
         elif method == "getbestblockhash":
             response = self.server.tip
         elif method == "getblockchaininfo":
             response = {
-                "chain": self.server.chain, "blocks": 1, "headers": 1,
+                "chain": self.server.chain, "blocks": self.server.height, "headers": self.server.height,
                 "bestblockhash": self.server.tip, "pruned": self.server.pruned,
             }
         elif method == "getblock":
-            response = {"hash": TIP, "previousblockhash": WAM_REGTEST_GENESIS,
-                        "height": 1, "tx": [{"txid": TX}]}
+            response = {"hash": TIP, "previousblockhash": (
+                self.server.parent_hash if self.server.height == 2 else WAM_REGTEST_GENESIS),
+                        "height": self.server.height, "tx": [{"txid": TX}]}
         elif method == "getrawmempool":
             response = [TX]
         else:
@@ -50,6 +55,8 @@ class _FixtureHandler(BaseHTTPRequestHandler):
             response = self.server.results[method]
         if method in self.server.flip_on:
             self.server.tip = OTHER
+        if method in self.server.flip_parent_on:
+            self.server.parent_hash = OTHER
         wire = json.dumps({"result": response, "error": None, "id": 1}).encode()
         if self.server.reply_override is not None and method == self.server.reply_method:
             wire = self.server.reply_override
@@ -88,6 +95,10 @@ class RegtestScannerReadBridgeTests(unittest.TestCase):
         self.server.genesis = WAM_REGTEST_GENESIS
         self.server.chain = "regtest"
         self.server.pruned = False
+        self.server.height = 1
+        self.server.parent_hash = "b" * 64
+        self.server.bad_parent = False
+        self.server.flip_parent_on = set()
         self.server.results = {}
         self.server.flip_on = set()
         self.server.status = 200
@@ -223,6 +234,36 @@ class RegtestScannerReadBridgeTests(unittest.TestCase):
     def test_height_ahead_rejected_after_regtest_probe(self):
         with self.assertRaisesRegex(RegtestScannerWireError, "^SCAN_RPC_HEIGHT_AHEAD$"):
             self.bridge.read_confirmed(2, expected_previous_hash=WAM_REGTEST_GENESIS)
+        self.assertNotIn("getblock", [r[2]["method"] for r in self.server.requests])
+
+    def test_live_node_supplies_parent_without_external_expected_hash(self):
+        summary = self.bridge.read_confirmed(1)
+        self.assertEqual((summary.height, summary.item_count), (1, 1))
+        gethash = [r[2]["params"] for r in self.server.requests
+                   if r[2]["method"] == "getblockhash"]
+        self.assertGreaterEqual(gethash.count([0]), 3)
+        self.assertGreaterEqual(gethash.count([1]), 2)
+
+    def test_mismatched_external_parent_denied_before_block_read(self):
+        with self.assertRaisesRegex(RegtestScannerWireError,
+                                    "^SCAN_RPC_PREVIOUS_MISMATCH$"):
+            self.bridge.read_confirmed(1, expected_previous_hash=TX)
+        self.assertNotIn("getblock", [r[2]["method"] for r in self.server.requests])
+
+    def test_parent_hash_change_with_stable_tip_is_denied(self):
+        self.server.height = 2
+        self.server.flip_parent_on.add("getblock")
+        with self.assertRaisesRegex(RegtestScannerWireError,
+                                    "^SCAN_RPC_TIP_CHANGED$"):
+            self.bridge.read_confirmed(2)
+        self.assertEqual(self.server.tip, TIP)
+
+    def test_parent_invalid_rpc_payload_denied_before_getblock(self):
+        self.server.height = 2
+        self.server.bad_parent = True
+        with self.assertRaisesRegex(RegtestScannerWireError,
+                                    "^SCAN_RPC_PARENT_DENIED$"):
+            self.bridge.read_confirmed(2)
         self.assertNotIn("getblock", [r[2]["method"] for r in self.server.requests])
 
     def test_live_transport_does_not_launch_core_or_load_wsp(self):

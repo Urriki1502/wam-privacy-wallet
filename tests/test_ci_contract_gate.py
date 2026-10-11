@@ -173,13 +173,13 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
             "test_offline_rescan_segments.py": 23,
             "test_offline_reorg_reconciliation.py": 24,
             "test_offline_integration_status.py": 31,
-            "test_regtest_scanner_wire.py": 15,
+            "test_regtest_scanner_wire.py": 19,
             "test_core_artifact_staging.py": 20,
             "test_core_candidate_bridge.py": 14,
             "test_core_signed_release.py": 20,
             "test_core_archive_inventory.py": 23,
             "test_verify_core_release_offline.py": 12,
-            "test_probe_existing_regtest.py": 11,
+            "test_probe_existing_regtest.py": 13,
         }
         self.assertEqual(MINIMUM_CASES, expected)
         self.assertEqual(MANDATORY_SUITES, tuple(expected))
