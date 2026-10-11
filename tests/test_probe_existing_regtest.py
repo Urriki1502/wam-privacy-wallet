@@ -128,13 +128,35 @@ class ExistingRegtestCliTests(unittest.TestCase):
             ):
                 self._call(block_height=height, previous_block_hash=prev)
 
-    def test_block_argument_pair_required_before_any_socket(self):
-        for kw in ({"block_height": 1}, {"previous_block_hash": WAM_REGTEST_GENESIS}):
-            with self.subTest(kw=kw), self.assertRaisesRegex(
-                cli.RegtestLiveProbeError, "^REGTEST_PROBE_BLOCK_PAIR_DENIED$"
-            ):
-                self._call(**kw)
+    def test_standalone_previous_hash_rejected_before_any_socket(self):
+        with self.assertRaisesRegex(
+            cli.RegtestLiveProbeError, "^REGTEST_PROBE_BLOCK_PAIR_DENIED$"
+        ):
+            self._call(previous_block_hash=WAM_REGTEST_GENESIS)
         self.assertFalse(self.server.calls)
+
+    def test_block_height_only_fetches_parent_directly_over_node_rpc(self):
+        status = self._call(block_height=1)
+        self.assertEqual((status["phase"], status["height"]), ("confirmed", 1))
+        parent_reads = [c for c in self.server.calls
+                        if c["method"] == "getblockhash" and c["params"] == [0]]
+        self.assertGreaterEqual(len(parent_reads), 3)
+        self.assertIs(status["wallet_ready"], False)
+
+    def test_cli_interactive_height_without_user_hash(self):
+        args = ["--port", str(self.port), "--rpc-user", "regtest",
+                "--block-height", "1"]
+        terminal = io.StringIO()
+        terminal.isatty = lambda: True
+        stdout = io.StringIO()
+        with patch.object(sys, "stdin", terminal), \
+             patch.object(cli.getpass, "getpass", return_value=PASS), \
+             contextlib.redirect_stdout(stdout):
+            result = cli.main(args)
+        self.assertEqual(result, 0)
+        report = json.loads(stdout.getvalue())
+        self.assertEqual((report["height"], report["item_count"]), (1, 1))
+        self.assertIs(report["binary_publisher_authenticated"], False)
 
     def test_remote_and_named_hosts_rejected_before_network_access(self):
         for host in ("localhost", "example.org", "8.8.8.8", "0.0.0.0"):
