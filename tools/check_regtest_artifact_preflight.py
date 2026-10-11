@@ -9,6 +9,7 @@ import argparse
 from dataclasses import dataclass, field
 import json
 from pathlib import Path
+import re
 import sys
 
 from wam_privacy_wallet.node.attestation import WAM_REGTEST_GENESIS
@@ -36,6 +37,15 @@ class LocalHashEvidence:
     binary_source_equivalence_verified: bool = field(default=False, init=False)
     execution_allowed: bool = field(default=False, init=False)
     release_allowed: bool = field(default=False, init=False)
+
+    def __post_init__(self) -> None:
+        # Prevent malformed or noncanonical strings from masquerading as
+        # evidence DTOs. A canonical SHA format is NOT proof of a real file,
+        # publisher provenance, executable identity or launch permission.
+        if type(self.sha256) is not str or re.fullmatch(
+            r"[0-9a-f]{64}", self.sha256, flags=re.ASCII
+        ) is None:
+            raise ValueError("G1_LOCAL_EVIDENCE_DIGEST_INVALID")
 
 
 def evaluate_local_binary(binary: object, expected_sha256: object) -> LocalHashEvidence:
