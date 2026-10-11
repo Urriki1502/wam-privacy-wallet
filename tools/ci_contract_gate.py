@@ -55,7 +55,7 @@ MINIMUM_CASES = {
     "test_core_archive_inventory.py": 23,
     "test_verify_core_release_offline.py": 12,
     "test_probe_existing_regtest.py": 13,
-    "test_probe_two_node_regtest.py": 14,
+    "test_probe_two_node_regtest.py": 21,
 }
 MANDATORY_SUITES = tuple(MINIMUM_CASES)
 
