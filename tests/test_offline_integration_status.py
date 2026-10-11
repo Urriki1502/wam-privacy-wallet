@@ -366,6 +366,70 @@ class OfflineIntegrationStatusTests(unittest.TestCase):
         ):
             inspect_offline_integration(bad)
 
+    def test_reorg_reconciliation_only_remains_untrusted(self):
+        from wam_privacy_wallet.application.offline_reorg_reconciliation import (
+            OfflineReorgReconciliation,
+        )
+        claim = OfflineReorgReconciliation(
+            "CONTIGUOUS_BUT_UNVERIFIED", 5, 3, 5, 1, 0
+        )
+        state = presentation().replace(0, reorg=claim)
+        result = inspect_offline_integration(state)
+        self.assertEqual(state.reorg, "CONTIGUOUS_BUT_UNVERIFIED")
+        self.assertEqual(result.presentation, "SYNTHETIC_ONLY")
+        self.assertEqual(result.status, "REVIEW_ONLY_UNTRUSTED")
+        self.assertFalse(any((
+            result.core_verified, result.scanner_enabled, result.storage_verified,
+            result.signer_enabled, result.release_allowed,
+        )))
+
+    def test_clear_reject_cannot_preserve_reorg_indicator(self):
+        for state in (presentation().reset(), presentation().state):
+            bad = replace(state, reorg="ROLLBACK_RESCAN_REVIEW")
+            with self.subTest(t=state.transition), self.assertRaisesRegex(
+                OfflineIntegrationStatusError,
+                "^APP_INTEGRATION_PRESENTATION_DENIED$",
+            ):
+                inspect_offline_integration(bad)
+
+    def test_mismatched_reorg_segment_or_recovery_fails_atomic_replacement(self):
+        from wam_privacy_wallet.application.offline_reorg_reconciliation import (
+            OfflineReorgReconciliation,
+        )
+        from wam_privacy_wallet.application.offline_rescan_segments import (
+            OfflineRescanSegments,
+        )
+        from wam_privacy_wallet.application.recovery_transition import (
+            OfflineRecoveryTransition,
+        )
+        from wam_privacy_wallet.application.presentation_lifecycle import OfflineLifecycleError
+        normal = OfflineReorgReconciliation(
+            "CONTIGUOUS_BUT_UNVERIFIED", 5, 3, 5, 1, 0,
+        )
+        segment = OfflineRescanSegments(
+            "CONTIGUOUS_UNVERIFIED", "REVALIDATE_BEFORE_RESCAN",
+            5, 3, 6, 1, 0, 3, 2,
+        )
+        rollback = OfflineReorgReconciliation(
+            "ROLLBACK_RESCAN_REVIEW", 5, 3, 5, 1, 0,
+        )
+        recovery = OfflineRecoveryTransition(
+            "NO_TRUSTED_RECOVERY_EVIDENCE",
+            "REVIEW_ONLY_NOT_VERIFIED", 4, 5, 3,
+        )
+        for inputs in (
+            {"rescan": segment, "reorg": normal},
+            {"recovery": recovery, "reorg": rollback},
+        ):
+            ctrl = presentation()
+            with self.subTest(fields=tuple(inputs)), self.assertRaisesRegex(
+                OfflineLifecycleError, "^APP_OFFLINE_LIFECYCLE_DENIED$",
+            ):
+                ctrl.replace(0, **inputs)
+            self.assertEqual(ctrl.state.transition, "REJECTED")
+            self.assertEqual(ctrl.state.reorg, "ABSENT")
+            self.assertEqual(inspect_offline_integration(ctrl.state).presentation, "EMPTY")
+
     def test_no_network_file_subprocess_or_operational_engine(self):
         s, w, r = presentation().state, scan(), storage()
         with patch("builtins.open", side_effect=AssertionError("NO_FILE")), \
