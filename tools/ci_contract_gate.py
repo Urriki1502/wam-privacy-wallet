@@ -34,6 +34,7 @@ MINIMUM_CASES = {
     "test_rpc_qualification_prep.py": 13,
     "test_reorg_qualification_prep.py": 13,
     "test_ci_contract_gate.py": 14,
+    "test_gui_ci_contract_gate.py": 20,
 }
 MANDATORY_SUITES = tuple(MINIMUM_CASES)
 
