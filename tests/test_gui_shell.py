@@ -428,6 +428,79 @@ class GuiShellSmokeTests(unittest.TestCase):
         self.assertEqual(self.window.findChildren(QPushButton), [])
 
 
+    def test_legacy_presenter_replaces_managed_snapshot_atomically(self) -> None:
+        # Legacy direct calls now run through the same single-writer revision.
+        from wam_privacy_wallet.application.node_status import NodeOverview
+        from wam_privacy_wallet.application.policy_evidence import (
+            SyntheticPolicyReport,
+        )
+        self.window.replace_offline_presentation(
+            0, node=NodeOverview(
+                "regtest", 10, "READ_ONLY_SNAPSHOT",
+                "EXPERIMENTAL_NO_REAL_FUNDS",
+            ), receive=rv.inspect_pinned_public_vector()
+        )
+        self.assertEqual(self.window.offline_presentation_state.revision, 1)
+        self.window.present_offline_policy_report(SyntheticPolicyReport(
+            "PIN_RECORDED_UNATTESTED", "MODEL_PASS_UNTRUSTED",
+            "MODEL_PASS_UNTRUSTED", "MODEL_ONLY_NO_AUTHORITY",
+            "BLOCKED", "BLOCKED", "BLOCKED",
+        ))
+        state = self.window.offline_presentation_state
+        self.assertEqual((state.revision, state.policy), (2, "MODEL_ONLY"))
+        self.assertEqual((state.node, state.receive), ("ABSENT", "ABSENT"))
+        self.assertEqual(self.window.node_diagnostic_status.text(),
+                         "NO DIAGNOSTIC SNAPSHOT · NO RPC")
+        self.assertEqual(self.window.receive_vector_status.text(),
+                         "NO PUBLIC SAMPLE · NO ADDRESS GENERATED")
+
+    def test_legacy_clear_invalidates_all_panels_and_prior_revision(self) -> None:
+        from wam_privacy_wallet.application.presentation_lifecycle import (
+            OfflineLifecycleError,
+        )
+        self.window.replace_offline_presentation(
+            0, receive=rv.inspect_pinned_public_vector()
+        )
+        self.window.clear_public_receive_vector()
+        state = self.window.offline_presentation_state
+        self.assertEqual((state.revision, state.transition), (2, "CLEARED"))
+        self.assertEqual((state.node, state.receive), ("ABSENT", "ABSENT"))
+        with self.assertRaises(OfflineLifecycleError):
+            self.window.replace_offline_presentation(1)
+        self.assertEqual(self.window.offline_presentation_state.transition,
+                         "REJECTED")
+
+    def test_legacy_invalid_input_does_not_mutate_accepted_state(self) -> None:
+        self.window.present_public_receive_vector(
+            rv.inspect_pinned_public_vector()
+        )
+        before = self.window.offline_presentation_state
+        self.assertEqual(before.receive, "PUBLIC_FIXTURE")
+        with self.assertRaisesRegex(
+            ValueError, "^APP_GUI_RECEIVE_VECTOR_DENIED$"
+        ):
+            self.window.present_public_receive_vector(
+                {"secret": "MUST_NOT_LOG"}
+            )
+        self.assertEqual(self.window.offline_presentation_state, before)
+        self.assertIn("PUBLIC FINGERPRINT",
+                      self.window.receive_vector_status.text())
+        self.assertNotIn("MUST_NOT_LOG",
+                         self.window.receive_vector_notice.text())
+
+    def test_legacy_demo_routes_through_controller_single_writer(self) -> None:
+        self.window.run_fixed_public_receive_demo()
+        state = self.window.offline_presentation_state
+        self.assertEqual((state.revision, state.receive), (1, "PUBLIC_FIXTURE"))
+        self.assertEqual(state.authority, "BLOCKED")
+        self.window.run_fixed_offline_policy_demo()
+        state = self.window.offline_presentation_state
+        self.assertEqual((state.revision, state.policy), (2, "MODEL_ONLY"))
+        self.assertEqual(state.receive, "ABSENT")
+        self.assertEqual(self.window.receive_vector_status.text(),
+                         "NO PUBLIC SAMPLE · NO ADDRESS GENERATED")
+        self.assertEqual(self.window.session_status.text(), "NO WALLET LOADED")
+
     def test_lifecycle_render_failure_clears_and_invalidates(self) -> None:
         # A renderer can fail *after* a validated state was committed.
         # That must never leave an accepted revision or stale panel visible.
