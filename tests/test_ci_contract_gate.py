@@ -168,7 +168,7 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
     "test_scanner_response_shape.py": 14,
     "test_scanner_window_contract.py": 18,
     "test_offline_recovery_disposition.py": 18,
-    "test_offline_integration_status.py": 18,
+    "test_offline_integration_status.py": 20,
         }
         self.assertEqual(MINIMUM_CASES, expected)
         self.assertEqual(MANDATORY_SUITES, tuple(expected))
