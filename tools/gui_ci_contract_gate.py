@@ -27,6 +27,10 @@ GUI_TEST_IDS = frozenset({
     "test_gui_shell.GuiShellSmokeTests.test_resume_forged_claims_rejected_without_changing_display",
     "test_gui_shell.GuiShellSmokeTests.test_resume_clear_invalidates_old_revision_and_evidence",
     "test_gui_shell.GuiShellSmokeTests.test_resume_renderer_fault_resets_and_redacts_without_privilege",
+    "test_gui_shell.GuiShellSmokeTests.test_rescan_segments_gui_starts_disabled_without_buttons",
+    "test_gui_shell.GuiShellSmokeTests.test_rescan_segment_forged_authority_or_counts_are_denied",
+    "test_gui_shell.GuiShellSmokeTests.test_segment_review_same_writer_and_direct_clear",
+    "test_gui_shell.GuiShellSmokeTests.test_rescan_segment_renderer_failure_resets_and_redacts",
     "test_gui_shell.GuiShellSmokeTests.test_legacy_presenter_replaces_managed_snapshot_atomically",
     "test_gui_shell.GuiShellSmokeTests.test_legacy_clear_invalidates_all_panels_and_prior_revision",
     "test_gui_shell.GuiShellSmokeTests.test_legacy_invalid_input_does_not_mutate_accepted_state",
@@ -63,9 +67,11 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_offline_integration_status.OfflineIntegrationStatusTests.test_conflicting_storage_and_presentation_recovery_denied",
     "test_offline_integration_status.OfflineIntegrationStatusTests.test_rejected_or_cleared_presentation_cannot_retain_resume",
     "test_offline_integration_status.OfflineIntegrationStatusTests.test_resume_only_research_panel_cannot_authorize_scanning",
+    "test_offline_integration_status.OfflineIntegrationStatusTests.test_rescan_segment_only_research_state_cannot_grant_scanner",
+    "test_offline_integration_status.OfflineIntegrationStatusTests.test_clear_state_with_stale_rescan_preview_is_denied",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 457
+FULL_MIN_CASES = 465
 
 
 def _cases(suite: unittest.TestSuite):
