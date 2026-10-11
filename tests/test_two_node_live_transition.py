@@ -56,7 +56,7 @@ class _Peer(BaseHTTPRequestHandler):
             }
         else:
             result = None
-        if method == self.server.flip_on:
+        if method == self.server.flip_on and (method != "getblockhash" or params == [h]):
             self.server.history[h] = FORK
             self.server.flip_on = None
         reply = json.dumps({"result": result, "error": None, "id": 1}).encode()
