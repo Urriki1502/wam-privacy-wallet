@@ -164,6 +164,7 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
     "test_app_policy_evidence.py": 12,
     "test_app_synthetic_policy_demo.py": 8,
     "test_app_receive_public_vector.py": 12,
+    "test_app_presentation_lifecycle.py": 10,
         }
         self.assertEqual(MINIMUM_CASES, expected)
         self.assertEqual(MANDATORY_SUITES, tuple(expected))
