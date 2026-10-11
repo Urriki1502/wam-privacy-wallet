@@ -22,8 +22,8 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_rpc_qualification_prep.RpcQualificationPreparationTests.test_fake_approval_release_or_core_execution_denied",
     "test_ci_contract_gate.MandatoryOfflineContractGateTests.test_minimum_case_floors_pinned_for_all_mandatory_suites",
 })
-# 198 at protected main + 4 from PR #53 + 20 V5 synthetic regressions.
-FULL_MIN_CASES = 222
+# 198 at protected main + 4 from PR #53 + 20 V5 regressions + 8 offline GUI diagnostic tests.
+FULL_MIN_CASES = 230
 
 
 def _cases(suite: unittest.TestSuite):
