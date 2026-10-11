@@ -55,7 +55,11 @@ class RegtestBinaryArtifactPreflightTests(unittest.TestCase):
             with self.subTest(field=field_name):
                 with self.assertRaises(TypeError):
                     LocalHashEvidence(self.digest, **{field_name: forged_value})
-        evidence = LocalHashEvidence(self.digest)
+        with self.assertRaisesRegex(
+            ValueError, "^G1_LOCAL_EVIDENCE_CONSTRUCTION_DENIED$"
+        ):
+            LocalHashEvidence(self.digest)
+        evidence = evaluate_local_binary(self.binary, self.digest)
         self.assertIs(evidence.execution_allowed, False)
         self.assertIs(evidence.binary_source_equivalence_verified, False)
 
@@ -67,7 +71,11 @@ class RegtestBinaryArtifactPreflightTests(unittest.TestCase):
                     ValueError, "^G1_LOCAL_EVIDENCE_DIGEST_INVALID$"
                 ):
                     LocalHashEvidence(invalid)
-        direct = LocalHashEvidence(self.digest)
+        with self.assertRaisesRegex(
+            ValueError, "^G1_LOCAL_EVIDENCE_CONSTRUCTION_DENIED$"
+        ):
+            LocalHashEvidence(self.digest)
+        direct = evaluate_local_binary(self.binary, self.digest)
         self.assertEqual(direct.sha256, self.digest)
         self.assertFalse(direct.execution_allowed)
         self.assertFalse(direct.publisher_identity_verified)
