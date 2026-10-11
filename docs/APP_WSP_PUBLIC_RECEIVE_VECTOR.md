@@ -16,6 +16,8 @@ Upstream repository: [Urriki1502/wam-silent-payments](https://github.com/Urriki1
 
 `.gitattributes` pins the vendor codec to LF on Windows, macOS and Linux to avoid checkout normalization changing its Git blob bytes.
 
+**Independent public sample SHA-256:** `5a0f212b2e6153242f68576d3b7e7649e17dbfe98a8235448849e59870dfaaf4`. The application compares the public fixture against this hardcoded complete digest in addition to the fixed source pin, before decoding. This is a deterministic regression guard, **not** source-signature verification.
+
 ## Narrow application boundary
 
 `application.receive_vector.inspect_pinned_public_vector()` uses only a **fixed public synthetic example**. It accepts no arbitrary user address, no other HRP, no mainnet/testnet, and no alternate SHA/version. After verifying the pinned codec source bytes, it only decodes/validates the public Bech32m checksum and expected 66-byte public payload shape.
