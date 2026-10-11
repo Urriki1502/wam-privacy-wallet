@@ -1077,6 +1077,115 @@ class GuiShellSmokeTests(unittest.TestCase):
         self.assertNotIn("PRIVATE_REORG_GUI_EXCEPTION",
                          self.window.reorg_review_notice.text())
 
+    def test_reentrant_clear_during_render_cannot_survive_swallowed_error(self) -> None:
+        from unittest.mock import patch
+        from wam_privacy_wallet.application.presentation_lifecycle import OfflineLifecycleError
+        original = MainWindow.present_offline_node_snapshot
+        observed = []
+
+        def reenter(window, snapshot):
+            try:
+                window.clear_offline_presentation()
+            except OfflineLifecycleError as exc:
+                observed.append(str(exc))
+            else:
+                observed.append("UNEXPECTEDLY_ACCEPTED")
+            return original(window, snapshot)
+
+        with patch.object(MainWindow, "present_offline_node_snapshot",
+                          autospec=True, side_effect=reenter):
+            with self.assertRaisesRegex(
+                OfflineLifecycleError, "^APP_OFFLINE_RENDER_DENIED$"
+            ) as exc:
+                self.window.replace_offline_presentation(
+                    0, node=NodeOverview("regtest", 4, "READ_ONLY_SNAPSHOT",
+                                          "EXPERIMENTAL_NO_REAL_FUNDS")
+                )
+            self.assertIsNone(exc.exception.__cause__)
+        self.assertEqual(observed, ["APP_OFFLINE_REENTRANT_DENIED"])
+        state = self.window.offline_presentation_state
+        self.assertEqual((state.revision, state.transition, state.node),
+                         (2, "CLEARED", "ABSENT"))
+        self.assertEqual(self.window.node_diagnostic_status.text(),
+                         "NO DIAGNOSTIC SNAPSHOT · NO RPC")
+        self.assertEqual(self.window.session_status.text(), "NO WALLET LOADED")
+
+    def test_reentrant_replace_during_clear_poisoned_even_when_callback_catches(self) -> None:
+        from unittest.mock import patch
+        from wam_privacy_wallet.application.presentation_lifecycle import OfflineLifecycleError
+        original = MainWindow.clear_offline_node_snapshot
+        observed = []
+
+        def reenter(window):
+            if not observed:
+                try:
+                    window.replace_offline_presentation(
+                        window.offline_presentation_state.revision,
+                        node=NodeOverview("regtest", 99, "READ_ONLY_SNAPSHOT",
+                                          "EXPERIMENTAL_NO_REAL_FUNDS")
+                    )
+                except OfflineLifecycleError as exc:
+                    observed.append(str(exc))
+                else:
+                    observed.append("UNEXPECTEDLY_ACCEPTED")
+            return original(window)
+
+        with patch.object(MainWindow, "clear_offline_node_snapshot",
+                          autospec=True, side_effect=reenter):
+            with self.assertRaisesRegex(
+                OfflineLifecycleError, "^APP_OFFLINE_RENDER_DENIED$"
+            ):
+                self.window.replace_offline_presentation(
+                    0, node=NodeOverview("regtest", 1, "READ_ONLY_SNAPSHOT",
+                                          "EXPERIMENTAL_NO_REAL_FUNDS")
+                )
+        self.assertEqual(observed, ["APP_OFFLINE_REENTRANT_DENIED"])
+        state = self.window.offline_presentation_state
+        self.assertEqual((state.revision, state.transition, state.node),
+                         (2, "CLEARED", "ABSENT"))
+        self.assertEqual(self.window.node_diagnostic_status.text(),
+                         "NO DIAGNOSTIC SNAPSHOT · NO RPC")
+
+    def test_reentrant_replace_during_explicit_clear_stays_blocked_then_recovers(self) -> None:
+        from unittest.mock import patch
+        from wam_privacy_wallet.application.presentation_lifecycle import OfflineLifecycleError
+        self.window.present_public_receive_vector(rv.inspect_pinned_public_vector())
+        original = MainWindow.clear_offline_node_snapshot
+        observed = []
+
+        def reenter(window):
+            if not observed:
+                try:
+                    window.replace_offline_presentation(
+                        window.offline_presentation_state.revision
+                    )
+                except OfflineLifecycleError as exc:
+                    observed.append(str(exc))
+                else:
+                    observed.append("UNEXPECTEDLY_ACCEPTED")
+            return original(window)
+
+        with patch.object(MainWindow, "clear_offline_node_snapshot",
+                          autospec=True, side_effect=reenter):
+            with self.assertRaisesRegex(
+                OfflineLifecycleError, "^APP_OFFLINE_RENDER_DENIED$"
+            ):
+                self.window.clear_offline_presentation()
+        self.assertEqual(observed, ["APP_OFFLINE_REENTRANT_DENIED"])
+        cleared = self.window.offline_presentation_state
+        self.assertEqual((cleared.revision, cleared.transition, cleared.receive),
+                         (2, "CLEARED", "ABSENT"))
+        self.assertEqual(self.window.receive_vector_status.text(),
+                         "NO PUBLIC SAMPLE · NO ADDRESS GENERATED")
+        # Internal reentry poison must not persist into a later valid update.
+        self.window.replace_offline_presentation(
+            2, node=NodeOverview("regtest", 3, "READ_ONLY_SNAPSHOT",
+                                  "EXPERIMENTAL_NO_REAL_FUNDS")
+        )
+        self.assertEqual(self.window.offline_presentation_state.revision, 3)
+        self.assertEqual(self.window.offline_presentation_state.node, "UNVERIFIED")
+        self.assertEqual(self.window.session_status.text(), "NO WALLET LOADED")
+
     def test_lifecycle_render_failure_clears_and_invalidates(self) -> None:
         # A renderer can fail *after* a validated state was committed.
         # That must never leave an accepted revision or stale panel visible.
