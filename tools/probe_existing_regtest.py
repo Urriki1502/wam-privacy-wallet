@@ -28,7 +28,9 @@ def probe_existing_regtest(
     block_height: int | None = None, previous_block_hash: str | None = None,
 ) -> dict[str, object]:
     """Connect to an existing local node; return scalar-only NO-AUTHORITY status."""
-    if (block_height is None) != (previous_block_hash is None):
+    # A height alone is sufficient: the RPC bridge derives the parent from
+    # the node itself. A standalone previous-hash flag is never meaningful.
+    if block_height is None and previous_block_hash is not None:
         raise RegtestLiveProbeError("REGTEST_PROBE_BLOCK_PAIR_DENIED")
     try:
         endpoint = LocalRegtestEndpoint(host, port)
