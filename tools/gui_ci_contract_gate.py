@@ -23,9 +23,12 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_ci_contract_gate.MandatoryOfflineContractGateTests.test_minimum_case_floors_pinned_for_all_mandatory_suites",
     "test_offline_recovery_disposition.OfflineRecoveryDispositionTests.test_no_caller_can_claim_verified_writer_identity_or_integrity",
     "test_offline_recovery_disposition.OfflineRecoveryDispositionTests.test_readonly_policy_never_uses_file_socket_or_subprocess",
+    "test_offline_recovery_transition.OfflineRecoveryTransitionTests.test_legacy_version_two_to_three_does_not_prove_rescan",
+    "test_offline_recovery_transition.OfflineRecoveryTransitionTests.test_downgrade_to_legacy_is_fail_closed",
+    "test_offline_recovery_transition.OfflineRecoveryTransitionTests.test_no_file_socket_subprocess_or_wsp_imports",
 })
 # Existing 284-case full baseline + 18 offline recovery disposition cases.
-FULL_MIN_CASES = 302
+FULL_MIN_CASES = 318
 
 
 def _cases(suite: unittest.TestSuite):
