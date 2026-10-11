@@ -68,6 +68,9 @@ def _entry_path(name: str, is_dir: bool) -> str:
     if not is_dir and name.endswith("/"):
         raise CoreArchiveInventoryError("CORE_ARCHIVE_PATH_DENIED")
     value = name[:-1] if is_dir and name.endswith("/") else name
+    # GNU tar normally contains the package root as an explicit directory.
+    if is_dir and value == _ROOT:
+        return value
     bits = value.split("/")
     if (len(bits) < 2 or len(bits) > 8
             or any(part in ("", ".", "..") for part in bits)
