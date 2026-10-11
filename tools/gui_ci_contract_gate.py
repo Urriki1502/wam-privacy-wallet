@@ -23,9 +23,11 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_ci_contract_gate.MandatoryOfflineContractGateTests.test_minimum_case_floors_pinned_for_all_mandatory_suites",
     "test_scanner_response_shape.ScannerResponseShapeTests.test_no_files_sockets_subprocess_or_wsp_imports",
     "test_scanner_response_shape.ScannerResponseShapeTests.test_wrong_hash_or_previous_hash_or_height_rejected",
+    "test_scanner_window_contract.OfflineScanWindowTests.test_changing_reported_tip_denied",
+    "test_scanner_window_contract.OfflineScanWindowTests.test_immutable_summary_and_no_io_or_wsp_imports",
 })
-# Existing 284-case full baseline plus 14 scanner response-shape regressions.
-FULL_MIN_CASES = 298
+# Existing 284-case baseline + 14 reply-shape + 18 window-coherence regressions.
+FULL_MIN_CASES = 317
 
 
 def _cases(suite: unittest.TestSuite):
