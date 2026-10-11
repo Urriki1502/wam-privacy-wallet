@@ -126,7 +126,7 @@ class RegtestCookieDescriptorTests(unittest.TestCase):
         def mutate(fd):
             count.append(fd)
             if len(count) == 2:
-                self.cookie.write_bytes(b"__cookie__:ALTERED_SE")
+                self.cookie.write_bytes(b"__cookie__:ALTERED_SEC")
                 os.utime(self.cookie, ns=(1000000000, 1000000000))
             return orig(fd)
         with patch.object(source.os, "fstat", side_effect=mutate), \
