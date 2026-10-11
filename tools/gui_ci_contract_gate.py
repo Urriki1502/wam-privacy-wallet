@@ -17,6 +17,9 @@ GUI_TEST_IDS = frozenset({
     "test_gui_shell.GuiShellSmokeTests.test_lifecycle_reset_invalidates_revision_and_all_panels",
     "test_gui_shell.GuiShellSmokeTests.test_lifecycle_replacement_does_not_retain_omitted_evidence",
     "test_gui_shell.GuiShellSmokeTests.test_lifecycle_render_failure_clears_and_invalidates",
+    "test_gui_shell.GuiShellSmokeTests.test_reentrant_clear_during_render_cannot_survive_swallowed_error",
+    "test_gui_shell.GuiShellSmokeTests.test_reentrant_replace_during_clear_poisoned_even_when_callback_catches",
+    "test_gui_shell.GuiShellSmokeTests.test_reentrant_replace_during_explicit_clear_stays_blocked_then_recovers",
     "test_gui_shell.GuiShellSmokeTests.test_lifecycle_clear_failure_invalidates_revision_and_other_panels",
     "test_gui_shell.GuiShellSmokeTests.test_reset_clear_failure_attempts_all_panels_and_stays_blocked",
     "test_gui_shell.GuiShellSmokeTests.test_recovery_page_has_no_backup_restore_or_signing_actions",
@@ -80,7 +83,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_offline_integration_status.OfflineIntegrationStatusTests.test_mismatched_reorg_segment_or_recovery_fails_atomic_replacement",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 499
+FULL_MIN_CASES = 502
 
 
 def _cases(suite: unittest.TestSuite):
