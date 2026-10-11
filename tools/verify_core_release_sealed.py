@@ -22,6 +22,8 @@ from tools.verify_core_release_offline import _absolute_path
 
 def verify_signed_linux_memfd(*, archive: str, gpg: str) -> dict[str, object]:
     archive_path, gpg_path = _absolute_path(archive), _absolute_path(gpg)
+    elf_failure: str | None = None
+    result: dict[str, object] | None = None
     with official_release_metadata() as meta:
         with sealed_signed_linux_wamd(
             archive=archive_path, gpg=gpg_path,
@@ -29,33 +31,45 @@ def verify_signed_linux_memfd(*, archive: str, gpg: str) -> dict[str, object]:
             signature=meta["signature"],
         ) as sealed:
             sealed.audit()
-            layout = inspect_sealed_linux_elf(sealed._descriptor)
-            p = sealed.evidence
-            if (p.execution_identity_bound is not False
-                    or p.core_execution_allowed is not False
-                    or p.mainnet_allowed is not False):
-                raise SignedNodeSealError("CORE_SIGNED_SEAL_AUTHORITY_DENIED")
-            return {
-                "status": "OFFICIAL_SIGNED_WAMD_LINUX_NOEXEC_MEMFD_REVIEW",
-                "node_sha256": p.sha256,
-                "node_byte_count": p.byte_count,
-                "elf_class": layout.binary_class,
-                "elf_architecture": layout.architecture,
-                "elf_type": layout.elf_type,
-                "elf_load_segment_count": layout.load_segment_count,
-                "elf_has_interpreter": layout.has_interpreter,
-                "elf_has_dynamic_segment": layout.has_dynamic_segment,
-                "runtime_loader_authenticated": False,
-                "kernel_seals_verified": p.seal_flags_verified,
-                "kernel_noexec_enforced": True,
-                "executed_core": False,
-                "real_regtest_qualified": False,
-                "execution_identity_bound": False,
-                "core_execution_allowed": False,
-                "real_wallet_allowed": False,
-                "mainnet_allowed": False,
-            }
-
+            # Do not throw a ValueError through the signed snapshot's yield:
+            # its cleanup wrapper deliberately redacts it as a staging error.
+            # Record only a fixed ELF denial code, close/audit the fd normally,
+            # then raise the code after the sealed review context has exited.
+            try:
+                layout = inspect_sealed_linux_elf(sealed._descriptor)
+            except SealedElfError as exc:
+                elf_failure = str(exc)
+            else:
+                p = sealed.evidence
+                if (p.execution_identity_bound is not False
+                        or p.core_execution_allowed is not False
+                        or p.mainnet_allowed is not False):
+                    raise SignedNodeSealError("CORE_SIGNED_SEAL_AUTHORITY_DENIED")
+                result = {
+                    "status": "OFFICIAL_SIGNED_WAMD_LINUX_NOEXEC_MEMFD_REVIEW",
+                    "node_sha256": p.sha256,
+                    "node_byte_count": p.byte_count,
+                    "elf_class": layout.binary_class,
+                    "elf_architecture": layout.architecture,
+                    "elf_type": layout.elf_type,
+                    "elf_load_segment_count": layout.load_segment_count,
+                    "elf_has_interpreter": layout.has_interpreter,
+                    "elf_has_dynamic_segment": layout.has_dynamic_segment,
+                    "runtime_loader_authenticated": False,
+                    "kernel_seals_verified": p.seal_flags_verified,
+                    "kernel_noexec_enforced": True,
+                    "executed_core": False,
+                    "real_regtest_qualified": False,
+                    "execution_identity_bound": False,
+                    "core_execution_allowed": False,
+                    "real_wallet_allowed": False,
+                    "mainnet_allowed": False,
+                }
+    if elf_failure is not None:
+        raise SealedElfError(elf_failure)
+    if result is None:
+        raise SealedElfError("CORE_ELF_READ_DENIED")
+    return result
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
