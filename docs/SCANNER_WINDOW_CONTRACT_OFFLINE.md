@@ -30,9 +30,9 @@ are fixed `false`.
   remain unchanged; WAM Core/real two-node is reserved for DEV WAM signoff.
 
 ## Regression and integration rules
-- Adds **18** deterministic negative/positive tests and pins mandatory suite
+- Adds **19** deterministic negative/positive tests and pins mandatory suite
   count **25→26** relative to Draft #64.
-- Raises GUI full-discovery floor **298→316** on the stacked branch.
+- Raises GUI full-discovery floor **298→317** on the stacked branch.
 - CI reviews must combine the suites from parallel #60 and #61 additively,
   rather than overwriting one another when eventually integrated.
 - Require 8/8 native Wallet CI, no skips/xfails, exact-head CodeQL Python +
@@ -45,3 +45,13 @@ are fixed `false`.
 
 Upstream WSP source reference: `Urriki1502/wam-silent-payments` @
 `ac55f13423620252bdbf848c7e8a280c3b84721e`, `Scanner._sync`.
+
+## Additional duplicate-block identity gate (11 Oct 2026)
+
+The initial link-only check accepted a synthetic window that reused a block
+hash at a different height, or reused the anchor hash as the first returned
+block. Both are rejected with fixed error `SCAN_WINDOW_DUPLICATE_BLOCK_HASH`.
+A new adversarial test fixes this gap; the required window suite is **19**
+cases and the stacked branch's GUI full-discovery floor is **317**. This
+only strengthens self-consistency of untrusted fixtures, not chain consensus
+or publisher/node authentication.
