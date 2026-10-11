@@ -6,6 +6,8 @@ on:
   pull_request:
     paths:
       - '.github/workflows/core-official-release-readonly.yml'
+      - 'src/wam_privacy_wallet/node/core_signed_linux_memfd.py'
+      - 'tools/verify_core_release_sealed.py'
   workflow_dispatch:
 
 permissions:
@@ -86,5 +88,28 @@ jobs:
           print("CORE_OFFICIAL_SIGNATURE_AND_ARCHIVE_VERIFIED_READ_ONLY")
           print("CORE_NODE_SHA256=" + receipt["node_sha256"])
           print("CORE_ARCHIVE_SHA256=" + receipt["archive_sha256"])
+          print("CORE_EXECUTION_ALLOWED=false; REAL_REGTEST_QUALIFIED=false")
+          PY
+
+          # Re-verify the actual official signed bytes and stream ONLY wamd
+          # from the approved archive into Linux MFD_NOEXEC_SEAL memfd.
+          # This is NOT a process launch or executable-image attestation.
+          python -m tools.verify_core_release_sealed \
+            --archive "$ARCHIVE_PATH" \
+            --gpg "$TRUSTED_GPG" \
+            > "$TMP_DIR/sealed.json"
+          python - "$TMP_DIR/sealed.json" <<'PY'
+          import json
+          import pathlib
+          import sys
+          p = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assert p["status"] == "OFFICIAL_SIGNED_WAMD_LINUX_NOEXEC_MEMFD_REVIEW"
+          assert p["node_sha256"] == "625609c08afef441e9dddd71330dcab1cec112d6fabe361769b9907f0efe7ab4"
+          assert p["kernel_seals_verified"] is True
+          assert p["kernel_noexec_enforced"] is True
+          for key in ("executed_core", "real_regtest_qualified", "execution_identity_bound",
+                      "core_execution_allowed", "real_wallet_allowed", "mainnet_allowed"):
+              assert p[key] is False
+          print("CORE_OFFICIAL_WAMD_NOEXEC_MEMFD_VERIFIED_READ_ONLY")
           print("CORE_EXECUTION_ALLOWED=false; REAL_REGTEST_QUALIFIED=false")
           PY
