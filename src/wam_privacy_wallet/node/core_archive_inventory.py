@@ -192,7 +192,15 @@ def _read_zip(path: Path, node_target: str) -> CoreArchiveInventory:
                 if (member.flag_bits & 1 or member.compress_type not in (
                         zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED)):
                     raise CoreArchiveInventoryError("CORE_ARCHIVE_TYPE_DENIED")
-                key = _entry_path(member.filename, is_dir)
+                # CPython ZipInfo can normalize backslash separators on
+                # Windows and truncate names at a NUL. Validate the original
+                # ZIP central-directory name before the convenience field.
+                # Otherwise a hostile name may become apparently canonical.
+                original = member.orig_filename
+                if (type(original) is not str
+                        or original != member.filename):
+                    raise CoreArchiveInventoryError("CORE_ARCHIVE_PATH_DENIED")
+                key = _entry_path(original, is_dir)
                 duplicate_key = key.casefold()
                 if duplicate_key in names:
                     raise CoreArchiveInventoryError("CORE_ARCHIVE_COLLISION_DENIED")
