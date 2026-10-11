@@ -21,6 +21,10 @@ _NAMES = (
     "test_lifecycle_reset_invalidates_revision_and_all_panels",
     "test_lifecycle_replacement_does_not_retain_omitted_evidence",
     "test_lifecycle_render_failure_clears_and_invalidates",
+    "test_legacy_presenter_replaces_managed_snapshot_atomically",
+    "test_legacy_clear_invalidates_all_panels_and_prior_revision",
+    "test_legacy_invalid_input_does_not_mutate_accepted_state",
+    "test_legacy_demo_routes_through_controller_single_writer",
 )
 
 
@@ -86,7 +90,7 @@ class GuiGateSyntheticTests(unittest.TestCase):
         self._gui(skipped=(_NAMES[0],))
         self.assertEqual(self._run(), 1)
 
-    def test_nine_pinned_gui_cases_pass(self):
+    def test_thirteen_pinned_gui_cases_pass(self):
         self._gui()
         self.assertEqual(self._run(), 0)
 
