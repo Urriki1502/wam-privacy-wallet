@@ -63,11 +63,14 @@ class PrivacyResearchSnapshot:
     send: Literal["BLOCKED"]
 
 
-RESEARCH_ONLY_SNAPSHOT = PrivacyResearchSnapshot(
-    "RESEARCH_ONLY", "PIN_RECORDED_UNATTESTED",
-    "MODEL_ONLY", "MODEL_ONLY", "MODEL_ONLY", "NOT_INTEGRATED",
-    "BLOCKED", "BLOCKED", "BLOCKED",
-)
+def _non_authorizing_snapshot() -> PrivacyResearchSnapshot:
+    # Construct a fresh value; never share a globally mutable object even
+    # though this dataclass rejects ordinary attribute assignment.
+    return PrivacyResearchSnapshot(
+        "RESEARCH_ONLY", "PIN_RECORDED_UNATTESTED",
+        "MODEL_ONLY", "MODEL_ONLY", "MODEL_ONLY", "NOT_INTEGRATED",
+        "BLOCKED", "BLOCKED", "BLOCKED",
+    )
 
 
 def _deny() -> None:
@@ -147,4 +150,4 @@ def research_readiness(manifest: object, ledger: object) -> PrivacyResearchSnaps
             _deny()
     if seen_gates != set(_GATES):
         _deny()
-    return RESEARCH_ONLY_SNAPSHOT
+    return _non_authorizing_snapshot()
