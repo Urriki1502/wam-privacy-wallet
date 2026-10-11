@@ -6,7 +6,7 @@ qualification. No network, subprocess, wallet, datadir, keys or secrets.
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass, field
 import json
 from pathlib import Path
 import re
@@ -24,10 +24,14 @@ class ArtifactPreflightError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
+_LOCAL_EVIDENCE_TOKEN = object()
+
+
 class LocalHashEvidence:
     """Local hash match only. No attestation or permission is represented."""
 
     sha256: str
+    _token: InitVar[object] = None
     # All status/authority claims are non-configurable, even at construction.
     # This remains a data contract, not a sandbox against hostile Python code.
     profile_network: str = field(default="regtest", init=False)
@@ -38,7 +42,7 @@ class LocalHashEvidence:
     execution_allowed: bool = field(default=False, init=False)
     release_allowed: bool = field(default=False, init=False)
 
-    def __post_init__(self) -> None:
+    def __post_init__(self, _token: object) -> None:
         # Prevent malformed or noncanonical strings from masquerading as
         # evidence DTOs. A canonical SHA format is NOT proof of a real file,
         # publisher provenance, executable identity or launch permission.
@@ -46,6 +50,10 @@ class LocalHashEvidence:
             r"[0-9a-f]{64}", self.sha256, flags=re.ASCII
         ) is None:
             raise ValueError("G1_LOCAL_EVIDENCE_DIGEST_INVALID")
+        if _token is not _LOCAL_EVIDENCE_TOKEN:
+            # Prevent accidental construction of a false hash-match receipt.
+            # Not an adversarial Python-process security boundary.
+            raise ValueError("G1_LOCAL_EVIDENCE_CONSTRUCTION_DENIED")
 
 
 def evaluate_local_binary(binary: object, expected_sha256: object) -> LocalHashEvidence:
@@ -79,7 +87,7 @@ def evaluate_local_binary(binary: object, expected_sha256: object) -> LocalHashE
                         "CORE_BINARY_NOT_REGULAR", "CORE_BINARY_UNAVAILABLE"):
             code = "CORE_BINARY_UNAVAILABLE"
         raise ArtifactPreflightError("G1_" + code) from None
-    return LocalHashEvidence(sha256=expected_sha256)
+    return LocalHashEvidence(sha256=expected_sha256, _token=_LOCAL_EVIDENCE_TOKEN)
 
 
 def main(argv: list[str] | None = None) -> int:
