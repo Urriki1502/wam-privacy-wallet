@@ -350,6 +350,22 @@ class MainWindow(QMainWindow):
             "NETWORK & PAYJOIN MODEL RESULTS ONLY · NO RPC / SIGN / SEND"
         )
 
+    def run_fixed_offline_policy_demo(self) -> None:
+        """Explicitly run a pinned, no-argument synthetic-only research demo.
+
+        No real transaction, remote plan, wallet state, signer or Core is read.
+        All model results are displayed as untrusted and not authorized.
+        """
+        from wam_privacy_wallet.application.synthetic_policy_demo import (
+            SyntheticDemoError, run_fixed_synthetic_privacy_demo,
+        )
+        try:
+            report = run_fixed_synthetic_privacy_demo()
+        except SyntheticDemoError:
+            self.clear_offline_policy_report()
+            raise ValueError("APP_GUI_SYNTHETIC_MODEL_DENIED") from None
+        self.present_offline_policy_report(report)
+
     def clear_offline_policy_report(self) -> None:
         """Reset only the synthetic model panel; never persist the input."""
         self.privacy_policy_status.setText("NO SYNTHETIC POLICY EVIDENCE")
