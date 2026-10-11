@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import contextlib
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, replace
 import hashlib
 import io
 import json
@@ -12,7 +12,7 @@ import unittest
 from unittest.mock import patch
 
 from tools.check_regtest_artifact_preflight import (
-    ArtifactPreflightError, evaluate_local_binary, main,
+    ArtifactPreflightError, LocalHashEvidence, evaluate_local_binary, main,
 )
 
 
@@ -32,10 +32,49 @@ class RegtestBinaryArtifactPreflightTests(unittest.TestCase):
         self.assertEqual(result.status, "LOCAL_SHA256_MATCH_ONLY")
         self.assertFalse(result.real_regtest_qualified)
         self.assertFalse(result.publisher_identity_verified)
+        self.assertFalse(result.binary_source_equivalence_verified)
+        self.assertFalse(result.execution_allowed)
         self.assertFalse(result.release_allowed)
         self.assertNotIn(str(self.binary), repr(result))
         with self.assertRaises(FrozenInstanceError):
             result.release_allowed = True
+
+    def test_preflight_constructor_cannot_forge_qualification(self):
+        # The offline evidence object cannot be initialized with elevated
+        # status or authority fields, even if the SHA matches.
+        claims = {
+            "profile_network": "main",
+            "status": "PUBLISHER_VERIFIED",
+            "real_regtest_qualified": True,
+            "publisher_identity_verified": True,
+            "binary_source_equivalence_verified": True,
+            "execution_allowed": True,
+            "release_allowed": True,
+        }
+        for field_name, forged_value in claims.items():
+            with self.subTest(field=field_name):
+                with self.assertRaises(TypeError):
+                    LocalHashEvidence(self.digest, **{field_name: forged_value})
+        evidence = LocalHashEvidence(self.digest)
+        self.assertIs(evidence.execution_allowed, False)
+        self.assertIs(evidence.binary_source_equivalence_verified, False)
+
+    def test_preflight_replace_cannot_escalate_qualification(self):
+        evidence = evaluate_local_binary(self.binary, self.digest)
+        for field_name, forged_value in (
+            ("profile_network", "main"),
+            ("status", "RELEASE_READY"),
+            ("real_regtest_qualified", True),
+            ("publisher_identity_verified", True),
+            ("binary_source_equivalence_verified", True),
+            ("execution_allowed", True),
+            ("release_allowed", True),
+        ):
+            with self.subTest(field=field_name):
+                with self.assertRaises(ValueError):
+                    replace(evidence, **{field_name: forged_value})
+        for name in ("binary_path", "rpc_credentials", "wallet_key", "subprocess"):
+            self.assertFalse(hasattr(evidence, name))
 
     def test_wrong_hash_and_malformed_hash_are_denied(self):
         cases = (
@@ -91,6 +130,8 @@ class RegtestBinaryArtifactPreflightTests(unittest.TestCase):
         self.assertEqual(data["status"], "LOCAL_SHA256_MATCH_ONLY")
         self.assertIs(data["real_regtest_qualified"], False)
         self.assertIs(data["publisher_identity_verified"], False)
+        self.assertIs(data["binary_source_equivalence_verified"], False)
+        self.assertIs(data["execution_allowed"], False)
         self.assertIs(data["release_allowed"], False)
         self.assertNotIn(str(self.binary), buffer.getvalue())
 
