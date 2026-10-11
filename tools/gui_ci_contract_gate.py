@@ -22,8 +22,8 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_rpc_qualification_prep.RpcQualificationPreparationTests.test_fake_approval_release_or_core_execution_denied",
     "test_ci_contract_gate.MandatoryOfflineContractGateTests.test_minimum_case_floors_pinned_for_all_mandatory_suites",
 })
-# Existing 241-case GUI baseline + 12 synthetic policy evidence + 4 Qt policy panel tests.
-FULL_MIN_CASES = 257
+# Existing 257-case GUI baseline + 8 pinned pure-model tests + 2 GUI demo tests.
+FULL_MIN_CASES = 267
 
 
 def _cases(suite: unittest.TestSuite):
