@@ -27,7 +27,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_scanner_window_contract.OfflineScanWindowTests.test_immutable_summary_and_no_io_or_wsp_imports",
 })
 # Existing 284-case baseline + 14 reply-shape + 18 window-coherence regressions.
-FULL_MIN_CASES = 316
+FULL_MIN_CASES = 317
 
 
 def _cases(suite: unittest.TestSuite):
