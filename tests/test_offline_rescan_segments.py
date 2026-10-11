@@ -110,6 +110,14 @@ class OfflineRescanSegmentsTests(unittest.TestCase):
                                     "^RESCAN_SEGMENT_CYCLE_DENIED$"):
             review(segments=(seg(digest=A),))
 
+    def test_hash_identity_cannot_cycle_back_to_earlier_anchor(self):
+        # Links are syntactically coherent but a content-addressed chain
+        # cannot revisit an earlier block identity at a new height.
+        with self.assertRaisesRegex(
+            OfflineRescanSegmentsError, "^RESCAN_SEGMENT_CYCLE_DENIED$"
+        ):
+            review(segments=(seg(), seg(10, 12, B, A)))
+
     def test_changed_attempt_is_not_an_idempotent_replay(self):
         with self.assertRaisesRegex(OfflineRescanSegmentsError,
                                     "^RESCAN_GAP_OR_OVERLAP_DENIED$"):
