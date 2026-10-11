@@ -39,7 +39,12 @@ class _Peer(BaseHTTPRequestHandler):
             return
         method = request["method"]
         if method == "getblockhash":
-            result = WAM_REGTEST_GENESIS if request["params"] == [0] else self.server.tip
+            if request["params"] == [0]:
+                result = WAM_REGTEST_GENESIS
+            elif self.server.height == 2 and request["params"] == [1]:
+                result = self.server.parent_hash
+            else:
+                result = self.server.tip
         elif method == "getblockcount":
             result = self.server.height
         elif method == "getbestblockhash":
@@ -50,6 +55,17 @@ class _Peer(BaseHTTPRequestHandler):
                 "headers": self.server.height, "bestblockhash": self.server.tip,
                 "pruned": False,
             }
+        elif method == "getblock":
+            result = {
+                "hash": self.server.tip, "height": self.server.height,
+                "previousblockhash": (
+                    self.server.parent_hash if self.server.height == 2
+                    else WAM_REGTEST_GENESIS
+                ),
+                "tx": [{"txid": TXID}],
+            }
+            if self.server.mutate_parent_after_block:
+                self.server.parent_hash = OTHER_TIP
         elif method == "getrawmempool":
             result = [TXID]
             if self.server.mutate_after_mempool:
@@ -96,6 +112,8 @@ class TwoNodeRegtestWireTests(unittest.TestCase):
             server.chain = "regtest"
             server.tip = TIP
             server.height = 1
+            server.parent_hash = "d" * 64
+            server.mutate_parent_after_block = False
             server.mutate_after_mempool = False
         self.params = {
             "node_a_host": "127.0.0.1",
@@ -200,6 +218,79 @@ class TwoNodeRegtestWireTests(unittest.TestCase):
             probe.TwoNodeRegtestProbeError, "^TWO_NODE_RPC_DENIED$",
         ):
             self._probe()
+
+    def test_confirmed_block_two_real_sockets_derive_parent_from_rpc(self):
+        for server in self.servers:
+            server.height = 2
+        report = self._probe(block_height=2)
+        self.assertEqual(report["mode"], "confirmed")
+        self.assertEqual((report["node_a_block_tx_count"], report["node_b_block_tx_count"]), (1, 1))
+        self.assertIsNone(report["node_a_mempool_count"])
+        for server in self.servers:
+            methods = [entry["method"] for entry in server.calls]
+            self.assertIn("getblock", methods)
+            parents = [entry["params"] for entry in server.calls
+                       if entry["method"] == "getblockhash"]
+            self.assertGreaterEqual(parents.count([1]), 3)
+
+    def test_same_tip_different_parent_rejected_across_nodes(self):
+        for server in self.servers:
+            server.height = 2
+        self.servers[1].parent_hash = "e" * 64
+        with self.assertRaisesRegex(
+            probe.TwoNodeRegtestProbeError, "^TWO_NODE_ANCESTRY_DIVERGED$",
+        ):
+            self._probe(block_height=2)
+
+    def test_confirmed_height_ahead_rejected_without_block_fetch(self):
+        with self.assertRaisesRegex(
+            probe.TwoNodeRegtestProbeError, "^TWO_NODE_HEIGHT_AHEAD$",
+        ):
+            self._probe(block_height=2)
+        self.assertFalse(any(
+            call["method"] == "getblock" for server in self.servers for call in server.calls
+        ))
+
+    def test_invalid_confirmed_height_denied_before_any_network(self):
+        for height in (True, 0, -1, 1.0, 100_000_001):
+            with self.subTest(height=height), self.assertRaisesRegex(
+                probe.TwoNodeRegtestProbeError, "^TWO_NODE_HEIGHT_DENIED$",
+            ):
+                self._probe(block_height=height)
+        self.assertFalse(self.servers[0].calls)
+        self.assertFalse(self.servers[1].calls)
+
+    def test_same_tip_parent_reorg_mid_block_denied(self):
+        for server in self.servers:
+            server.height = 2
+        self.servers[0].mutate_parent_after_block = True
+        with self.assertRaisesRegex(
+            probe.TwoNodeRegtestProbeError, "^TWO_NODE_RPC_DENIED$",
+        ):
+            self._probe(block_height=2)
+
+    def test_malformed_live_ancestor_denied_without_leaking_response(self):
+        for server in self.servers:
+            server.height = 2
+        self.servers[1].parent_hash = "invalid-secret-parent"
+        with self.assertRaises(probe.TwoNodeRegtestProbeError) as caught:
+            self._probe(block_height=2)
+        self.assertEqual(str(caught.exception), "TWO_NODE_RPC_DENIED")
+        self.assertNotIn("invalid-secret-parent", str(caught.exception))
+
+    def test_interactive_confirmed_cli_no_user_supplied_hash(self):
+        tty = io.StringIO()
+        tty.isatty = lambda: True
+        out = io.StringIO()
+        with patch.object(sys, "stdin", tty), \
+             patch.object(probe.getpass, "getpass", side_effect=[SECRET_A, SECRET_B]), \
+             contextlib.redirect_stdout(out):
+            self.assertEqual(probe.main(self._cli_args() + ["--block-height", "1"]), 0)
+        report = json.loads(out.getvalue())
+        self.assertEqual(report["mode"], "confirmed")
+        self.assertIs(report["wallet_ready"], False)
+        self.assertNotIn(TIP, out.getvalue())
+        self.assertNotIn(TXID, out.getvalue())
 
     def test_no_core_process_launch_during_real_socket_observation(self):
         with patch.object(subprocess, "Popen", side_effect=AssertionError("NO_EXEC")):

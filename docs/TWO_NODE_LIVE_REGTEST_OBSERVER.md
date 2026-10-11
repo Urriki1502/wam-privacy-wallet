@@ -64,3 +64,25 @@ and recorded genuine two-node test transcript are available.
    chain divergence/reorg, tip convergence, authenticated RPC denial, restart.
 3. Integrate the frozen WSP scanner only **after** upstream #3/#16 review
    and real file-lock/storage crash/recovery gates; no changing Core consensus.
+
+## Confirmed block cross-endpoint mode (additive)
+
+Pass `--block-height <HEIGHT>` to read a confirmed block through the **actual
+authenticated loopback HTTP** on both endpoints. The two scanner bridges
+independently retrieve `getblockhash(HEIGHT-1)`, `getblockhash(HEIGHT)`, and
+`getblock(hash,3)` from their respective local nodes and reject inconsistent
+payloads and observed ancestry changes. Then this observer explicitly
+cross-compares **both parent and child hashes** from two fresh read-only RPC
+views and rechecks them after final profile probes.
+
+The input height must be an integer >=1 and no greater than the jointly
+observed tip. No caller-provided parent/block hash is used as evidence; no
+raw hash/txid/credential is printed. It reports redacted per-endpoint block
+transaction counts and `mode=confirmed`; mempool counts are null in this
+mode. Existing mempool behavior remains the default.
+
+This catches some consistent-tip/different-parent and mid-read reorg cases,
+but cannot prove an honest node, a shared canonical chain or atomic snapshots.
+The fixtures in native CI are disposable HTTP servers. **Actual official WAM
+Core execution, two independent process identity, P2P reorg testing, scanner
+activation and wallet authorization are all still blocked by #36/#9.**

@@ -48,6 +48,8 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_regtest_scanner_wire.RegtestScannerReadBridgeTests.test_parent_hash_change_with_stable_tip_is_denied",
     "test_regtest_scanner_wire.RegtestScannerReadBridgeTests.test_mismatched_external_parent_denied_before_block_read",
     "test_probe_existing_regtest.ExistingRegtestCliTests.test_block_height_only_fetches_parent_directly_over_node_rpc",
+    "test_probe_two_node_regtest.TwoNodeRegtestWireTests.test_same_tip_different_parent_rejected_across_nodes",
+    "test_probe_two_node_regtest.TwoNodeRegtestWireTests.test_same_tip_parent_reorg_mid_block_denied",
     "test_probe_two_node_regtest.TwoNodeRegtestWireTests.test_both_endpoints_actually_receive_separate_http_rpc",
     "test_probe_two_node_regtest.TwoNodeRegtestWireTests.test_no_core_process_launch_during_real_socket_observation",
     "test_probe_existing_regtest.ExistingRegtestCliTests.test_actual_loopback_mempool_wire_has_no_mock_transport_hook",
@@ -115,7 +117,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 640
+FULL_MIN_CASES = 647
 
 
 def _cases(suite: unittest.TestSuite):
