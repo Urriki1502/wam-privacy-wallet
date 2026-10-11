@@ -67,6 +67,32 @@ class HarnessTests(unittest.TestCase):
         with self.assertRaises(RealRegtestError):
             _read_cookie(path)
 
+    def test_cookie_symlink_never_read(self):
+        target = self.root / "real-cookie"
+        target.write_text("__cookie__:synthetic-only", encoding="ascii")
+        link = self.root / ".cookie-link"
+        try:
+            link.symlink_to(target)
+        except (OSError, NotImplementedError):
+            self.skipTest("symlink creation unavailable on this host")
+        with self.assertRaisesRegex(RealRegtestError, "^CORE_COOKIE_INVALID$"):
+            _read_cookie(link)
+
+    def test_cookie_path_swap_between_lstat_and_open_is_denied(self):
+        path = self.root / ".cookie-race"
+        path.write_text("__cookie__:before", encoding="ascii")
+        original_open = os.open
+
+        def swap_then_open(name, flags, *args, **kwargs):
+            path.unlink()
+            path.write_text("__cookie__:after", encoding="ascii")
+            return original_open(name, flags, *args, **kwargs)
+
+        with patch("wam_privacy_wallet.node.real_regtest.os.open",
+                   side_effect=swap_then_open):
+            with self.assertRaisesRegex(RealRegtestError, "^CORE_COOKIE_INVALID$"):
+                _read_cookie(path)
+
     def test_clean_environment(self):
         with patch.dict(os.environ, {"WAM_RPC_PASS": "SECRET", "HTTPS_PROXY": "SECRET",
                                      "LD_PRELOAD": "SECRET", "HOME": "SECRET"}):
