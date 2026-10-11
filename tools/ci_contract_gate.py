@@ -59,6 +59,7 @@ MINIMUM_CASES = {
     "test_core_official_metadata.py": 18,
     "test_core_linux_sealed_snapshot.py": 13,
     "test_core_signed_linux_memfd.py": 13,
+    "test_core_elf_preflight.py": 14,
 }
 MANDATORY_SUITES = tuple(MINIMUM_CASES)
 
