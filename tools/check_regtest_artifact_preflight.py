@@ -23,10 +23,10 @@ class ArtifactPreflightError(ValueError):
     """Stable failure code, no binary path or filesystem detail in the message."""
 
 
-@dataclass(frozen=True, slots=True)
 _LOCAL_EVIDENCE_TOKEN = object()
 
 
+@dataclass(frozen=True, slots=True)
 class LocalHashEvidence:
     """Local hash match only. No attestation or permission is represented."""
 
