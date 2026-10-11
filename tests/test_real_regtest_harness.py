@@ -57,6 +57,8 @@ class HarnessTests(unittest.TestCase):
     def test_cookie_and_secret_repr(self):
         path = self.root / ".cookie"
         path.write_text("__cookie__:synthetic-test-secret\n", encoding="ascii")
+        if os.name != "nt":
+            path.chmod(0o600)  # Real Core cookie must be private on POSIX.
         auth = _read_cookie(path)
         self.assertEqual(auth.username, "__cookie__")
         self.assertNotIn("synthetic-test-secret", repr(auth))
