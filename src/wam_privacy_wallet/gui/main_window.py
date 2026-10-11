@@ -92,6 +92,10 @@ class MainWindow(QMainWindow):
         self._offline_controller = OfflinePresentationController()
         # Internal Qt projection writes must not recursively mutate revision.
         self._managed_render_depth = 0
+        # Nested Qt callbacks may re-enter public updates. Poison the
+        # enclosing transition even when the callback swallows its error.
+        self._managed_transition_active = False
+        self._managed_transition_interrupted = False
         self.setObjectName("wamPrivacyWalletWindow")
         self.setWindowTitle("WAM Privacy Wallet — Experimental")
         self.setMinimumSize(960, 620)
@@ -299,54 +303,89 @@ class MainWindow(QMainWindow):
         if failed:
             raise OfflineLifecycleError("APP_OFFLINE_RENDER_DENIED") from None
 
+    def _begin_managed_transition(self) -> None:
+        """Reject nested public transactions without mutating their revision."""
+        if self._managed_transition_active:
+            self._managed_transition_interrupted = True
+            raise OfflineLifecycleError("APP_OFFLINE_REENTRANT_DENIED") from None
+        self._managed_transition_active = True
+        self._managed_transition_interrupted = False
+
+    def _assert_managed_transition_clean(self) -> None:
+        """A swallowed nested exception still poisons the outer operation."""
+        if self._managed_transition_interrupted:
+            raise OfflineLifecycleError("APP_OFFLINE_REENTRANT_DENIED") from None
+
+    def _end_managed_transition(self) -> None:
+        self._managed_transition_active = False
+        self._managed_transition_interrupted = False
+
     def clear_offline_presentation(self) -> None:
-        """Invalidate revisions and clear every research evidence panel."""
-        self._offline_controller.reset()
-        self._clear_managed_panels()
+        """Invalidate revision before cleanup; reject reentrant view resets."""
+        self._begin_managed_transition()
+        try:
+            self._offline_controller.reset()
+            try:
+                self._clear_managed_panels()
+                self._assert_managed_transition_clean()
+            except Exception:
+                # A faulty/reentrant Qt callback cannot restore a stale view.
+                try:
+                    self._clear_managed_panels()
+                except Exception:
+                    pass
+                raise OfflineLifecycleError("APP_OFFLINE_RENDER_DENIED") from None
+        finally:
+            self._end_managed_transition()
 
     def replace_offline_presentation(
         self, expected_revision: object, *, node: object = None,
         privacy: object = None, policy: object = None, receive: object = None,
     ) -> None:
         """Atomically validate all four synthetic DTOs before displaying."""
+        self._begin_managed_transition()
         try:
-            state = self._offline_controller.replace(
-                expected_revision, node=node, privacy=privacy,
-                policy=policy, receive=receive,
-            )
-        except OfflineLifecycleError:
-            # Validation already rejected the revision; still clear every
-            # panel even if a broken widget raises while clearing.
             try:
-                self._clear_managed_panels()
+                state = self._offline_controller.replace(
+                    expected_revision, node=node, privacy=privacy,
+                    policy=policy, receive=receive,
+                )
             except OfflineLifecycleError:
-                pass
-            raise
-        try:
-            # Reset is part of the guarded transition: previously a failure
-            # here escaped before the controller revision was invalidated.
-            self._clear_managed_panels()
-            self._managed_render_depth += 1
+                # Validation already rejected the revision; still clear every
+                # panel even if a broken widget raises while clearing.
+                try:
+                    self._clear_managed_panels()
+                except OfflineLifecycleError:
+                    pass
+                raise
             try:
-                if state.node == "UNVERIFIED":
-                    self.present_offline_node_snapshot(node)
-                if state.privacy == "RESEARCH_ONLY":
-                    self.present_offline_privacy_readiness(privacy)
-                if state.policy == "MODEL_ONLY":
-                    self.present_offline_policy_report(policy)
-                if state.receive == "PUBLIC_FIXTURE":
-                    self.present_public_receive_vector(receive)
-            finally:
-                self._managed_render_depth -= 1
-        except Exception:
-            # Presentation or reset can fail after a revision was accepted.
-            # Invalidate it, attempt every panel reset, and redact the error.
-            self._offline_controller.reset()
-            try:
+                # Reset is part of the guarded transition: previously a failure
+                # here escaped before the controller revision was invalidated.
                 self._clear_managed_panels()
-            except OfflineLifecycleError:
-                pass
-            raise OfflineLifecycleError("APP_OFFLINE_RENDER_DENIED") from None
+                self._managed_render_depth += 1
+                try:
+                    if state.node == "UNVERIFIED":
+                        self.present_offline_node_snapshot(node)
+                    if state.privacy == "RESEARCH_ONLY":
+                        self.present_offline_privacy_readiness(privacy)
+                    if state.policy == "MODEL_ONLY":
+                        self.present_offline_policy_report(policy)
+                    if state.receive == "PUBLIC_FIXTURE":
+                        self.present_public_receive_vector(receive)
+                finally:
+                    self._managed_render_depth -= 1
+                self._assert_managed_transition_clean()
+            except Exception:
+                # Presentation or reset can fail after a revision was accepted.
+                # Invalidate it, attempt every panel reset, and redact the error.
+                self._offline_controller.reset()
+                try:
+                    self._clear_managed_panels()
+                except OfflineLifecycleError:
+                    pass
+                raise OfflineLifecycleError("APP_OFFLINE_RENDER_DENIED") from None
+        finally:
+            self._end_managed_transition()
 
     def present_offline_node_snapshot(self, snapshot: object) -> None:
         """Display a non-authorizing, unverified projection; no node/RPC access.
