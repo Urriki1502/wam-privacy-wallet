@@ -9,6 +9,7 @@ import argparse
 import json
 import sys
 
+from wam_privacy_wallet.node.core_elf_preflight import SealedElfError, inspect_sealed_linux_elf
 from wam_privacy_wallet.node.core_official_metadata import (
     OfficialMetadataError, official_release_metadata,
 )
@@ -28,6 +29,7 @@ def verify_signed_linux_memfd(*, archive: str, gpg: str) -> dict[str, object]:
             signature=meta["signature"],
         ) as sealed:
             sealed.audit()
+            layout = inspect_sealed_linux_elf(sealed._descriptor)
             p = sealed.evidence
             if (p.execution_identity_bound is not False
                     or p.core_execution_allowed is not False
@@ -37,6 +39,13 @@ def verify_signed_linux_memfd(*, archive: str, gpg: str) -> dict[str, object]:
                 "status": "OFFICIAL_SIGNED_WAMD_LINUX_NOEXEC_MEMFD_REVIEW",
                 "node_sha256": p.sha256,
                 "node_byte_count": p.byte_count,
+                "elf_class": layout.binary_class,
+                "elf_architecture": layout.architecture,
+                "elf_type": layout.elf_type,
+                "elf_load_segment_count": layout.load_segment_count,
+                "elf_has_interpreter": layout.has_interpreter,
+                "elf_has_dynamic_segment": layout.has_dynamic_segment,
+                "runtime_loader_authenticated": False,
                 "kernel_seals_verified": p.seal_flags_verified,
                 "kernel_noexec_enforced": True,
                 "executed_core": False,
@@ -60,7 +69,7 @@ def main(argv: list[str] | None = None) -> int:
             archive=options.archive, gpg=options.gpg,
         )
     except (OfficialMetadataError, SignedNodeSealError,
-            CoreReleaseSignatureError) as exc:
+            CoreReleaseSignatureError, SealedElfError) as exc:
         print(str(exc), file=sys.stderr)
         return 2
     print(json.dumps(receipt, sort_keys=True, separators=(",", ":")))
