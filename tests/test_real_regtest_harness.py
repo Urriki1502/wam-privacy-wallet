@@ -81,8 +81,40 @@ class HarnessTests(unittest.TestCase):
                 check_real_regtest(self.binary, "1" * 64)
             proc.assert_not_called()
 
+    def test_verified_binary_still_cannot_spawn_before_binding_review(self):
+        with patch("wam_privacy_wallet.node.real_regtest.subprocess.Popen") as proc:
+            with self.assertRaisesRegex(RealRegtestError,
+                                        "^CORE_EXECUTION_REVIEW_REQUIRED$"):
+                check_real_regtest(self.binary, self.digest)
+            proc.assert_not_called()
+
+    def test_launch_gate_precedes_workspace_creation_and_socket_bind(self):
+        with patch("wam_privacy_wallet.node.real_regtest.tempfile.TemporaryDirectory"
+                   ) as workspace, patch(
+                   "wam_privacy_wallet.node.real_regtest._free_local_port"
+                   ) as bind, patch(
+                   "wam_privacy_wallet.node.real_regtest.subprocess.Popen"
+                   ) as process:
+            with self.assertRaisesRegex(RealRegtestError,
+                                        "^CORE_EXECUTION_REVIEW_REQUIRED$"):
+                check_real_regtest(self.binary, self.digest)
+            workspace.assert_not_called()
+            bind.assert_not_called()
+            process.assert_not_called()
+
+    def test_no_environment_flag_can_bypass_launch_interlock(self):
+        with patch.dict(os.environ, {
+            "WAM_REAL_CORE_ALLOW": "1", "WAM_NETWORK": "regtest",
+            "WAM_CORE_SHA256": self.digest,
+        }), patch("wam_privacy_wallet.node.real_regtest.subprocess.Popen") as proc:
+            with self.assertRaisesRegex(RealRegtestError,
+                                        "^CORE_EXECUTION_REVIEW_REQUIRED$"):
+                check_real_regtest(self.binary, self.digest)
+            proc.assert_not_called()
+
     def test_spawn_failure_redacted_and_isolated(self):
-        with patch("wam_privacy_wallet.node.real_regtest.subprocess.Popen",
+        with patch("wam_privacy_wallet.node.real_regtest._require_reviewed_core_launch"), \
+             patch("wam_privacy_wallet.node.real_regtest.subprocess.Popen",
                    side_effect=OSError("sensitive")) as proc:
             with self.assertRaisesRegex(RealRegtestError, "^CORE_START_FAILED$"):
                 check_real_regtest(self.binary, self.digest)
@@ -94,13 +126,15 @@ class HarnessTests(unittest.TestCase):
             self.assertNotEqual(options["cwd"], Path.home())
 
     def test_early_exit_is_not_success(self):
-        with patch("wam_privacy_wallet.node.real_regtest.subprocess.Popen") as proc:
+        with patch("wam_privacy_wallet.node.real_regtest._require_reviewed_core_launch"), \
+             patch("wam_privacy_wallet.node.real_regtest.subprocess.Popen") as proc:
             proc.return_value.poll.return_value = 7
             with self.assertRaisesRegex(RealRegtestError, "CORE_EARLY_EXIT"):
                 check_real_regtest(self.binary, self.digest)
 
     def test_timeout_stops_own_child(self):
-        with patch("wam_privacy_wallet.node.real_regtest.subprocess.Popen") as proc, patch(
+        with patch("wam_privacy_wallet.node.real_regtest._require_reviewed_core_launch"), \
+             patch("wam_privacy_wallet.node.real_regtest.subprocess.Popen") as proc, patch(
             "wam_privacy_wallet.node.real_regtest.time.monotonic", side_effect=[1.0, 100.0]
         ):
             proc.return_value.poll.return_value = None
