@@ -31,6 +31,10 @@ GUI_TEST_IDS = frozenset({
     "test_gui_shell.GuiShellSmokeTests.test_rescan_segment_forged_authority_or_counts_are_denied",
     "test_gui_shell.GuiShellSmokeTests.test_segment_review_same_writer_and_direct_clear",
     "test_gui_shell.GuiShellSmokeTests.test_rescan_segment_renderer_failure_resets_and_redacts",
+    "test_gui_shell.GuiShellSmokeTests.test_reorg_panel_defaults_to_no_evidence_and_no_actions",
+    "test_gui_shell.GuiShellSmokeTests.test_reorg_forged_counts_or_authority_are_rejected",
+    "test_gui_shell.GuiShellSmokeTests.test_reorg_atomic_recovery_resume_rescan_and_clear",
+    "test_gui_shell.GuiShellSmokeTests.test_reorg_renderer_fault_redacts_and_invalidates_revision",
     "test_gui_shell.GuiShellSmokeTests.test_legacy_presenter_replaces_managed_snapshot_atomically",
     "test_gui_shell.GuiShellSmokeTests.test_legacy_clear_invalidates_all_panels_and_prior_revision",
     "test_gui_shell.GuiShellSmokeTests.test_legacy_invalid_input_does_not_mutate_accepted_state",
@@ -72,9 +76,11 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_offline_integration_status.OfflineIntegrationStatusTests.test_resume_only_research_panel_cannot_authorize_scanning",
     "test_offline_integration_status.OfflineIntegrationStatusTests.test_rescan_segment_only_research_state_cannot_grant_scanner",
     "test_offline_integration_status.OfflineIntegrationStatusTests.test_clear_state_with_stale_rescan_preview_is_denied",
+    "test_offline_integration_status.OfflineIntegrationStatusTests.test_reorg_reconciliation_only_remains_untrusted",
+    "test_offline_integration_status.OfflineIntegrationStatusTests.test_mismatched_reorg_segment_or_recovery_fails_atomic_replacement",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 489
+FULL_MIN_CASES = 499
 
 
 def _cases(suite: unittest.TestSuite):
