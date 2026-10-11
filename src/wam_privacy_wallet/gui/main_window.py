@@ -10,6 +10,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 
 from wam_privacy_wallet.application.node_status import NodeOverview
+from wam_privacy_wallet.application.privacy_readiness import PrivacyResearchSnapshot
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -210,6 +211,18 @@ class MainWindow(QMainWindow):
             placeholder = QLabel("REAL WAM CORE INTEGRATION · BLOCKED")
             placeholder.setObjectName("notice")
             column.addWidget(placeholder)
+        elif title == "Privacy":
+            self.privacy_readiness_status = QLabel("RESEARCH INVENTORY · NOT LOADED")
+            column.addWidget(self._status_card("PRIVACY RESEARCH", self.privacy_readiness_status))
+            self.privacy_readiness_notice = QLabel(
+                "WSP-1, PAYJOIN AND NETWORK PRIVACY · NO ACTIVE INTEGRATION"
+            )
+            self.privacy_readiness_notice.setObjectName("smallText")
+            self.privacy_readiness_notice.setWordWrap(True)
+            column.addWidget(self.privacy_readiness_notice)
+            placeholder = QLabel("SCANNING, SIGNING AND SENDING · BLOCKED")
+            placeholder.setObjectName("notice")
+            column.addWidget(placeholder)
         else:
             placeholder = QLabel("NOT IMPLEMENTED · REVIEW REQUIRED")
             placeholder.setObjectName("notice")
@@ -263,6 +276,45 @@ class MainWindow(QMainWindow):
         self.node_diagnostic_status.setText("NO DIAGNOSTIC SNAPSHOT · NO RPC")
         self.node_diagnostic_notice.setText(
             "UNVERIFIED DATA ONLY · NOT A CONNECTION OR WALLET AUTHORIZATION"
+        )
+
+    def present_offline_privacy_readiness(self, snapshot: object) -> None:
+        """Show a fixed no-authority summary, never import or enable an engine."""
+        if (
+            type(snapshot) is not PrivacyResearchSnapshot
+            or type(snapshot.research_state) is not str
+            or snapshot.research_state != "RESEARCH_ONLY"
+            or type(snapshot.wsp_source) is not str
+            or snapshot.wsp_source != "PIN_RECORDED_UNATTESTED"
+            or type(snapshot.wallet_privacy) is not str
+            or snapshot.wallet_privacy != "MODEL_ONLY"
+            or type(snapshot.payjoin) is not str
+            or snapshot.payjoin != "MODEL_ONLY"
+            or type(snapshot.network_privacy) is not str
+            or snapshot.network_privacy != "MODEL_ONLY"
+            or type(snapshot.selective_disclosure) is not str
+            or snapshot.selective_disclosure != "NOT_INTEGRATED"
+            or type(snapshot.scan) is not str or snapshot.scan != "BLOCKED"
+            or type(snapshot.sign) is not str or snapshot.sign != "BLOCKED"
+            or type(snapshot.send) is not str or snapshot.send != "BLOCKED"
+        ):
+            raise ValueError("APP_GUI_PRIVACY_GATE_REJECTED")
+        # Fixed vocabulary prevents accidental display of untrusted manifest
+        # blocker text, paths, RPC settings, keys, or authority-like claims.
+        self.privacy_readiness_status.setText(
+            "RESEARCH ONLY · 0 ACTIVE WALLET CAPABILITIES"
+        )
+        self.privacy_readiness_notice.setText(
+            "WSP-1 SOURCE PIN RECORDED (UNATTESTED) · "
+            "WALLET PRIVACY / PAYJOIN / NETWORK MODELS ONLY · "
+            "SCANNER / SIGNER / SEND BLOCKED"
+        )
+
+    def clear_offline_privacy_readiness(self) -> None:
+        """Reset to the non-authorizing preview without storing evidence."""
+        self.privacy_readiness_status.setText("RESEARCH INVENTORY · NOT LOADED")
+        self.privacy_readiness_notice.setText(
+            "WSP-1, PAYJOIN AND NETWORK PRIVACY · NO ACTIVE INTEGRATION"
         )
 
     def _select_page(self, index: int) -> None:

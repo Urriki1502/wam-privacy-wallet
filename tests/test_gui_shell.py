@@ -2,6 +2,12 @@
 
 import os
 import unittest
+import json
+from pathlib import Path
+
+from wam_privacy_wallet.application.privacy_readiness import (
+    PrivacyResearchSnapshot, research_readiness,
+)
 
 from wam_privacy_wallet.application.node_status import NodeOverview, node_overview
 from wam_privacy_wallet.node.attestation import ChainIdentity, WAM_REGTEST_GENESIS
@@ -132,6 +138,56 @@ class GuiShellSmokeTests(unittest.TestCase):
         self.assertIn("regtest height 6", self.window.node_diagnostic_status.text())
         self.assertEqual(self.window.session_status.text(), "NO WALLET LOADED")
         self.assertEqual(self.window.node_status.text(), "DISCONNECTED · NO RPC")
+
+
+    def test_privacy_page_starts_with_all_research_capabilities_disabled(self) -> None:
+        self.assertEqual(self.window.privacy_readiness_status.text(), "RESEARCH INVENTORY · NOT LOADED")
+        self.assertIn("NO ACTIVE INTEGRATION", self.window.privacy_readiness_notice.text())
+        self.assertEqual(self.window.findChildren(QPushButton), [])
+
+    def test_canonical_wsp_and_security_evidence_is_displayed_as_review_only(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        manifest = json.loads((root / "compat/reuse_candidates.json").read_text(encoding="utf-8"))
+        ledger = json.loads((root / "compat/g0_security_gate_ledger.json").read_text(encoding="utf-8"))
+        snapshot = research_readiness(manifest, ledger)
+        self.window.present_offline_privacy_readiness(snapshot)
+        self.window.navigation.setCurrentRow(3)
+        self.assertEqual(self.window.current_page_title, "Privacy")
+        self.assertIn("0 ACTIVE WALLET CAPABILITIES", self.window.privacy_readiness_status.text())
+        self.assertIn("UNATTESTED", self.window.privacy_readiness_notice.text())
+        self.assertIn("SCANNER / SIGNER / SEND BLOCKED", self.window.privacy_readiness_notice.text())
+        self.assertEqual(self.window.findChildren(QPushButton), [])
+        self.assertEqual(self.window.node_status.text(), "DISCONNECTED · NO RPC")
+        self.assertEqual(self.window.session_status.text(), "NO WALLET LOADED")
+
+    def test_privacy_snapshot_forgery_is_rejected_and_reset_clears_display(self) -> None:
+        good = PrivacyResearchSnapshot(
+            "RESEARCH_ONLY", "PIN_RECORDED_UNATTESTED",
+            "MODEL_ONLY", "MODEL_ONLY", "MODEL_ONLY", "NOT_INTEGRATED",
+            "BLOCKED", "BLOCKED", "BLOCKED",
+        )
+        self.window.present_offline_privacy_readiness(good)
+        before = self.window.privacy_readiness_status.text()
+        for invalid in (
+            None, {}, {"secret": "DO_NOT_DISPLAY"}, True,
+            PrivacyResearchSnapshot(
+                "APPROVED", "PIN_RECORDED_UNATTESTED",
+                "MODEL_ONLY", "MODEL_ONLY", "MODEL_ONLY", "NOT_INTEGRATED",
+                "BLOCKED", "BLOCKED", "BLOCKED",
+            ),
+            PrivacyResearchSnapshot(
+                "RESEARCH_ONLY", "PIN_RECORDED_UNATTESTED",
+                "MODEL_ONLY", "MODEL_ONLY", "MODEL_ONLY", "NOT_INTEGRATED",
+                "BLOCKED", "READY", "BLOCKED",
+            ),
+        ):
+            with self.subTest(kind=type(invalid).__name__):
+                with self.assertRaisesRegex(ValueError, "^APP_GUI_PRIVACY_GATE_REJECTED$"):
+                    self.window.present_offline_privacy_readiness(invalid)
+                self.assertEqual(self.window.privacy_readiness_status.text(), before)
+        self.assertNotIn("DO_NOT_DISPLAY", self.window.privacy_readiness_notice.text())
+        self.window.clear_offline_privacy_readiness()
+        self.assertEqual(self.window.privacy_readiness_status.text(), "RESEARCH INVENTORY · NOT LOADED")
 
 
 if __name__ == "__main__":
