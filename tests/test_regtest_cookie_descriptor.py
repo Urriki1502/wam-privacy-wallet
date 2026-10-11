@@ -45,10 +45,17 @@ class RegtestCookieDescriptorTests(unittest.TestCase):
         with self.assertRaises(RealRegtestError):
             self._read()
 
+    def test_exact_terminal_crlf_is_accepted_but_internal_crlf_denied(self):
+        self.cookie.write_bytes(b"__cookie__:TEST_SECRET\r\n")
+        self.assertEqual(self._read().password, "TEST_SECRET")
+        self.cookie.write_bytes(b"__cookie__:TEST\r\nSECRET")
+        with self.assertRaises(RealRegtestError):
+            self._read()
+
     def test_empty_oversize_and_bad_auth_denied(self):
         for raw in (b"", b"x" * 1025, b"no-colon", b":TEST_SECRET",
                     b"__cookie__:", b"\xff:bad", b"__cookie__:\x00ABC",
-                    b"__cookie__:hello\r\n"):
+                    b"__cookie__:hello\r\nINJECTED"):
             with self.subTest(length=len(raw)), self.assertRaises(RealRegtestError):
                 self.cookie.write_bytes(raw)
                 self._read()
