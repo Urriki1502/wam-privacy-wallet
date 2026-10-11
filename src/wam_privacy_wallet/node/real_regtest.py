@@ -68,19 +68,74 @@ def _free_local_port() -> int:
 
 
 def _read_cookie(path: Path) -> ExplicitRpcAuth:
-    """Read only our isolated test datadir's RPC cookie."""
-    try:
-        info = path.lstat()
-        if not stat.S_ISREG(info.st_mode) or path.is_symlink() or info.st_size > 1024:
-            raise RealRegtestError("CORE_COOKIE_INVALID")
-        raw = path.read_bytes()
-        if not 1 <= len(raw) <= 1024:
-            raise RealRegtestError("CORE_COOKIE_INVALID")
-        username, password = raw.decode("ascii").strip().split(":", 1)
-        return ExplicitRpcAuth(username, password)
-    except (OSError, ValueError, UnicodeDecodeError):
-        raise RealRegtestError("CORE_COOKIE_UNAVAILABLE") from None
+    """Read our isolated regtest cookie from one verified file descriptor.
 
+    Never open the pathname a second time for the content. Check the inode,
+    device, size, time and Windows reparse metadata before/after same-fd
+    bounded read and against the pathname after completion. Fail closed on
+    symlinks, hardlinks and any visible path/file replacement. This does not
+    authorize Core launch or prove the OS process image (#36).
+    """
+    if type(path) is not type(Path()) or not path.is_absolute():
+        raise RealRegtestError("CORE_COOKIE_INVALID")
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+
+    def valid(info: os.stat_result) -> bool:
+        return (
+            stat.S_ISREG(info.st_mode)
+            and info.st_nlink == 1
+            and 1 <= info.st_size <= 1024
+            and not (getattr(info, "st_file_attributes", 0)
+                     & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
+            and (os.name == "nt" or info.st_mode & 0o077 == 0)
+        )
+
+    def identical(first: os.stat_result, other: os.stat_result) -> bool:
+        return (
+            first.st_dev == other.st_dev
+            and first.st_ino == other.st_ino
+            and first.st_size == other.st_size
+            and first.st_mtime_ns == other.st_mtime_ns
+            # On Windows, native stat APIs can expose creation/change time
+            # differently between pathname and descriptor observations.
+            # Preserve inode/dev/size/mtime checks; ctime is additionally
+            # required where POSIX specifies it consistently.
+            and (os.name == "nt" or first.st_ctime_ns == other.st_ctime_ns)
+            and valid(other)
+        )
+
+    try:
+        before = path.lstat()
+        if not valid(before):
+            raise RealRegtestError("CORE_COOKIE_INVALID")
+        with os.fdopen(os.open(path, flags), "rb") as stream:
+            opened = os.fstat(stream.fileno())
+            if not identical(before, opened):
+                raise RealRegtestError("CORE_COOKIE_CHANGED")
+            raw = stream.read(1025)
+            held = os.fstat(stream.fileno())
+            after = path.lstat()
+            if (not identical(opened, held) or not identical(held, after)
+                    or len(raw) != opened.st_size):
+                raise RealRegtestError("CORE_COOKIE_CHANGED")
+        if (not 1 <= len(raw) <= 1024 or raw.count(b":") != 1
+                or b"\x00" in raw):
+            raise RealRegtestError("CORE_COOKIE_INVALID")
+        # Accept at most one line ending at EOF for legacy harnesses, where
+        # Windows text mode writes CRLF. Never use unbounded strip() or accept
+        # embedded control characters in the actual username/password.
+        credential_bytes = (raw[:-2] if raw.endswith(b"\r\n")
+                            else raw[:-1] if raw.endswith(b"\n") else raw)
+        if b"\n" in credential_bytes or b"\r" in credential_bytes:
+            raise RealRegtestError("CORE_COOKIE_INVALID")
+        username, password = credential_bytes.decode("ascii").split(":", 1)
+        return ExplicitRpcAuth(username, password)
+    except RealRegtestError:
+        raise
+    except (OSError, TypeError, UnicodeError, ValueError, OverflowError):
+        raise RealRegtestError("CORE_COOKIE_UNAVAILABLE") from None
 
 def _write_private_conf(path: Path, rpc_port: int, p2p_port: int) -> None:
     """Generate a new, regtest-only node configuration with no external peers."""
