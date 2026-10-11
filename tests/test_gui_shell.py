@@ -384,5 +384,49 @@ class GuiShellSmokeTests(unittest.TestCase):
         self.assertEqual(self.window.node_status.text(), "DISCONNECTED · NO RPC")
 
 
+    def test_lifecycle_valid_then_invalid_clears_all_panels(self) -> None:
+        from wam_privacy_wallet.application.presentation_lifecycle import OfflineLifecycleError
+        self.window.replace_offline_presentation(0, node=NodeOverview(
+            "regtest", 42, "READ_ONLY_SNAPSHOT", "EXPERIMENTAL_NO_REAL_FUNDS"))
+        self.assertIn("UNVERIFIED", self.window.node_diagnostic_status.text())
+        with self.assertRaises(OfflineLifecycleError):
+            self.window.replace_offline_presentation(1, node={"private": "DO_NOT_ECHO"})
+        self.assertEqual(self.window.node_diagnostic_status.text(), "NO DIAGNOSTIC SNAPSHOT · NO RPC")
+        self.assertEqual(self.window.offline_presentation_state.transition, "REJECTED")
+        self.assertEqual(self.window.node_status.text(), "DISCONNECTED · NO RPC")
+
+    def test_lifecycle_stale_revision_clears_receive_and_node(self) -> None:
+        from wam_privacy_wallet.application.presentation_lifecycle import OfflineLifecycleError
+        self.window.replace_offline_presentation(0, node=NodeOverview(
+            "regtest", 42, "READ_ONLY_SNAPSHOT", "EXPERIMENTAL_NO_REAL_FUNDS"),
+            receive=rv.inspect_pinned_public_vector())
+        self.assertIn("PUBLIC FINGERPRINT", self.window.receive_vector_status.text())
+        with self.assertRaises(OfflineLifecycleError):
+            self.window.replace_offline_presentation(0)
+        self.assertEqual(self.window.receive_vector_status.text(),
+                         "NO PUBLIC SAMPLE · NO ADDRESS GENERATED")
+        self.assertEqual(self.window.node_diagnostic_status.text(),
+                         "NO DIAGNOSTIC SNAPSHOT · NO RPC")
+
+    def test_lifecycle_reset_invalidates_revision_and_all_panels(self) -> None:
+        from wam_privacy_wallet.application.presentation_lifecycle import OfflineLifecycleError
+        self.window.replace_offline_presentation(0, receive=rv.inspect_pinned_public_vector())
+        self.window.clear_offline_presentation()
+        self.assertEqual(self.window.offline_presentation_state.transition, "CLEARED")
+        self.assertEqual(self.window.receive_vector_status.text(),
+                         "NO PUBLIC SAMPLE · NO ADDRESS GENERATED")
+        with self.assertRaises(OfflineLifecycleError):
+            self.window.replace_offline_presentation(1)
+
+    def test_lifecycle_replacement_does_not_retain_omitted_evidence(self) -> None:
+        self.window.replace_offline_presentation(0, receive=rv.inspect_pinned_public_vector())
+        self.window.replace_offline_presentation(1)
+        self.assertEqual(self.window.offline_presentation_state.receive, "ABSENT")
+        self.assertEqual(self.window.receive_vector_status.text(),
+                         "NO PUBLIC SAMPLE · NO ADDRESS GENERATED")
+        self.assertEqual(self.window.session_status.text(), "NO WALLET LOADED")
+        self.assertEqual(self.window.findChildren(QPushButton), [])
+
+
 if __name__ == "__main__":
     unittest.main()
