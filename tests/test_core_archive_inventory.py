@@ -135,7 +135,7 @@ class CoreArchiveInventoryTests(unittest.TestCase):
 
     def test_reject_zip_slip_casefold_and_windows_drive(self):
         for path in (
-            f"{ROOT}/../evil", "C:/evil", f"{ROOT}/bin\\evil",
+            f"{ROOT}/../evil", "C:/evil",
             f"{ROOT}//bin/evil", f"{ROOT}/./evil",
         ):
             with self.subTest(path=path):
@@ -143,6 +143,18 @@ class CoreArchiveInventoryTests(unittest.TestCase):
                     "CORE_ARCHIVE_PATH_DENIED",
                     self.zip([(f"{ROOT}/bin/wamd.exe", PE), (path, b"bad")]),
                 )
+        # Python's zipfile silently normalizes backslash to slash when
+        # creating a ZIP on Windows. Modify raw archive filename bytes in
+        # both local+central records (same length), so the hostile on-disk
+        # member actually contains a backslash on every native OS.
+        crafted = self.zip([
+            (f"{ROOT}/bin/wamd.exe", PE),
+            (f"{ROOT}/bin/evil", b"bad"),
+        ])
+        raw = crafted.read_bytes()
+        self.assertEqual(raw.count(b"bin/evil"), 2)
+        crafted.write_bytes(raw.replace(b"bin/evil", b"bin\\\\evil"))
+        self.assert_code("CORE_ARCHIVE_PATH_DENIED", crafted)
 
     def test_reject_tar_symlink_and_hardlink(self):
         for kind in (tarfile.SYMTYPE, tarfile.LNKTYPE):
