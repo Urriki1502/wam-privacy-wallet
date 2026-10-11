@@ -226,7 +226,8 @@ class SignedMemberCliTests(unittest.TestCase):
         ):
             stderr, stdout = io.StringIO(), io.StringIO()
             with contextlib.redirect_stderr(stderr), contextlib.redirect_stdout(stdout):
-                status = cli.main(["--archive", "/tmp/release.tar.gz", "--gpg", "/bin/gpg"])
+                status = cli.main(["--archive", str(Path.cwd() / "review-release.tar.gz"),
+                                   "--gpg", str(Path.cwd() / "review-gpg")])
             self.assertEqual(status, 2)
             self.assertEqual(stderr.getvalue().strip(), "CORE_SIGNED_SEAL_DENIED")
             self.assertEqual(stdout.getvalue(), "")
