@@ -56,6 +56,15 @@ def _valid_presentation(s: object) -> bool:
         and type(s.wallet) is str and s.wallet == "NO_WALLET_LOADED"
         and type(s.transition) is str
         and s.transition in ("INITIAL", "REPLACED", "CLEARED", "REJECTED")
+        # Cleared/rejected/initial revisions cannot retain display evidence.
+        and (
+            s.transition == "REPLACED"
+            or (s.node, s.privacy, s.policy, s.receive) == ("ABSENT",) * 4
+        )
+        and (
+            (s.transition == "INITIAL" and s.revision == 0)
+            or (s.transition != "INITIAL" and s.revision >= 1)
+        )
     )
 
 
