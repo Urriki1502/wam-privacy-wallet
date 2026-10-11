@@ -1,0 +1,90 @@
+# Opt-in genuine WAM Core release provenance evidence. NEVER EXECUTES CORE.
+# Runs on this workflow's PR for qualification and may be manually dispatched.
+name: Official WAM Core signed archive (read-only)
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/core-official-release-readonly.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-official-release:
+    name: Verify genuine WAM v0.1.11 signature + archive bytes (NO EXEC)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout only wallet review code, no persisted Git credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Configure Python for read-only verification
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Confirm trusted GnuPG installed on runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v gpg
+          gpg --version
+          # This job never imports operator keys, uses wallet files or launches wam*.
+
+      - name: Fetch official signed node archive and verify real HTTPS/GnuPG evidence
+        shell: bash
+        env:
+          PYTHONPATH: src
+        run: |
+          set -euo pipefail
+          umask 077
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf -- "$TMP_DIR"' EXIT
+
+          ARCHIVE_NAME='wam-coin-v0.1.11-x86_64-linux-gnu.tar.gz'
+          ARCHIVE_PATH="$TMP_DIR/$ARCHIVE_NAME"
+          curl --fail --silent --show-error --retry 0 \
+            --max-time 180 --max-filesize 536870912 \
+            --proto '=https' --tlsv1.2 \
+            --output "$ARCHIVE_PATH" \
+            "https://wamcoin.org/downloads/v0.1.11/$ARCHIVE_NAME"
+
+          # The CLI fetches actual official signing key, SHA256SUMS and
+          # SHA256SUMS.asc from fixed HTTPS paths; it verifies detached GPG
+          # signature, archive digest, and node member hash by inspection.
+          # The downloaded archive is NEVER unpacked or executed.
+          TRUSTED_GPG="$(readlink -f "$(command -v gpg)")"
+          python -m tools.verify_core_release_official \
+            --archive "$ARCHIVE_PATH" \
+            --gpg "$TRUSTED_GPG" \
+            > "$TMP_DIR/receipt.json"
+
+          python - "$TMP_DIR/receipt.json" <<'PY'
+          import json
+          import pathlib
+          import sys
+          receipt = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          expected = {
+              "status": "SIGNED_ARCHIVE_REVIEW_ONLY",
+              "metadata_origin": "PINNED_WAM_HTTPS_V0_1_11",
+              "signer_fingerprint": "4BD4A8D3AFD43F5CBCB500E23798462FE00ADBA4",
+              "core_execution_allowed": False,
+              "real_wallet_allowed": False,
+              "mainnet_allowed": False,
+              "real_regtest_qualified": False,
+              "execution_identity_bound": False,
+          }
+          if any(receipt.get(k) != v for k, v in expected.items()):
+              raise SystemExit("CORE_OFFICIAL_RECEIPT_AUTHORITY_DENIED")
+          if (len(receipt.get("archive_sha256", "")) != 64 or
+                  len(receipt.get("node_sha256", "")) != 64):
+              raise SystemExit("CORE_OFFICIAL_RECEIPT_DIGEST_DENIED")
+          print("CORE_OFFICIAL_SIGNATURE_AND_ARCHIVE_VERIFIED_READ_ONLY")
+          print("CORE_NODE_SHA256=" + receipt["node_sha256"])
+          print("CORE_ARCHIVE_SHA256=" + receipt["archive_sha256"])
+          print("CORE_EXECUTION_ALLOWED=false; REAL_REGTEST_QUALIFIED=false")
+          PY
