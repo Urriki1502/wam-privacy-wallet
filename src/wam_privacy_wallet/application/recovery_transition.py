@@ -24,7 +24,7 @@ class OfflineRecoveryTransition:
 
     reason: Literal[
         "NO_TRUSTED_RECOVERY_EVIDENCE", "VERSION_DOWNGRADE",
-        "CHECKPOINT_ROLLBACK", "CHECKPOINT_FORK_OR_RESTORE",
+        "CHECKPOINT_ROLLBACK", "REPORTED_TIP_REWIND", "CHECKPOINT_FORK_OR_RESTORE",
         "MIGRATION_RESCAN_REQUIRED", "RESCAN_REQUIRED",
     ]
     decision: Literal[
@@ -66,13 +66,22 @@ def evaluate_offline_recovery_transition(
     # Use hash equality transiently for fork/restore *detection*, not identity
     # attestation; do not retain any hashes or raw input in the output.
     if current.store_schema_version < previous.store_schema_version:
-        decision, reason = "RESCAN_REQUIRED", "VERSION_DOWNGRADE"
-    elif current.store_schema_version in (0, 2):
+        decision = ("MIGRATION_RESCAN_REQUIRED"
+                    if current.store_schema_version in (0, 2)
+                    else "RESCAN_REQUIRED")
+        reason = "VERSION_DOWNGRADE"
+    elif (previous.store_schema_version in (0, 2)
+            or current.store_schema_version in (0, 2)):
+        # A claimed legacy->v3 migration never proves a rescan completed.
         decision, reason = "MIGRATION_RESCAN_REQUIRED", "MIGRATION_RESCAN_REQUIRED"
     elif current.checkpoint_height < previous.checkpoint_height:
         decision, reason = "RESCAN_REQUIRED", "CHECKPOINT_ROLLBACK"
-    elif (current.checkpoint_height == previous.checkpoint_height
-            and candidate["checkpoint_hash"] != old["checkpoint_hash"]):
+    elif candidate["reported_height"] < old["reported_height"]:
+        decision, reason = "RESCAN_REQUIRED", "REPORTED_TIP_REWIND"
+    elif ((current.checkpoint_height == previous.checkpoint_height
+           and candidate["checkpoint_hash"] != old["checkpoint_hash"])
+          or (candidate["reported_height"] == old["reported_height"]
+              and candidate["reported_tip"] != old["reported_tip"])):
         decision, reason = "RESCAN_REQUIRED", "CHECKPOINT_FORK_OR_RESTORE"
     elif current.decision == "RESCAN_REQUIRED":
         decision, reason = "RESCAN_REQUIRED", "RESCAN_REQUIRED"
