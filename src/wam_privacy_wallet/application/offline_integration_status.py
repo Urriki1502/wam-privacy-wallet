@@ -133,6 +133,11 @@ def inspect_offline_integration(
         raise OfflineIntegrationStatusError("APP_INTEGRATION_SCANNER_DENIED")
     if storage is not None and not _valid_storage(storage):
         raise OfflineIntegrationStatusError("APP_INTEGRATION_STORAGE_DENIED")
+    if (storage is not None and presentation.recovery != "ABSENT"
+            and presentation.recovery != storage.decision):
+        # Two individually well-shaped projections must not contradict each
+        # other about the same claimed recovery disposition.
+        raise OfflineIntegrationStatusError("APP_INTEGRATION_STORAGE_DENIED")
 
     has_presentation = any((
         presentation.node != "ABSENT",
