@@ -268,6 +268,48 @@ class OfflineIntegrationStatusTests(unittest.TestCase):
                              for value in vars(summary).values())
                          if hasattr(summary, "__dict__") else False)
 
+    def test_recovery_only_managed_presentation_is_research_not_ready(self):
+        from wam_privacy_wallet.application.recovery_transition import (
+            OfflineRecoveryTransition,
+        )
+        receipt = OfflineRecoveryTransition(
+            "NO_TRUSTED_RECOVERY_EVIDENCE",
+            "REVIEW_ONLY_NOT_VERIFIED", 5, 6, 5,
+        )
+        controller = presentation()
+        state = controller.replace(0, recovery=receipt)
+        summary = inspect_offline_integration(state)
+        self.assertEqual((state.revision, state.recovery),
+                         (1, "REVIEW_ONLY_NOT_VERIFIED"))
+        self.assertEqual(summary.presentation, "SYNTHETIC_ONLY")
+        self.assertEqual(summary.status, "REVIEW_ONLY_UNTRUSTED")
+        self.assertFalse(summary.storage_verified)
+
+    def test_cleared_state_cannot_retain_recovery_preview(self):
+        clear_state = presentation().reset()
+        forged = replace(clear_state, recovery="RESCAN_REQUIRED")
+        with self.assertRaisesRegex(
+            OfflineIntegrationStatusError,
+            "^APP_INTEGRATION_PRESENTATION_DENIED$",
+        ):
+            inspect_offline_integration(forged)
+
+    def test_conflicting_storage_and_presentation_recovery_denied(self):
+        from wam_privacy_wallet.application.recovery_transition import (
+            OfflineRecoveryTransition,
+        )
+        receipt = OfflineRecoveryTransition(
+            "RESCAN_REQUIRED", "RESCAN_REQUIRED", 5, 6, 5,
+        )
+        controller = presentation()
+        display = controller.replace(0, recovery=receipt)
+        self.assertEqual(display.recovery, "RESCAN_REQUIRED")
+        with self.assertRaisesRegex(
+            OfflineIntegrationStatusError, "^APP_INTEGRATION_STORAGE_DENIED$"
+        ):
+            inspect_offline_integration(display, storage=storage())
+        self.assertFalse(inspect_offline_integration(display).release_allowed)
+
     def test_no_network_file_subprocess_or_operational_engine(self):
         s, w, r = presentation().state, scan(), storage()
         with patch("builtins.open", side_effect=AssertionError("NO_FILE")), \
