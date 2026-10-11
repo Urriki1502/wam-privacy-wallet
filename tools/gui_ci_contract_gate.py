@@ -59,6 +59,9 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_offline_rescan_segments.OfflineRescanSegmentsTests.test_exact_immediate_replay_does_not_double_count",
     "test_offline_rescan_segments.OfflineRescanSegmentsTests.test_hash_identity_cannot_cycle_back_to_earlier_anchor",
     "test_offline_rescan_segments.OfflineRescanSegmentsTests.test_output_immutable_no_sensitive_values_or_io",
+    "test_offline_reorg_reconciliation.OfflineReorgReconciliationTests.test_checkpoint_mismatch_across_receipts_denied",
+    "test_offline_reorg_reconciliation.OfflineReorgReconciliationTests.test_metamorphic_immediate_replay_never_increases_unique_work",
+    "test_offline_reorg_reconciliation.OfflineReorgReconciliationTests.test_no_file_socket_subprocess_or_operational_wsp_imports",
     "test_offline_integration_status.OfflineIntegrationStatusTests.test_all_three_synthetic_evidence_types_never_make_a_wallet",
     "test_offline_integration_status.OfflineIntegrationStatusTests.test_in_place_scan_authority_forgery_denied",
     "test_offline_integration_status.OfflineIntegrationStatusTests.test_in_place_storage_writer_claim_denied",
@@ -71,7 +74,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_offline_integration_status.OfflineIntegrationStatusTests.test_clear_state_with_stale_rescan_preview_is_denied",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 465
+FULL_MIN_CASES = 489
 
 
 def _cases(suite: unittest.TestSuite):
