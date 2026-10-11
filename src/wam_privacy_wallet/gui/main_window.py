@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 
-from wam_privacy_wallet.application.presentation_lifecycle import OfflinePresentationController, OfflineLifecycleError
+from wam_privacy_wallet.application.presentation_lifecycle import OfflinePresentationController, OfflineLifecycleError, _valid_recovery
 from wam_privacy_wallet.application.node_status import NodeOverview
 from wam_privacy_wallet.application.privacy_readiness import PrivacyResearchSnapshot
 from wam_privacy_wallet.application.policy_evidence import SyntheticPolicyReport
@@ -249,6 +249,20 @@ class MainWindow(QMainWindow):
             placeholder = QLabel("SCANNING, SIGNING AND SENDING · BLOCKED")
             placeholder.setObjectName("notice")
             column.addWidget(placeholder)
+        elif title == "Recovery":
+            self.recovery_review_status = QLabel("NO OFFLINE RECOVERY EVIDENCE")
+            column.addWidget(self._status_card(
+                "RECOVERY STATE · SYNTHETIC ONLY", self.recovery_review_status
+            ))
+            self.recovery_review_notice = QLabel(
+                "NO WALLET RESTORED · NO DATABASE OPENED · SCANNER / SIGNER BLOCKED"
+            )
+            self.recovery_review_notice.setObjectName("smallText")
+            self.recovery_review_notice.setWordWrap(True)
+            column.addWidget(self.recovery_review_notice)
+            placeholder = QLabel("REAL BACKUP, RESTORE AND MIGRATION · BLOCKED")
+            placeholder.setObjectName("notice")
+            column.addWidget(placeholder)
         else:
             placeholder = QLabel("NOT IMPLEMENTED · REVIEW REQUIRED")
             placeholder.setObjectName("notice")
@@ -279,7 +293,7 @@ class MainWindow(QMainWindow):
         """Attempt ALL panel resets and signal any failure without leaking Qt details.
 
         Partial cleanup is never silently accepted; a broken label setter must
-        not stop the other three panels from being cleared.
+        not stop the other four panels from being cleared.
         """
         self._managed_render_depth += 1
         failed = False
@@ -289,6 +303,7 @@ class MainWindow(QMainWindow):
                 self.clear_offline_privacy_readiness,
                 self.clear_offline_policy_report,
                 self.clear_public_receive_vector,
+                self.clear_offline_recovery_review,
             ):
                 try:
                     clear()
@@ -307,12 +322,13 @@ class MainWindow(QMainWindow):
     def replace_offline_presentation(
         self, expected_revision: object, *, node: object = None,
         privacy: object = None, policy: object = None, receive: object = None,
+        recovery: object = None,
     ) -> None:
-        """Atomically validate all four synthetic DTOs before displaying."""
+        """Atomically validate all five synthetic DTOs before displaying."""
         try:
             state = self._offline_controller.replace(
                 expected_revision, node=node, privacy=privacy,
-                policy=policy, receive=receive,
+                policy=policy, receive=receive, recovery=recovery,
             )
         except OfflineLifecycleError:
             # Validation already rejected the revision; still clear every
@@ -336,6 +352,8 @@ class MainWindow(QMainWindow):
                     self.present_offline_policy_report(policy)
                 if state.receive == "PUBLIC_FIXTURE":
                     self.present_public_receive_vector(receive)
+                if state.recovery != "ABSENT":
+                    self.present_offline_recovery_review(recovery)
             finally:
                 self._managed_render_depth -= 1
         except Exception:
@@ -347,6 +365,42 @@ class MainWindow(QMainWindow):
             except OfflineLifecycleError:
                 pass
             raise OfflineLifecycleError("APP_OFFLINE_RENDER_DENIED") from None
+
+    def present_offline_recovery_review(self, preview: object) -> None:
+        """Display only fixed vocabulary from a synthetic recovery transition.
+
+        Never show hashes, paths, checkpoint identifiers or raw input strings.
+        Recovery decisions DO NOT grant persistence, scanner or wallet rights.
+        """
+        if not _valid_recovery(preview):
+            raise ValueError("APP_GUI_RECOVERY_REVIEW_DENIED")
+        if not self._managed_render_depth:
+            self.replace_offline_presentation(
+                self._offline_controller.state.revision, recovery=preview
+            )
+            return
+        messages = {
+            "REVIEW_ONLY_NOT_VERIFIED":
+                "UNTRUSTED CHECKPOINT · RECOVERY NOT VERIFIED",
+            "RESCAN_REQUIRED": "RESCAN REQUIRED · NOT PERFORMED",
+            "MIGRATION_RESCAN_REQUIRED":
+                "MIGRATION + RESCAN REQUIRED · NOT PERFORMED",
+        }
+        self.recovery_review_status.setText(messages[preview.decision])
+        self.recovery_review_notice.setText(
+            "SYNTHETIC REVIEW ONLY · NO WALLET RESTORED · "
+            "SCANNER / SIGNER / SEND BLOCKED"
+        )
+
+    def clear_offline_recovery_review(self) -> None:
+        """Invalidate all research panels on direct clear; no wallet IO."""
+        if not self._managed_render_depth:
+            self.clear_offline_presentation()
+            return
+        self.recovery_review_status.setText("NO OFFLINE RECOVERY EVIDENCE")
+        self.recovery_review_notice.setText(
+            "NO WALLET RESTORED · NO DATABASE OPENED · SCANNER / SIGNER BLOCKED"
+        )
 
     def present_offline_node_snapshot(self, snapshot: object) -> None:
         """Display a non-authorizing, unverified projection; no node/RPC access.
