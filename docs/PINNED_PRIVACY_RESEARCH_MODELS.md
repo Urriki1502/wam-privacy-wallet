@@ -11,6 +11,13 @@ at commit `db3d2dcaa540f1129d540101813b761167d33174`, MIT licensed.
 | `prototypes/payjoin_safety/model.py` | `8e3e8be096a66fc960f75a56f1ac34daa9306017` |
 | `prototypes/payjoin_safety/validator.py` | `598596a8bde118204b3baf69bb53a884c6dad21a` |
 
+**Cross-platform checkout:** GitHub's Windows runners may use
+`core.autocrlf=true`, converting LF to CRLF and causing a false integrity
+failure when checking working-tree bytes. An explicit `.gitattributes` rule
+sets `text eol=lf` for these **four files only**. CI asserts those exact rules
+exist and still verifies raw source bytes against the unchanged Git blob SHAs;
+the SHA integrity gate is not disabled, normalized or bypassed.
+
 Copied under `src/wam_privacy_wallet/research_models/` without modifying
 their source bytes. `application.synthetic_policy_demo` independently computes
 the Git blob hash of each copy **before any research model is imported**. A
