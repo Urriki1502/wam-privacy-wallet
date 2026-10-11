@@ -153,7 +153,7 @@ class CoreArchiveInventoryTests(unittest.TestCase):
         ])
         raw = crafted.read_bytes()
         self.assertEqual(raw.count(b"bin/evil"), 2)
-        crafted.write_bytes(raw.replace(b"bin/evil", b"bin\\\\evil"))
+        crafted.write_bytes(raw.replace(b"bin/evil", b"bin\\evil"))
         self.assert_code("CORE_ARCHIVE_PATH_DENIED", crafted)
 
     def test_reject_tar_symlink_and_hardlink(self):
