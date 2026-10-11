@@ -22,7 +22,8 @@ from wam_privacy_wallet.node.core_signed_release import (
 )
 
 ARCHIVE = "wam-coin-v0.1.11-arm64-apple-darwin.tar.gz"
-ABS = str(Path.cwd() / "wam-review-fixtures") + "/"\nGPG = str(Path.cwd() / "review-only-gpg-executable")
+ABS = str(Path.cwd() / "wam-review-fixtures") + "/"
+GPG = str(Path.cwd() / "review-only-gpg-executable")
 
 
 def files(name=ARCHIVE):
