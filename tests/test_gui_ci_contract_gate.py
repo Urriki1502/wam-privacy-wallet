@@ -20,6 +20,7 @@ _NAMES = (
     "test_lifecycle_stale_revision_clears_receive_and_node",
     "test_lifecycle_reset_invalidates_revision_and_all_panels",
     "test_lifecycle_replacement_does_not_retain_omitted_evidence",
+    "test_lifecycle_render_failure_clears_and_invalidates",
 )
 
 
@@ -66,11 +67,11 @@ class GuiGateSyntheticTests(unittest.TestCase):
         self.assertEqual(self._run(0), 1)
 
     def test_partial_gui_cases_denied(self):
-        self._gui(names=_NAMES[:7])
+        self._gui(names=_NAMES[:8])
         self.assertEqual(self._run(0), 1)
 
     def test_replaced_gui_case_same_count_denied(self):
-        self._gui(names=(*_NAMES[:7], "test_replacement"))
+        self._gui(names=(*_NAMES[:8], "test_replacement"))
         self.assertEqual(self._run(0), 1)
 
     def test_gui_import_error_denied(self):
@@ -85,17 +86,17 @@ class GuiGateSyntheticTests(unittest.TestCase):
         self._gui(skipped=(_NAMES[0],))
         self.assertEqual(self._run(), 1)
 
-    def test_eight_pinned_gui_cases_pass(self):
+    def test_nine_pinned_gui_cases_pass(self):
         self._gui()
         self.assertEqual(self._run(), 0)
 
     def test_additional_gui_case_allowed(self):
         self._gui(names=(*_NAMES, "test_extra"))
-        self.assertEqual(self._run(9), 0)
+        self.assertEqual(self._run(10), 0)
 
     def test_full_discovery_count_floor_denies_loss(self):
         self._gui()
-        self.assertEqual(self._run(9), 1)
+        self.assertEqual(self._run(10), 1)
 
     def test_extra_full_suite_counts(self):
         self._gui()
