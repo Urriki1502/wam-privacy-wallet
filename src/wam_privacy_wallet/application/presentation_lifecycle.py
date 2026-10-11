@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from .node_status import NodeOverview
+from .recovery_transition import OfflineRecoveryTransition
 from .policy_evidence import SyntheticPolicyReport
 from .privacy_readiness import PrivacyResearchSnapshot
 from .receive_vector import ReceiveVectorPreview, _FIXED_FINGERPRINT
@@ -31,6 +32,10 @@ class OfflinePresentationState:
     network: Literal["OFFLINE_REGTEST_ONLY"]
     wallet: Literal["NO_WALLET_LOADED"]
     transition: Literal["INITIAL", "REPLACED", "CLEARED", "REJECTED"]
+    recovery: Literal[
+        "ABSENT", "REVIEW_ONLY_NOT_VERIFIED", "RESCAN_REQUIRED",
+        "MIGRATION_RESCAN_REQUIRED",
+    ] = "ABSENT"
 
 
 def _empty(revision: int, transition: str) -> OfflinePresentationState:
@@ -93,6 +98,39 @@ def _valid_receive(value: object) -> bool:
     )
 
 
+def _valid_recovery(value: object) -> bool:
+    """Accept only bounded non-authorizing synthetic recovery transitions."""
+    if type(value) is not OfflineRecoveryTransition:
+        return False
+    if (
+        type(value.old_revision) is not int
+        or type(value.new_revision) is not int
+        or not 0 <= value.old_revision < 2**63 - 1
+        or value.new_revision != value.old_revision + 1
+        or type(value.checkpoint_height) is not int
+        or not 0 <= value.checkpoint_height <= 100_000_000
+        or type(value.reason) is not str
+        or type(value.decision) is not str
+        or type(value.status) is not str
+        or value.status != "SYNTHETIC_TRANSITION_UNTRUSTED"
+        or value.writer_verified is not False
+        or value.chain_verified is not False
+        or value.recovery_completed is not False
+        or value.wallet_enabled is not False
+    ):
+        return False
+    cases = {
+        "NO_TRUSTED_RECOVERY_EVIDENCE": "REVIEW_ONLY_NOT_VERIFIED",
+        "VERSION_DOWNGRADE": "MIGRATION_RESCAN_REQUIRED",
+        "MIGRATION_RESCAN_REQUIRED": "MIGRATION_RESCAN_REQUIRED",
+        "CHECKPOINT_ROLLBACK": "RESCAN_REQUIRED",
+        "REPORTED_TIP_REWIND": "RESCAN_REQUIRED",
+        "CHECKPOINT_FORK_OR_RESTORE": "RESCAN_REQUIRED",
+        "RESCAN_REQUIRED": "RESCAN_REQUIRED",
+    }
+    return cases.get(value.reason) == value.decision
+
+
 class OfflinePresentationController:
     """Whole-view replacements with revision checks and fail-closed rejection.
 
@@ -124,6 +162,7 @@ class OfflinePresentationController:
         privacy: object = None,
         policy: object = None,
         receive: object = None,
+        recovery: object = None,
     ) -> OfflinePresentationState:
         if type(expected_revision) is not int or expected_revision != self._state.revision:
             self._reject()
@@ -132,6 +171,7 @@ class OfflinePresentationController:
             or (privacy is not None and not _valid_privacy(privacy))
             or (policy is not None and not _valid_policy(policy))
             or (receive is not None and not _valid_receive(receive))
+            or (recovery is not None and not _valid_recovery(recovery))
         ):
             self._reject()
         self._state = OfflinePresentationState(
@@ -141,5 +181,6 @@ class OfflinePresentationController:
             "MODEL_ONLY" if policy is not None else "ABSENT",
             "PUBLIC_FIXTURE" if receive is not None else "ABSENT",
             "BLOCKED", "OFFLINE_REGTEST_ONLY", "NO_WALLET_LOADED", "REPLACED",
+            recovery.decision if recovery is not None else "ABSENT",
         )
         return self._state
