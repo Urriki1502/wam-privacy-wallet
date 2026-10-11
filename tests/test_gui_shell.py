@@ -935,6 +935,148 @@ class GuiShellSmokeTests(unittest.TestCase):
         self.assertNotIn("SECRET_RESCAN_RENDER",
                          self.window.rescan_segments_notice.text())
 
+    def _synthetic_reorg_receipts(self, mode="normal", replay=False):
+        from wam_privacy_wallet.application.recovery_transition import (
+            OfflineRecoveryTransition,
+        )
+        from wam_privacy_wallet.application.offline_rescan_segments import (
+            OfflineRescanSegments,
+        )
+        from wam_privacy_wallet.application.offline_reorg_reconciliation import (
+            reconcile_offline_reorg,
+        )
+        if mode == "normal":
+            transition = OfflineRecoveryTransition(
+                "NO_TRUSTED_RECOVERY_EVIDENCE",
+                "REVIEW_ONLY_NOT_VERIFIED", 4, 5, 3,
+            )
+            resume = self._synthetic_resume_preview()
+            segment = self._synthetic_segment_report(replay=replay)
+        elif mode == "rollback":
+            transition = OfflineRecoveryTransition(
+                "CHECKPOINT_ROLLBACK", "RESCAN_REQUIRED", 4, 5, 3,
+            )
+            resume = self._synthetic_resume_preview(scenario="rollback")
+            segment = OfflineRescanSegments(
+                "CONTIGUOUS_UNVERIFIED", "REWIND_RESCAN_REVIEW",
+                5, 3, 5, 1, 0, 2, 2,
+            )
+        elif mode == "migration":
+            transition = OfflineRecoveryTransition(
+                "MIGRATION_RESCAN_REQUIRED", "MIGRATION_RESCAN_REQUIRED",
+                4, 5, 3,
+            )
+            resume = self._synthetic_resume_preview(scenario="migration")
+            segment = OfflineRescanSegments(
+                "CONTIGUOUS_UNVERIFIED", "MIGRATION_RESCAN_REVIEW",
+                5, 0, 2, 1, 0, 2, 1,
+            )
+        else:
+            raise AssertionError("unknown test case")
+        outcome = reconcile_offline_reorg(
+            transition=transition, resume=resume, segments=segment,
+            expected_revision=5,
+        )
+        return transition, resume, segment, outcome
+
+    def test_reorg_panel_defaults_to_no_evidence_and_no_actions(self):
+        self.window.navigation.setCurrentRow(5)
+        self.assertIn("NO REORG", self.window.reorg_review_status.text())
+        self.assertIn("NO TRUSTED CURSOR", self.window.reorg_review_notice.text())
+        self.assertEqual(self.window.findChildren(QPushButton), [])
+
+    def test_reorg_contiguous_model_remains_untrusted_in_gui(self):
+        _, _, _, outcome = self._synthetic_reorg_receipts()
+        self.window.present_offline_reorg_reconciliation(outcome)
+        self.assertIn("NOT AUTHENTICATED", self.window.reorg_review_status.text())
+        self.assertEqual(self.window.offline_presentation_state.reorg,
+                         "CONTIGUOUS_BUT_UNVERIFIED")
+        self.assertEqual(self.window.offline_presentation_state.wallet,
+                         "NO_WALLET_LOADED")
+        self.assertNotIn("a" * 64, self.window.reorg_review_notice.text())
+        self.assertEqual(self.window.findChildren(QPushButton), [])
+
+    def test_reorg_replayed_segment_never_looks_committed(self):
+        _, _, _, outcome = self._synthetic_reorg_receipts(replay=True)
+        self.window.present_offline_reorg_reconciliation(outcome)
+        self.assertEqual(outcome.verdict, "REPLAY_NOT_DOUBLE_COUNTED")
+        self.assertIn("NOT COMMITTED", self.window.reorg_review_status.text())
+        self.assertFalse(outcome.checkpoint_durable)
+
+    def test_reorg_rollback_and_migration_keep_safe_fixed_language(self):
+        for mode, token in (("rollback", "ROLLBACK REVIEW"),
+                            ("migration", "MIGRATION REVIEW")):
+            with self.subTest(mode=mode):
+                _, _, _, outcome = self._synthetic_reorg_receipts(mode)
+                self.window.present_offline_reorg_reconciliation(outcome)
+                self.assertIn(token, self.window.reorg_review_status.text())
+                self.assertIn("NO SAFE CURSOR", self.window.reorg_review_status.text())
+                self.assertEqual(self.window.offline_presentation_state.authority,
+                                 "BLOCKED")
+
+    def test_reorg_forged_counts_or_authority_are_rejected(self):
+        from dataclasses import replace
+        _, _, _, good = self._synthetic_reorg_receipts()
+        self.window.present_offline_reorg_reconciliation(good)
+        state = self.window.offline_presentation_state
+        fake = replace(good)
+        object.__setattr__(fake, "scanner_enabled", True)
+        for candidate in (
+            fake,
+            replace(good, unique_segments=0),
+            replace(good, verdict="MIGRATION_RESCAN_REVIEW"),
+            {"private_key": "DO_NOT_LEAK"},
+        ):
+            # A different valid verdict is an untrusted receipt, so the
+            # invalid verdict fixture must be coupled to contradictory counts.
+            if type(candidate) is type(good) and candidate.verdict == "MIGRATION_RESCAN_REVIEW":
+                candidate = replace(candidate, unique_segments=0)
+            with self.subTest(value=type(candidate).__name__), self.assertRaisesRegex(
+                ValueError, "^APP_GUI_REORG_REVIEW_DENIED$"
+            ):
+                self.window.present_offline_reorg_reconciliation(candidate)
+            self.assertEqual(self.window.offline_presentation_state, state)
+        self.assertEqual(self.window.findChildren(QPushButton), [])
+
+    def test_reorg_atomic_recovery_resume_rescan_and_clear(self):
+        from dataclasses import replace
+        from wam_privacy_wallet.application.presentation_lifecycle import OfflineLifecycleError
+        _, restart, seg, outcome = self._synthetic_reorg_receipts()
+        self.window.replace_offline_presentation(
+            0, resume=restart, rescan=seg, reorg=outcome,
+        )
+        state = self.window.offline_presentation_state
+        self.assertEqual((state.revision, state.resume, state.rescan, state.reorg),
+                         (1, "REVALIDATE_BEFORE_RESCAN",
+                          "CONTIGUOUS_UNVERIFIED", "CONTIGUOUS_BUT_UNVERIFIED"))
+        with self.assertRaises(OfflineLifecycleError):
+            self.window.replace_offline_presentation(
+                1, resume=restart, rescan=seg,
+                reorg=replace(outcome, unique_segments=2),
+            )
+        self.assertEqual(self.window.offline_presentation_state.transition,
+                         "REJECTED")
+        self.assertIn("NO REORG", self.window.reorg_review_status.text())
+        self.assertIn("NO RESCAN SEGMENT", self.window.rescan_segments_status.text())
+
+    def test_reorg_renderer_fault_redacts_and_invalidates_revision(self):
+        from unittest.mock import patch
+        from wam_privacy_wallet.application.presentation_lifecycle import OfflineLifecycleError
+        _, _, _, outcome = self._synthetic_reorg_receipts()
+        with patch.object(MainWindow, "present_offline_reorg_reconciliation",
+                          side_effect=RuntimeError("PRIVATE_REORG_GUI_EXCEPTION")):
+            with self.assertRaisesRegex(
+                OfflineLifecycleError, "^APP_OFFLINE_RENDER_DENIED$"
+            ) as error:
+                self.window.replace_offline_presentation(0, reorg=outcome)
+            self.assertIsNone(error.exception.__cause__)
+        state = self.window.offline_presentation_state
+        self.assertEqual((state.revision, state.transition, state.reorg),
+                         (2, "CLEARED", "ABSENT"))
+        self.assertIn("NO REORG", self.window.reorg_review_status.text())
+        self.assertNotIn("PRIVATE_REORG_GUI_EXCEPTION",
+                         self.window.reorg_review_notice.text())
+
     def test_lifecycle_render_failure_clears_and_invalidates(self) -> None:
         # A renderer can fail *after* a validated state was committed.
         # That must never leave an accepted revision or stale panel visible.
