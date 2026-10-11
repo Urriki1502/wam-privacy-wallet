@@ -101,6 +101,9 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_regtest_scanner_wire.RegtestScannerReadBridgeTests.test_reorg_during_block_rpc_denied_after_read",
     "test_regtest_scanner_wire.RegtestScannerReadBridgeTests.test_live_transport_does_not_launch_core_or_load_wsp",
     "test_offline_integration_status.OfflineIntegrationStatusTests.test_mismatched_reorg_segment_or_recovery_fails_atomic_replacement",
+    "test_regtest_cookie_descriptor.RegtestCookieDescriptorTests.test_swap_between_lstat_and_fd_open_is_rejected",
+    "test_regtest_cookie_descriptor.RegtestCookieDescriptorTests.test_swap_after_same_fd_read_is_rejected",
+    "test_regtest_cookie_descriptor.RegtestCookieDescriptorTests.test_windows_reparse_attribute_denied_even_when_regular_metadata",
     "test_real_regtest_harness.HarnessTests.test_verified_binary_still_cannot_spawn_before_binding_review",
     "test_real_regtest_harness.HarnessTests.test_launch_gate_precedes_workspace_creation_and_socket_bind",
     "test_core_artifact_staging.CoreArtifactStagingTests.test_verified_synthetic_snapshot_never_authorizes_core_execution",
@@ -123,7 +126,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 691
+FULL_MIN_CASES = 704
 
 
 def _cases(suite: unittest.TestSuite):
