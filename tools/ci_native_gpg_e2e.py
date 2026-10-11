@@ -124,9 +124,22 @@ def main() -> int:
             )
 
             sig_tampered = base / "SHA256SUMS-TAMPERED.asc"
-            sig_tampered.write_bytes(sig_file.read_bytes()[:-24] + b"INVALID_TAMPER_BYTES")
+            # Cryptographic payload, NOT optional trailing ASCII armor text:
+            # GnuPG can legitimately ignore a suffix following END marker.
+            armor = sig_file.read_text(encoding="ascii").splitlines()
+            altered = False
+            for i, line in enumerate(armor):
+                if (line and not line.startswith(("-----", "="))
+                        and len(line) > 24 and not altered):
+                    pos = len(line) // 2
+                    replacement_char = "A" if line[pos] != "A" else "B"
+                    armor[i] = line[:pos] + replacement_char + line[pos + 1:]
+                    altered = True
+            if not altered:
+                raise AssertionError("CI_REAL_GPG_ARMOR_BODY_MISSING")
+            sig_tampered.write_text("\n".join(armor) + "\n", encoding="ascii")
             _deny(
-                "signature_modified", "CORE_RELEASE_SIGNATURE_DENIED",
+                "signature_payload_modified", "CORE_RELEASE_SIGNATURE_DENIED",
                 lambda: review(sig=sig_tampered),
             )
 
