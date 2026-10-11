@@ -36,9 +36,13 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_scanner_window_contract.OfflineScanWindowTests.test_immutable_summary_and_no_io_or_wsp_imports",
     "test_offline_recovery_disposition.OfflineRecoveryDispositionTests.test_no_caller_can_claim_verified_writer_identity_or_integrity",
     "test_offline_recovery_disposition.OfflineRecoveryDispositionTests.test_readonly_policy_never_uses_file_socket_or_subprocess",
+    "test_offline_integration_status.OfflineIntegrationStatusTests.test_all_three_synthetic_evidence_types_never_make_a_wallet",
+    "test_offline_integration_status.OfflineIntegrationStatusTests.test_in_place_scan_authority_forgery_denied",
+    "test_offline_integration_status.OfflineIntegrationStatusTests.test_in_place_storage_writer_claim_denied",
+    "test_offline_integration_status.OfflineIntegrationStatusTests.test_no_network_file_subprocess_or_operational_engine",
 })
-# Full floor is the additive union of original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18.
-FULL_MIN_CASES = 356
+# Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 18.
+FULL_MIN_CASES = 374
 
 
 def _cases(suite: unittest.TestSuite):
