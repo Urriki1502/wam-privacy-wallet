@@ -85,10 +85,17 @@ def validate_offline_scan_window(
     if height == start_height and start_hash != tiphash:
         raise OfflineScanWindowError("SCAN_WINDOW_ANCHOR_MISMATCH")
     previous = start_hash
+    seen_block_hashes = {start_hash}
     count = 0
     for index, block in enumerate(blocks, 1):
         if type(block) is not dict or not _hash(block.get("hash")):
             raise OfflineScanWindowError("SCAN_WINDOW_BLOCK_DENIED")
+        current_hash = block["hash"]
+        # A canonical chain window cannot revisit the anchor or reuse a block
+        # identity at a second height, even if previous-hash links look valid.
+        if current_hash in seen_block_hashes:
+            raise OfflineScanWindowError("SCAN_WINDOW_DUPLICATE_BLOCK_HASH")
+        seen_block_hashes.add(current_hash)
         try:
             validated = validate_offline_confirmed_block(
                 block, expected_hash=block["hash"],
