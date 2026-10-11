@@ -118,3 +118,32 @@ requires **29 mandatory suites and a full GUI-host discovery floor >=378**
 (21 new cross-module cases); all earlier 29/377 checks belong to a
 previous HEAD. Requalify all eight Wallet CI jobs and both CodeQL jobs
 on the latest SHA, retaining the exact-head reviewer gate.
+
+## GUI clear-stage fault injection (11 Oct 2026)
+
+A GUI-source review found that `replace_offline_presentation()` performed
+`_clear_managed_panels()` **after accepting a controller revision but before
+entering the guarded render block**. If a Qt label or direct presenter failed
+in that pre-render clearing stage, the accepted revision could survive while
+the display remained stale. Another panel's exception could also prevent the
+remaining reset functions from running.
+
+The clear helper now attempts **all four independent panel reset functions**
+without retaining their exception payloads, then raises the redacted
+`APP_OFFLINE_RENDER_DENIED` error on any failure. Both pre-render clearing
+and panel rendering are guarded as one acceptance transaction: any failure
+invalidates the controller revision, retries best-effort cleanup and exposes
+only the fixed failure code. Explicit resets invalidate the controller before
+attempting all view clears. In an actual permanently broken Qt widget, no
+claim of visually successful cleanup is made; the application state is still
+`CLEARED` with all operational wallet capabilities blocked.
+
+Two adversarial GUI regressions cover a **one-time** pre-render cleanup fault
+and **persistent** fault during explicit clear. They confirm revision
+invalidity, reset of other unaffected panels, and fixed-error redaction. The
+source lifecycle #60 now requires >=**305** full-discovery tests; combined
+integration #67 now requires >=**380** full-discovery tests with **37 GUI
+cases and 15 pinned GUI identities**. Earlier 303/378 PASS runs qualify only
+their old commit SHAs; new exact-head Wallet CI and CodeQL must be re-read
+before acceptance. This change does not touch WAM Core, WSP-1 runtime,
+scanner, storage writer or any real key/funds.
