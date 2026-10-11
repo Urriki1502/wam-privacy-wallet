@@ -13,6 +13,7 @@ from typing import Literal
 from .node_status import NodeOverview
 from .recovery_transition import OfflineRecoveryTransition
 from .offline_resume_review import OfflineResumeReview
+from .offline_rescan_segments import OfflineRescanSegments
 from .policy_evidence import SyntheticPolicyReport
 from .privacy_readiness import PrivacyResearchSnapshot
 from .receive_vector import ReceiveVectorPreview, _FIXED_FINGERPRINT
@@ -40,6 +41,9 @@ class OfflinePresentationState:
     resume: Literal[
         "ABSENT", "REVALIDATE_BEFORE_RESCAN", "REWIND_RESCAN_REVIEW",
         "MIGRATION_RESCAN_REVIEW",
+    ] = "ABSENT"
+    rescan: Literal[
+        "ABSENT", "NO_SEGMENTS", "CONTIGUOUS_UNVERIFIED", "REPLAY_NOT_APPLIED",
     ] = "ABSENT"
 
 
@@ -164,6 +168,48 @@ def _valid_resume(value: object) -> bool:
     return cases.get(value.action) == value.reason
 
 
+def _valid_rescan(value: object) -> bool:
+    """Valid only as nonauthorizing in-memory rescan accounting evidence."""
+    if type(value) is not OfflineRescanSegments:
+        return False
+    if (
+        type(value.revision) is not int or not 1 <= value.revision < 2**63
+        or type(value.start_height) is not int
+        or type(value.observed_end_height) is not int
+        or not 0 <= value.start_height <= value.observed_end_height <= 100_000_000
+        or type(value.unique_segment_count) is not int
+        or type(value.replay_count) is not int
+        or not 0 <= value.unique_segment_count <= 8
+        or not 0 <= value.replay_count <= 1
+        or value.unique_segment_count + value.replay_count > 8
+        or type(value.observed_block_count) is not int
+        or value.observed_block_count != value.observed_end_height - value.start_height
+        or not value.unique_segment_count <= value.observed_block_count <= 16 * value.unique_segment_count
+        or type(value.observed_transaction_count) is not int
+        or not 0 <= value.observed_transaction_count <= 20_000
+        or type(value.status) is not str or value.status != "OFFLINE_RESCAN_UNTRUSTED"
+        or type(value.disposition) is not str
+        or type(value.resume_action) is not str
+        or value.resume_action not in (
+            "REVALIDATE_BEFORE_RESCAN", "REWIND_RESCAN_REVIEW",
+            "MIGRATION_RESCAN_REVIEW",
+        )
+        or value.scanner_enabled is not False
+        or value.resume_authorized is not False
+        or value.checkpoint_durable is not False
+        or value.chain_verified is not False
+        or value.wallet_enabled is not False
+        or value.release_allowed is not False
+    ):
+        return False
+    if value.replay_count:
+        return value.unique_segment_count > 0 and value.disposition == "REPLAY_NOT_APPLIED"
+    if value.unique_segment_count == 0:
+        return (value.disposition == "NO_SEGMENTS"
+                and value.observed_transaction_count == 0)
+    return value.disposition == "CONTIGUOUS_UNVERIFIED"
+
+
 class OfflinePresentationController:
     """Whole-view replacements with revision checks and fail-closed rejection.
 
@@ -197,6 +243,7 @@ class OfflinePresentationController:
         receive: object = None,
         recovery: object = None,
         resume: object = None,
+        rescan: object = None,
     ) -> OfflinePresentationState:
         if type(expected_revision) is not int or expected_revision != self._state.revision:
             self._reject()
@@ -207,6 +254,11 @@ class OfflinePresentationController:
             or (receive is not None and not _valid_receive(receive))
             or (recovery is not None and not _valid_recovery(recovery))
             or (resume is not None and not _valid_resume(resume))
+            or (rescan is not None and not _valid_rescan(rescan))
+            or (resume is not None and rescan is not None and (
+                rescan.revision != resume.revision
+                or rescan.resume_action != resume.action
+            ))
         ):
             self._reject()
         self._state = OfflinePresentationState(
@@ -218,5 +270,6 @@ class OfflinePresentationController:
             "BLOCKED", "OFFLINE_REGTEST_ONLY", "NO_WALLET_LOADED", "REPLACED",
             recovery.decision if recovery is not None else "ABSENT",
             resume.action if resume is not None else "ABSENT",
+            rescan.disposition if rescan is not None else "ABSENT",
         )
         return self._state
