@@ -16,7 +16,7 @@ PYTHONPATH=src python -m tools.probe_existing_regtest \
   --rpc-user <DISPOSABLE_REGTEST_RPC_USER>
 ```
 
-Password is requested interactively without echo. No password in arguments, URLs, environment defaults, source files, logs or shell history; a noninteractive stdin is explicitly refused. No default regtest RPC port is guessed. For a confirmed block, add both `--block-height <HEIGHT>` and `--previous-block-hash <64-char-lowercase-hash>` from the verified regtest chain. The default performs a read-only mempool metadata request.
+Password is requested interactively without echo. No password in arguments, URLs, environment defaults, source files, logs or shell history; a noninteractive stdin is explicitly refused. No default regtest RPC port is guessed. For a confirmed block, add **only** `--block-height <HEIGHT>`: the client now fetches the parent hash via authenticated regtest-only RPC `getblockhash(height-1)` and rechecks both parent and block hashes after the read, detecting observed non-tip ancestor changes. The optional `--previous-block-hash <64-char-lowercase-hash>` is a supplemental user expectation only, never a trust anchor; an orphan previous-hash flag is rejected. The default performs a read-only mempool metadata request.
 
 Every request is preceded and followed by fresh chain/profile checks; inconsistent genesis, chain, pruning, tip, height, HTTP response, authentication or payload shape fails closed. The output is a **scalar-only, nonauthorizing** JSON report, with no raw transactions, mempool IDs, wallet addresses, keys, Core process handles or RPC password.
 
