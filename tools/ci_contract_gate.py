@@ -26,7 +26,7 @@ MINIMUM_CASES = {
     "test_reuse_manifest.py": 6,
     "test_app_diagnostic_boundary.py": 5,
     "test_security_gate_ledger.py": 6,
-    "test_regtest_artifact_preflight.py": 7,
+    "test_regtest_artifact_preflight.py": 10,
     "test_two_node_topology.py": 12,
     "test_two_node_policy.py": 19,
     "test_two_node_schema.py": 18,
