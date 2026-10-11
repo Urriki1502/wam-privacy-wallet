@@ -100,7 +100,8 @@ class GuiGateSyntheticTests(unittest.TestCase):
 
     def test_full_discovery_count_floor_denies_loss(self):
         self._gui()
-        self.assertEqual(self._run(10), 1)
+        # A drop below the current pinned GUI identity count must fail.
+        self.assertEqual(self._run(len(_NAMES) + 1), 1)
 
     def test_extra_full_suite_counts(self):
         self._gui()
