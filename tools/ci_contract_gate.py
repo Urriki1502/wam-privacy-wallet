@@ -21,7 +21,7 @@ MINIMUM_CASES = {
     "test_node_contract.py": 7,
     "test_read_rpc.py": 11,
     "test_real_regtest_harness.py": 13,
-    "test_regtest_cookie_descriptor.py": 13,
+    "test_regtest_cookie_descriptor.py": 14,
     "test_regtest_attestation.py": 10,
     "test_regtest_gateway.py": 10,
     "test_reuse_manifest.py": 6,
