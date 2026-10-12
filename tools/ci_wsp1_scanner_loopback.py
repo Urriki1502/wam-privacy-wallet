@@ -11,6 +11,7 @@ import argparse
 import importlib.util
 import json
 import os
+import sqlite3
 from pathlib import Path
 import sys
 import tempfile
@@ -31,6 +32,9 @@ from wam_privacy_wallet.application.scan_preview_workflow import (
 from wam_privacy_wallet.application.encrypted_scan_backup import (
     EncryptedScanBackupError, provision_encrypted_scan_backup,
     load_encrypted_scan_backup,
+)
+from wam_privacy_wallet.application.retained_scan_session import (
+    RetainedScanError, run_retained_scan_only,
 )
 from wam_privacy_wallet.integrations.wsp1_scanner_only_rpc import (
     Wsp1ScannerOnlyRpc, WspScannerRpcError,
@@ -526,6 +530,24 @@ def _run(source_root: Path) -> None:
                     raise RuntimeError("WSP1_ACCOUNT_MISMATCH_CHANGED_VALID_SESSION")
                 print("WSP1_ACTUAL_SCANNER_FOREIGN_ACCOUNT_DB_DENIED_PASS")
 
+                # First process-equivalent retained scan at height 1 before
+                # switching the synthetic peer to height 2. The server's
+                # synthetic getblock RPC intentionally serves only its tip.
+                # This test must preserve that historical block in real
+                # upstream SQLite before the new payment arrives.
+                retained_dir = path / "retained-scan-regtest"
+                retained_dir.mkdir(mode=0o700)
+                provision_encrypted_scan_backup(retained_dir, envelope)
+                initial_retained = run_retained_scan_only(
+                    retained_dir, test_password,
+                    import_scan=import_scan, scanner_factory=Scanner,
+                    rpc=Wsp1ScannerOnlyRpc(endpoint, auth),
+                    user_consented=True, max_blocks=1,
+                )
+                if initial_retained.blocks_processed != 1:
+                    raise RuntimeError("WSP1_RETAINED_GENESIS_BOOTSTRAP_DENIED")
+                print("WSP1_RETAINED_HEIGHT1_SQLITE_BOOTSTRAP_PASS")
+
                 # Real pinned BIP352 derivation: a synthetic sender pays the
                 # synthetic scan account on fake regtest height 2. The actual
                 # upstream scanner must discover the matching P2TR output,
@@ -562,6 +584,72 @@ def _run(source_root: Path) -> None:
                     raise RuntimeError("WSP1_BIP352_RECEIVE_QT_DISPLAY_DENIED")
                 print("WSP1_REAL_BIP352_RECEIVE_TO_GUI_PASS")
 
+                # Real encrypted backup -> real SQLite DB on disk -> reopen
+                # from a new Scanner/process-equivalent lifecycle. The WSP
+                # store owns schema/identity/version/locks, not our app.
+                print("WSP1_RETAINED_PRIVATE_BACKUP_STAGED")
+                try:
+                    first_retained = run_retained_scan_only(
+                    retained_dir, test_password,
+                    import_scan=import_scan, scanner_factory=Scanner,
+                    rpc=Wsp1ScannerOnlyRpc(endpoint, auth),
+                    user_consented=True, max_blocks=2,
+                    )
+                except RetainedScanError as diag:
+                    print("WSP1_RETAINED_FIRST_" + str(diag),
+                          file=sys.stderr)
+                    raise
+                print("WSP1_RETAINED_FIRST_SCANNER_CLOSED")
+                db_path = retained_dir / "scan-only-state.sqlite"
+                if (first_retained.blocks_processed != 1
+                        or not db_path.is_file()):
+                    raise RuntimeError("WSP1_RETAINED_DB_FIRST_SCAN_DENIED")
+                with sqlite3.connect(
+                    f"file:{db_path}?mode=ro", uri=True,
+                ) as read_only_db:
+                    if read_only_db.execute(
+                        "SELECT COUNT(*) FROM coins"
+                    ).fetchone()[0] != 1:
+                        raise RuntimeError("WSP1_RETAINED_BIP352_COIN_MISSING")
+
+                # New WSP Scanner instance must restore the same DB identity
+                # and must NOT replay the confirmed P2TR receive twice.
+                repeated = run_retained_scan_only(
+                    retained_dir, test_password,
+                    import_scan=import_scan, scanner_factory=Scanner,
+                    rpc=Wsp1ScannerOnlyRpc(endpoint, auth),
+                    user_consented=True, max_blocks=2,
+                )
+                if repeated.blocks_processed != 0:
+                    raise RuntimeError("WSP1_RETAINED_RESTART_REPLAY_DENIED")
+                with sqlite3.connect(
+                    f"file:{db_path}?mode=ro", uri=True,
+                ) as read_only_db:
+                    if read_only_db.execute(
+                        "SELECT COUNT(*) FROM coins"
+                    ).fetchone()[0] != 1:
+                        raise RuntimeError("WSP1_RETAINED_REPLAY_DUPLICATED")
+                print("WSP1_REAL_PERSISTENT_SQLITE_RESTART_IDEMPOTENT_PASS")
+
+                foreign_scan_only = ScanAccount(2, 3, pub(5), birthday=1)
+                no_wire_before = len(server.observed_methods)
+                try:
+                    run_retained_scan_only(
+                        retained_dir, test_password,
+                        import_scan=lambda _e, _p: (foreign_scan_only,),
+                        scanner_factory=Scanner,
+                        rpc=Wsp1ScannerOnlyRpc(endpoint, auth),
+                        user_consented=True, max_blocks=2,
+                    )
+                except RetainedScanError as exc:
+                    if str(exc) != "APP_RETAINED_RUNTIME_DENIED":
+                        raise
+                else:
+                    raise RuntimeError("WSP1_FOREIGN_SQLITE_IDENTITY_ACCEPTED")
+                if len(server.observed_methods) != no_wire_before:
+                    raise RuntimeError("WSP1_FOREIGN_IDENTITY_CALLED_RPC")
+                print("WSP1_REAL_PERSISTENT_SQLITE_FOREIGN_IDENTITY_DENIED_PASS")
+
                 again = run_consented_wsp_scan(
                     scanner, Wsp1ScannerOnlyRpc(endpoint, auth),
                     user_consented=True, max_blocks=1,
@@ -597,6 +685,23 @@ def _run(source_root: Path) -> None:
                         or payment_window.findChildren(QPushButton)):
                     raise RuntimeError("WSP1_REAL_REORG_QT_UI_CLAIM_DENIED")
                 print("WSP1_REAL_BIP352_REORG_TO_GUI_PASS")
+                resumed_reorg = run_retained_scan_only(
+                    retained_dir, test_password,
+                    import_scan=import_scan, scanner_factory=Scanner,
+                    rpc=Wsp1ScannerOnlyRpc(endpoint, auth),
+                    user_consented=True, max_blocks=2,
+                )
+                if (resumed_reorg.rollback_blocks != 1
+                        or resumed_reorg.blocks_processed != 1):
+                    raise RuntimeError("WSP1_RETAINED_REORG_NOT_DETECTED")
+                with sqlite3.connect(
+                    f"file:{db_path}?mode=ro", uri=True,
+                ) as read_only_db:
+                    if read_only_db.execute(
+                        "SELECT COUNT(*) FROM coins"
+                    ).fetchone()[0] != 0:
+                        raise RuntimeError("WSP1_RETAINED_REORG_COIN_STALE")
+                print("WSP1_REAL_PERSISTENT_SQLITE_REORG_UNDO_PASS")
                 payment_window.close()
                 payment_window.deleteLater()
                 QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)

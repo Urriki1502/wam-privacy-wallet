@@ -10,6 +10,8 @@ on:
       - 'src/wam_privacy_wallet/application/wsp_scan_coordinator.py'
       - 'src/wam_privacy_wallet/application/scan_only_account_session.py'
       - 'src/wam_privacy_wallet/application/encrypted_scan_backup.py'
+      - 'src/wam_privacy_wallet/application/retained_scan_session.py'
+      - 'tests/test_retained_scan_session.py'
       - 'tests/test_encrypted_scan_backup.py'
       - 'src/wam_privacy_wallet/application/scan_preview_workflow.py'
       - 'src/wam_privacy_wallet/gui/main_window.py'
