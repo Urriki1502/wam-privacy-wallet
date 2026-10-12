@@ -8,6 +8,10 @@ on:
       - '.github/workflows/wsp1-real-scanner-synthetic-regtest.yml'
       - 'tools/ci_wsp1_scanner_loopback.py'
       - 'src/wam_privacy_wallet/application/wsp_scan_coordinator.py'
+      - 'src/wam_privacy_wallet/application/scan_only_account_session.py'
+      - 'src/wam_privacy_wallet/application/scan_preview_workflow.py'
+      - 'src/wam_privacy_wallet/gui/main_window.py'
+      - 'tests/test_scan_preview_workflow.py'
       - 'tests/test_app_wsp_scan_coordinator.py'
       - 'tools/wsp1_pinned_surface.py'
       - 'tools/wsp1_full_source_closure.py'
@@ -58,6 +62,7 @@ jobs:
       - name: Install only pinned experimental WSP-1 scanner runtime dependencies
         run: |
           python -m pip install --disable-pip-version-check -e ./wsp-source
+          python -m pip install --disable-pip-version-check -e '.[gui]'
           python -m pip check
 
       - name: Compile/test actual WSP-1 Scanner.sync against disposable loopback peer
@@ -65,7 +70,8 @@ jobs:
         env:
           PYTHONPATH: src
           PYTHONUNBUFFERED: '1'
+          QT_QPA_PLATFORM: offscreen
         run: |
           set -euo pipefail
-          python -m py_compile tools/ci_wsp1_scanner_loopback.py
+          python -m py_compile tools/ci_wsp1_scanner_loopback.py src/wam_privacy_wallet/application/scan_preview_workflow.py
           python -m tools.ci_wsp1_scanner_loopback --source-root "$GITHUB_WORKSPACE/wsp-source"
