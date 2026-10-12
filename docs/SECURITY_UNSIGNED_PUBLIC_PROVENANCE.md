@@ -40,3 +40,10 @@ No Core process, real keys/funds, signer, broadcast or mainnet. CORE-003 remains
 excluded. Wallet #9/#82/#86/#153, trusted anti-rollback #148/#151, WSP upstream
 review and privacy external review are unchanged. An unsigned digest cannot
 satisfy any of these holds or authorize a release.
+
+## Repository CodeQL language gates
+
+GitHub default setup now includes actions, Python and Rust. Final qualification
+must inspect every observed CodeQL language result on the exact PR head, including
+Rust when present, rather than inferring success from an earlier Python-only
+configuration. This is static analysis, not external review or runtime approval.
