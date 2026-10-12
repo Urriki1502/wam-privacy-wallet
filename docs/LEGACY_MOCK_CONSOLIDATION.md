@@ -49,3 +49,9 @@
 - **Failure gate:** wrong passphrase must deny before any RPC call and erase stale GUI scan receipt. GUI receives immutable scalar counters only. No API grants spend, signer, broadcast or mainnet authority.
 - **KEEP:** negative security test doubles in `tests/test_scan_preview_workflow.py` because they validate cancellation, consent, cleanup and render exceptions. Native WSP-1 + Qt CI separately proves the real integrated path; no fallback to fake success.
 - **Still missing:** operational WSP source loader, durable encrypted custody, event-loop worker/cancellation semantics, genuine DEV-approved WAM Core two-node regtest, independent production qualification. Qt is invoked synchronously here for a bounded CI-only test; do not enable a user scan button based on this PR.
+
+## Checkpoint: native BIP352 receive/replay/reorg → Qt (PR #140 candidate)
+
+- Extend the prior source-verified **actual pinned WSP-1 Scanner.sync + SQLite** CI fixture beyond genesis/coinbase: application scanner actually detects a synthetic BIP352 P2TR payment using real secp256k1 derivation, supplies its redacted scalar summary to offscreen Qt, scans the same height without duplicates, then processes a chain reorg and presents the rollback count to the same Qt window.
+- Reuse real upstream database and scanner; do **not** replace existing raw WSP metrics validation, source-authentication gate, reorg negative cases, GUI authority guards or full platform tests with mocks.
+- This still does not establish a genuine WAM Core network, a wallet balance, transaction acceptance, spend-key management, production receive addresses or native Win32 full-wallet packaging.
