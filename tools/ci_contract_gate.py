@@ -24,6 +24,7 @@ MINIMUM_CASES = {
     "test_regtest_cookie_descriptor.py": 14,
     "test_two_node_private_workspace.py": 13,
     "test_two_node_live_transition.py": 15,
+    "test_two_node_bounded_ancestry.py": 15,
     "test_regtest_attestation.py": 10,
     "test_regtest_gateway.py": 10,
     "test_reuse_manifest.py": 6,
