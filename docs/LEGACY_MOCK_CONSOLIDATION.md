@@ -62,3 +62,10 @@
 - **Native WSP CI:** store → reload ciphertext → real upstream `import_scan` → real Scanner/SQLite synthetic scan with a *new instance*. Tampering the ciphertext is rejected by upstream authenticated decryption before any RPC.
 - This **is not** a persistent scanner database, production vault, secure hardware keystore or proof against same-UID malware/directory rollback. Zeroization, portable Windows/macOS implementation, versioned backups and lifecycle worker remain out of scope.
 - Keep negative synthetic filesystem tests. Never store `ScanAccount` plaintext, passphrase, seed or spender secrets in the new store.
+
+## Checkpoint: retained native WSP-1 SQLite scanner (PR #142)
+
+- **Real integration:** re-import source-pinned scan-only backup ciphertext from the Linux create-only vault (#141) and instantiate upstream **real** WSP-1 Scanner/SQLite in one private data directory. Scanner itself controls database identity/schema, FULL synchronous transactions, its native nonblocking file lock, incremental scan progress and reorg undo. No duplicate synthetic scanner engine is added.
+- **Native proof:** real scanner discovers BIP352 payment at height 2 and persists one SQLite coin; new scanner instance reopens the *same DB*, reattests local synthetic RPC and performs zero duplicate work; a foreign scan-only identity is refused before RPC; fork to a payment-free block rolls back that coin in durable SQLite.
+- **Critical security limitation:** the upstream SQLite database contains **unencrypted privacy-sensitive public/transaction graph metadata**. A pre-open path check reduces obvious symlink/hardlink abuse but is **not** an FD-bound anti-TOCTOU guarantee; same-UID attackers, filesystem rollback and OS-level compromise are NOT solved. Never activate in a real operator GUI or use real wallet keys/funds.
+- **KEEP** legacy negative fixtures for malformed account, failure to close, cancellation, wrong identity and file attacks; actual pinned WSP implementation is separately verified by native CI. Core execution, signer and network broadcast remain off.
