@@ -53,6 +53,9 @@ GUI_TEST_IDS = frozenset({
 })
 # Security-critical original non-GUI identities; additive to original suite floors.
 CRITICAL_NON_GUI_IDS = frozenset({
+    "test_core_help_example_parity.CoreHelpExampleParityTests.test_same_options_no_release_authority",
+    "test_core_help_example_parity.CoreHelpExampleParityTests.test_added_help_option_without_sample_is_denied",
+    "test_core_help_example_parity.CoreHelpExampleParityTests.test_active_network_header_denied",
     "test_core_next_release_audit.NextCoreReleaseCandidateTests.test_each_broken_binary_is_rejected_independently",
     "test_core_next_release_audit.NextCoreReleaseCandidateTests.test_missing_gnu_stack_note_rejected",
     "test_core_next_release_audit.NextCoreReleaseCandidateTests.test_active_rpc_binding_configuration_is_denied",

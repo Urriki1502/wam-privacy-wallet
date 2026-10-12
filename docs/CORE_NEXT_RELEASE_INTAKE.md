@@ -53,3 +53,29 @@ and planned an automatically generated `share/examples/wam.conf` matching
 
 Issues #86, #82 and #9 remain OPEN until separately satisfied by actual
 DEV-signed replacement builds and qualified real-regtest evidence.
+
+## Staged DEV help/example option-parity proof (issue #153, PR #154)
+
+Until the DEV release environment publishes authenticated exact-image --help
+capture and a new signed artifact, the wallet can only compare **untrusted
+text inventories** offline. The following does **NOT** execute WAM Core:
+
+```bash
+python -m tools.verify_core_help_example_parity \
+  --captured-help /absolute/path/from-DEV/daemon-help.txt \
+  --example-conf /absolute/path/from-DEV/wam.conf
+```
+
+The test-only preflight rejects a missing/extra/duplicate option, non-comment
+active config, literal credentials and unsafe example bind/network values. It
+does not assume a fixed number (e.g. 129). It returns only option-name digests
+and immutable no-authority flags including `help_parity_verified=false`.
+This is **not actual same-binary parity**, safe-defaults certification or signed
+provenance. The comparison's input bytes can be forged.
+
+The DEV release pipeline must prove source-linked binary identity, derive
+both values from the **same** verified build, authenticate and attest the
+capture, handle intentionally command-line-only flags, and independently
+document exact network-specific safe defaults before issue #153 can close.
+No Core binary execution, live regtest, launcher permission, wallet signing,
+broadcast or mainnet is authorized by this preflight.
