@@ -228,6 +228,67 @@ def _run(source_root: Path) -> None:
                     raise RuntimeError("WSP1_FORGED_PREVOUT_ROLLBACK_FAILED")
                 print("WSP1_ACTUAL_SCANNER_LOCAL_SYNTHETIC_PREVOUT_DENIED_PASS")
 
+                # Simulate a real application restart. A stored chain tip and
+                # previous mempool snapshot MUST NOT bootstrap fresh scan
+                # authority: WSP Scanner.ready always starts false.
+                db_path = path / "synthetic-scan-only.sqlite"
+                scanner.close()
+                scanner = Scanner(db_path, (account,))
+                if scanner.ready or scanner.mempool_ready:
+                    raise RuntimeError("WSP1_RESTART_STALE_AUTHORITY")
+                try:
+                    scanner.assert_current()
+                except ValueError as exc:
+                    if str(exc) != "SCAN_NOT_CURRENT":
+                        raise
+                else:
+                    raise RuntimeError("WSP1_RESTART_MISSING_REATTEST_GATE")
+                if (scanner.store.tip() != (1, FORK)
+                        or [tuple(row) for row in scanner.store.db.execute(
+                            "SELECT txid,vout,spending FROM mempool_spends"
+                        )] != rows):
+                    raise RuntimeError("WSP1_RESTART_SNAPSHOT_CHANGED")
+                print("WSP1_ACTUAL_SCANNER_PERSISTED_BUT_NOT_TRUSTED_PASS")
+
+                # Revalidation on a NEW RPC session must not replay block #1
+                # or duplicate the mempool's persisted spent outpoint.
+                server.flip_mempool_second = False
+                server.bad_prevout = False
+                server.mempool_reads = 0
+                fresh_session = Wsp1ScannerOnlyRpc(endpoint, auth)
+                replay = scanner.sync(fresh_session, max_blocks=1)
+                if (replay.blocks != 0 or replay.transactions != 0
+                        or scanner.store.tip() != (1, FORK)
+                        or scanner.ready is not True):
+                    raise RuntimeError("WSP1_RESTART_IDEMPOTENT_RESCAN_FAILED")
+                resumable_mempool = Wsp1ScannerOnlyRpc(
+                    endpoint, auth, include_mempool=True,
+                )
+                if (scanner.sync_mempool(resumable_mempool) != 1
+                        or [tuple(row) for row in scanner.store.db.execute(
+                            "SELECT txid,vout,spending FROM mempool_spends"
+                        )] != rows or scanner.mempool_ready is not True):
+                    raise RuntimeError("WSP1_RESTART_MEMPOOL_REPLAY_FAILED")
+                print("WSP1_ACTUAL_SCANNER_RESTART_REATTEST_IDEMPOTENT_PASS")
+
+                # A different account cannot reuse the original scan-state
+                # database, even if its chain tip is identical.
+                from wam_sp.errors import StorageError
+                different = ScanAccount(0, 2, pub(3), birthday=1)
+                try:
+                    forbidden_store = Scanner(db_path, (different,))
+                except StorageError as exc:
+                    if str(exc) != "STATE_WALLET_MISMATCH_RESCAN_REQUIRED":
+                        raise
+                else:
+                    forbidden_store.close()
+                    raise RuntimeError("WSP1_FOREIGN_ACCOUNT_DATABASE_ACCEPTED")
+                if (scanner.store.tip() != (1, FORK)
+                        or not scanner.ready
+                        or not scanner.mempool_ready):
+                    raise RuntimeError("WSP1_ACCOUNT_MISMATCH_CHANGED_VALID_SESSION")
+                print("WSP1_ACTUAL_SCANNER_FOREIGN_ACCOUNT_DB_DENIED_PASS")
+
                 before = len(server.observed_methods)
                 for forbidden in ("sendrawtransaction", "getwalletinfo", "stop"):
                     try:
