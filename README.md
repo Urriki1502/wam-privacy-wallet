@@ -20,7 +20,12 @@ A proposed cross-platform, privacy-focused WAM desktop wallet. Its intended arch
 | Phase 008 — WAM Core profile gate | Merged; fail-closed read-only profile checks |
 | Phase 009 — WAM Core source pin | Merged; source identity/drift evidence, not consensus approval |
 | Application scanning (#134–#139) | **Merged**; actual pinned WSP-1 Scanner.sync and SQLite, encrypted scan-only import and Qt scalar receipt exercised against a synthetic localhost regtest-shaped RPC peer in native Linux CI; no WAM Core execution or usable wallet |
-| BIP352 receive/replay/reorg → Qt (#140) | **Draft / review-gated**; native WSP-1 scanner and persistent test SQLite verify matched test P2TR output, no duplicate replay and rollback, with nonauthorizing GUI metrics; no confirmed real-node E2E |
+| BIP352 receive/replay/reorg → Qt (#140) | **Merged**; pinned native WSP scanner and test SQLite detect P2TR payment, reject replay and undo reorg with nonauthorizing Qt metrics |
+| Linux encrypted scan-only backup (#141) | **Merged**; private create-once WSP AES-GCM scan-only ciphertext saved/reloaded across test lifecycles; no production account vault |
+| Retained WSP-1 SQLite scanner (#142) | **Merged**; real upstream SQLite schema/account identity, scanner lock, restart and reorg verified against synthetic local RPC. SQLite metadata is **not encrypted** |
+| Genuine encrypted SQLite checkpoint restore (#143) | **Merged**; upstream WSP AES-GCM Store export/restore verified including authentication, foreign-account denial and post-fork undo |
+| Persistent encrypted checkpoint archive (#144) | **Merged**; Linux create-once private ciphertext-on-disk file with no-clobber publication, upstream restore authenticated in native CI; **no anti-rollback/version rotation** |
+| App encrypted checkpoint recovery → Qt (#145) | **Draft**; source-verified WSP restore from two private encrypted files to transient scanner+read-only Qt preview; no operational restore button or Core E2E |
 
 The WSP scanner-to-Qt testing above uses real upstream library code but **synthetic blockchain/RPC inputs**. It does not support creating or storing a real user wallet, operational scan buttons, real receive addresses, balances, signing, broadcast or mainnet. An authenticated WAM Core runner, durable scan-key custody and native release qualification remain blocked/review-gated. Original frozen WSP source review [#3](https://github.com/Urriki1502/wam-privacy-wallet/pull/3) is still not approved for production.
 
