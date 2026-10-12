@@ -69,3 +69,10 @@
 - **Native proof:** real scanner discovers BIP352 payment at height 2 and persists one SQLite coin; new scanner instance reopens the *same DB*, reattests local synthetic RPC and performs zero duplicate work; a foreign scan-only identity is refused before RPC; fork to a payment-free block rolls back that coin in durable SQLite.
 - **Critical security limitation:** the upstream SQLite database contains **unencrypted privacy-sensitive public/transaction graph metadata**. A pre-open path check reduces obvious symlink/hardlink abuse but is **not** an FD-bound anti-TOCTOU guarantee; same-UID attackers, filesystem rollback and OS-level compromise are NOT solved. Never activate in a real operator GUI or use real wallet keys/funds.
 - **KEEP** legacy negative fixtures for malformed account, failure to close, cancellation, wrong identity and file attacks; actual pinned WSP implementation is separately verified by native CI. Core execution, signer and network broadcast remain off.
+
+## Checkpoint: genuine WSP-1 encrypted SQLite checkpoint recovery (PR #143 candidate)
+
+- No additional crypto implementation: native source-pinned WSP-1 Store.export_checkpoint / restore_checkpoint handles authenticated network/account-bound AES-GCM backup and schema/identity checks directly.
+- Actual SQLite stores one BIP352 synthetic receive, then an encrypted checkpoint is restored into a different WSP Scanner instance; scanner reattests the same local synthetic RPC and does not re-apply confirmed receive. Flipped authentication tag and foreign account are refused before RPC, without partially restoring SQLite.
+- Recovering the pre-fork encrypted checkpoint after a synthetic chain reorg must roll back one block and erase the coin using the same actual WSP Store/Scanner, not a fabricated backend.
+- This is ONLY native test qualification. Checkpoint bytes remain ephemeral; no user-facing backup export, disk-save/delete/rotation feature, provenance signing or real WAM Core runtime is authorized. Upstream SQLite remains unencrypted at rest. No real user wallet keys/funds, signing, broadcast or mainnet.
