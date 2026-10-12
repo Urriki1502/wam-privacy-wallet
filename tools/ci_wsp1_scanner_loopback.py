@@ -28,6 +28,10 @@ from wam_privacy_wallet.application.scan_only_account_session import (
 from wam_privacy_wallet.application.scan_preview_workflow import (
     ScanPreviewError, run_disposable_scan_preview,
 )
+from wam_privacy_wallet.application.encrypted_scan_backup import (
+    EncryptedScanBackupError, provision_encrypted_scan_backup,
+    load_encrypted_scan_backup,
+)
 from wam_privacy_wallet.integrations.wsp1_scanner_only_rpc import (
     Wsp1ScannerOnlyRpc, WspScannerRpcError,
 )
@@ -267,6 +271,48 @@ def _run(source_root: Path) -> None:
                         or intake.mainnet_allowed is not False):
                     raise RuntimeError("WSP1_REAL_SCAN_ONLY_INTAKE_FAILED")
                 print("WSP1_REAL_ENCRYPTED_SCAN_ONLY_DISPOSABLE_INTAKE_PASS")
+
+                # Persistent ciphertext (NOT SQLite/account plaintext) must
+                # survive a simulated process restart. Real pinned WSP-1
+                # export/import performs AES-GCM authentication after reload.
+                private_backup = path / "scan-only-encrypted-vault"
+                private_backup.mkdir(mode=0o700)
+                provision_encrypted_scan_backup(private_backup, envelope)
+                saved = load_encrypted_scan_backup(private_backup)
+                if saved != envelope:
+                    raise RuntimeError("WSP1_BACKUP_VAULT_ROUNDTRIP_DENIED")
+                # Simulate restart by reloading only opaque ciphertext and
+                # creating a distinct real scanner/SQLite in a new temp dir.
+                recovered = run_disposable_scan_only_backup(
+                    saved, test_password,
+                    import_scan=import_scan, scanner_factory=Scanner,
+                    rpc=Wsp1ScannerOnlyRpc(endpoint, auth),
+                    user_consented=True, max_blocks=1,
+                )
+                if (recovered.blocks_processed != 1
+                        or recovered.wallet_operational is not False
+                        or recovered.signer_enabled is not False):
+                    raise RuntimeError("WSP1_BACKUP_RESTART_SCAN_DENIED")
+                before_tamper = len(server.observed_methods)
+                backup_file = private_backup / "scan-only.wsp.enc"
+                corrupted = bytearray(backup_file.read_bytes())
+                corrupted[-1] ^= 0x01
+                backup_file.write_bytes(corrupted)
+                try:
+                    run_disposable_scan_only_backup(
+                        load_encrypted_scan_backup(private_backup), test_password,
+                        import_scan=import_scan, scanner_factory=Scanner,
+                        rpc=Wsp1ScannerOnlyRpc(endpoint, auth),
+                        user_consented=True, max_blocks=1,
+                    )
+                except ScanOnlySessionError:
+                    pass
+                else:
+                    raise RuntimeError("WSP1_BACKUP_TAMPER_ACCEPTED")
+                if len(server.observed_methods) != before_tamper:
+                    raise RuntimeError("WSP1_TAMPER_SENT_RPC")
+                print("WSP1_ENCRYPTED_SCAN_BACKUP_RESTART_AESGCM_PASS")
+                print("WSP1_ENCRYPTED_SCAN_BACKUP_TAMPER_NO_RPC_PASS")
 
                 # Actual pinned encrypted account import + WSP-1 Scanner.sync
                 # + native SQLite + offscreen Qt MainWindow. No GUI scan keys.

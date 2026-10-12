@@ -55,3 +55,10 @@
 - Extend the prior source-verified **actual pinned WSP-1 Scanner.sync + SQLite** CI fixture beyond genesis/coinbase: application scanner actually detects a synthetic BIP352 P2TR payment using real secp256k1 derivation, supplies its redacted scalar summary to offscreen Qt, scans the same height without duplicates, then processes a chain reorg and presents the rollback count to the same Qt window.
 - Reuse real upstream database and scanner; do **not** replace existing raw WSP metrics validation, source-authentication gate, reorg negative cases, GUI authority guards or full platform tests with mocks.
 - This still does not establish a genuine WAM Core network, a wallet balance, transaction acceptance, spend-key management, production receive addresses or native Win32 full-wallet packaging.
+
+## Checkpoint: persistent encrypted WSP scan-only backup (PR #141 candidate)
+
+- **Actual crypto, not a mock:** upstream pinned WSP `export_scan` creates AES-GCM encrypted scan-only ciphertext; a new Linux-only create-once private file store uses `openat` / nofollow, fsync, atomic hard-link publication with no overwrite, rejects bad modes, symlinks, hardlinks, oversize and partial writes.
+- **Native WSP CI:** store → reload ciphertext → real upstream `import_scan` → real Scanner/SQLite synthetic scan with a *new instance*. Tampering the ciphertext is rejected by upstream authenticated decryption before any RPC.
+- This **is not** a persistent scanner database, production vault, secure hardware keystore or proof against same-UID malware/directory rollback. Zeroization, portable Windows/macOS implementation, versioned backups and lifecycle worker remain out of scope.
+- Keep negative synthetic filesystem tests. Never store `ScanAccount` plaintext, passphrase, seed or spender secrets in the new store.

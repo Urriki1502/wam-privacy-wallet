@@ -80,6 +80,7 @@ MINIMUM_CASES = {
     "test_app_wsp_scan_coordinator.py": 15,
     "test_scan_only_account_session.py": 14,
     "test_scan_preview_workflow.py": 15,
+    "test_encrypted_scan_backup.py": 18,
 }
 MANDATORY_SUITES = tuple(MINIMUM_CASES)
 
