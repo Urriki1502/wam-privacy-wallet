@@ -33,7 +33,7 @@ jobs:
           - {os: ubuntu-latest, arch: x64, bits: 64}
     steps:
       - name: Checkout source without persisted credentials
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -70,7 +70,7 @@ jobs:
         run: git config --global core.autocrlf false
 
       - name: Checkout exact pinned privacy research source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: Urriki1502/wam-privacy
           ref: db3d2dcaa540f1129d540101813b761167d33174
@@ -108,7 +108,7 @@ jobs:
       PYTHONUNBUFFERED: '1'
     steps:
       - name: Checkout source without persisted credentials
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -145,7 +145,7 @@ jobs:
     timeout-minutes: 8
     steps:
       - name: Checkout source without persisted credentials
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 

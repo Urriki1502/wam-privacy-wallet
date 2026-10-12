@@ -44,12 +44,12 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout WAM Privacy Wallet (no credentials)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
       - name: Checkout independently pinned WSP-1 source (read-only)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: Urriki1502/wam-silent-payments
           ref: ac55f13423620252bdbf848c7e8a280c3b84721e
