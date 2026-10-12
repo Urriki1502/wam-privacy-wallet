@@ -109,3 +109,7 @@
 - Verify a caller-named generation (never an auto-selected latest) across the complete bounded synthetic-regtest predecessor chain, from generation 1 through N. Missing/half-written generation, tampered old manifest, wrong predecessor or cross-account scope fails closed with fixed redacted codes.
 - Native WSP integration writes two generations containing **actual upstream AES-GCM checkpoint ciphertext** and checks predecessor linkage. A forged local hash, callback or mock proof cannot approve operational anti-rollback: `evaluate_trusted_rollback_status` always denies until a separately qualified independent external high-water trust anchor exists.
 - **All local files can be rolled back together.** No external trusted anchor, hardware monotonicity, fully recoverable on-disk rotation, safe deletion or production restore exists. These are test and architecture evidence only.
+
+### Main-target review trigger for #150
+
+The synthetic lineage verifier is not an anti-rollback verifier. In particular, a local callback, hash-chain digest or `ready.sha256` marker must never stand in for a platform-qualified external monotonic high-water mark. Review and qualify the anchor protocol in issue #151 independently; this PR cannot enable real-wallet recovery. PR #150 requires fresh exact-HEAD CodeQL and all platform CI after retargeting from the stacked branch to `main`.
