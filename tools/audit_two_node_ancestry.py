@@ -51,6 +51,22 @@ def main(argv: list[str] | None = None) -> int:
             b, ExplicitRpcAuth(arguments.node_b_rpc_user, password_b),
         )
         result = audit.audit(window_size=arguments.window_size)
+        # Fail closed if a future library change accidentally introduces
+        # or asserts operational authority in a review-only CLI response.
+        forbidden = (
+            "genuine_core_processes_verified",
+            "block_parent_links_verified",
+            "real_two_node_regtest_qualified",
+            "scanner_enabled",
+            "wallet_ready",
+            "signing_allowed",
+            "broadcast_allowed",
+            "mainnet_allowed",
+        )
+        if (type(result) is not dict
+                or result.get("status") != "UNTRUSTED_TWO_NODE_BOUNDED_ANCESTRY_ONLY"
+                or any(result.get(field) is not False for field in forbidden)):
+            raise TwoNodeAncestryError("REGTEST_ANCESTRY_AUTHORITY_DENIED")
     except TwoNodeAncestryError as exc:
         print(str(exc), file=sys.stderr)
         return 2
