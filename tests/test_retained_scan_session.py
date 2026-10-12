@@ -66,7 +66,7 @@ class RetainedScanUnitTests(unittest.TestCase):
         self.events.append("factory")
         return TestScanner(path, accounts, self.events)
 
-    def run(self, **changes):
+    def invoke(self, **changes):
         kwargs = dict(
             import_scan=self.importer, scanner_factory=self.builder,
             rpc=self.rpc, user_consented=True,
@@ -76,7 +76,7 @@ class RetainedScanUnitTests(unittest.TestCase):
         return app.run_retained_scan_only(self.folder, password, **kwargs)
 
     def test_valid_session_uses_pinned_state_path_and_scalar_only(self):
-        result = self.run()
+        result = self.invoke()
         self.assertEqual(self.events, ["load", "import", "factory",
                                        "constructed", "sync", "close"])
         self.assertEqual(result.blocks_processed, 1)
@@ -86,18 +86,18 @@ class RetainedScanUnitTests(unittest.TestCase):
     def test_no_consent_denied_before_disk(self):
         with self.assertRaisesRegex(app.RetainedScanError,
                                     "^APP_RETAINED_INPUT_DENIED$"):
-            self.run(user_consented=False)
+            self.invoke(user_consented=False)
         self.assertEqual(self.events, [])
 
     def test_forged_truthy_consent_denied(self):
         with self.assertRaises(app.RetainedScanError):
-            self.run(user_consented=1)
+            self.invoke(user_consented=1)
         self.assertEqual(self.events, [])
 
     def test_pre_cancel_denied_before_backup_load(self):
         with self.assertRaisesRegex(app.RetainedScanError,
                                     "^APP_RETAINED_CANCELLED$"):
-            self.run(cancelled=lambda: True)
+            self.invoke(cancelled=lambda: True)
         self.assertEqual(self.events, [])
 
     def test_cancel_callback_exception_redacted(self):
@@ -105,32 +105,32 @@ class RetainedScanUnitTests(unittest.TestCase):
             raise ValueError("secret password")
         with self.assertRaisesRegex(app.RetainedScanError,
                                     "^APP_RETAINED_CANCELLED$"):
-            self.run(cancelled=broken)
+            self.invoke(cancelled=broken)
         self.assertEqual(self.events, [])
 
     def test_password_type_or_size_rejected(self):
         for password in (None, "", b"", b"a"*11, b"a"*1025):
             with self.subTest(password=type(password).__name__):
                 with self.assertRaises(app.RetainedScanError):
-                    self.run(password=password)
+                    self.invoke(password=password)
         self.assertEqual(self.events, [])
 
     def test_oversized_or_bool_scan_batch_denied(self):
         for blocks in (True, 0, 17, -1, 1.5):
             with self.subTest(blocks=blocks), self.assertRaises(app.RetainedScanError):
-                self.run(max_blocks=blocks)
+                self.invoke(max_blocks=blocks)
         self.assertEqual(self.events, [])
 
     def test_imposter_rpc_denied_before_disk(self):
         with self.assertRaises(app.RetainedScanError):
-            self.run(rpc=object())
+            self.invoke(rpc=object())
         self.assertEqual(self.events, [])
 
     def test_missing_factories_denied(self):
         for kw in ({"import_scan": None}, {"scanner_factory": None},
                    {"cancelled": "yes"}):
             with self.subTest(kwargs=str(kw)), self.assertRaises(app.RetainedScanError):
-                self.run(**kw)
+                self.invoke(**kw)
         self.assertEqual(self.events, [])
 
     def test_loader_failure_does_not_import_or_start_scanner(self):
@@ -138,7 +138,7 @@ class RetainedScanUnitTests(unittest.TestCase):
                           side_effect=OSError("secret backup path")):
             with self.assertRaisesRegex(app.RetainedScanError,
                                         "^APP_RETAINED_RUNTIME_DENIED$"):
-                self.run()
+                self.invoke()
         self.assertEqual(self.events, [])
 
     def test_wrong_password_from_upstream_never_constructs_scanner(self):
@@ -146,13 +146,13 @@ class RetainedScanUnitTests(unittest.TestCase):
             raise ValueError("KEY MATERIAL")
         with self.assertRaisesRegex(app.RetainedScanError,
                                     "^APP_RETAINED_RUNTIME_DENIED$"):
-            self.run(import_scan=wrong)
+            self.invoke(import_scan=wrong)
         self.assertEqual(self.events, ["load"])
 
     def test_bad_account_tuple_is_denied(self):
         with self.assertRaisesRegex(app.RetainedScanError,
                                     "^APP_RETAINED_ACCOUNT_DENIED$"):
-            self.run(import_scan=lambda *_: [])
+            self.invoke(import_scan=lambda *_: [])
         self.assertEqual(self.events, ["load"])
 
     def test_upstream_database_mismatch_is_redacted(self):
@@ -160,7 +160,7 @@ class RetainedScanUnitTests(unittest.TestCase):
             raise ValueError("STATE_WALLET_MISMATCH_RESCAN_REQUIRED PRIVATE ID")
         with self.assertRaisesRegex(app.RetainedScanError,
                                     "^APP_RETAINED_RUNTIME_DENIED$"):
-            self.run(scanner_factory=denied)
+            self.invoke(scanner_factory=denied)
         self.assertEqual(self.events, ["load", "import"])
 
     def test_upstream_scan_error_closes_before_refusal(self):
@@ -168,7 +168,7 @@ class RetainedScanUnitTests(unittest.TestCase):
             return TestScanner(path, accounts, self.events, broken=True)
         with self.assertRaisesRegex(app.RetainedScanError,
                                     "^APP_RETAINED_SCAN_DENIED$"):
-            self.run(scanner_factory=broken)
+            self.invoke(scanner_factory=broken)
         self.assertEqual(self.events[-2:], ["sync", "close"])
 
     def test_close_error_invalidates_success(self):
@@ -176,7 +176,7 @@ class RetainedScanUnitTests(unittest.TestCase):
             return TestScanner(path, accounts, self.events, close_broken=True)
         with self.assertRaisesRegex(app.RetainedScanError,
                                     "^APP_RETAINED_RUNTIME_DENIED$"):
-            self.run(scanner_factory=broken)
+            self.invoke(scanner_factory=broken)
         self.assertEqual(self.events[-2:], ["sync", "close"])
 
     def test_existing_database_symlink_cannot_be_opened(self):
@@ -188,12 +188,12 @@ class RetainedScanUnitTests(unittest.TestCase):
                               side_effect=app.RetainedScanError("APP_RETAINED_DB_DENIED")):
                 with self.assertRaisesRegex(app.RetainedScanError,
                                             "^APP_RETAINED_DB_DENIED$"):
-                    self.run()
+                    self.invoke()
             return
         db.symlink_to(self.folder / "missing")
         with self.assertRaisesRegex(app.RetainedScanError,
                                     "^APP_RETAINED_DB_DENIED$"):
-            self.run()
+            self.invoke()
         self.assertEqual(self.events, ["load", "import"])
 
     def test_existing_database_bad_modes_are_refused(self):
@@ -202,7 +202,7 @@ class RetainedScanUnitTests(unittest.TestCase):
         db.chmod(0o644)
         with self.assertRaisesRegex(app.RetainedScanError,
                                     "^APP_RETAINED_DB_DENIED$"):
-            self.run()
+            self.invoke()
         self.assertEqual(self.events, ["load", "import"])
 
     def test_no_default_crypto_wsp_or_wallet_signing_import(self):
