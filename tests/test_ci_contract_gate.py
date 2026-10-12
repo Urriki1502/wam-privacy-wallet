@@ -32,7 +32,7 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
         return patch.dict(MINIMUM_CASES, {self.pattern: 1})
 
     def test_manifest_preserves_original_eight_and_self_test(self):
-        self.assertEqual(len(MANDATORY_SUITES), 59)
+        self.assertEqual(len(MANDATORY_SUITES), 60)
         self.assertEqual(len(set(MANDATORY_SUITES)), len(MANDATORY_SUITES))
         self.assertIn("test_ci_contract_gate.py", MANDATORY_SUITES)
         self.assertIn("test_regtest_gateway.py", MANDATORY_SUITES)
@@ -182,7 +182,7 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
             "test_offline_rescan_segments.py": 23,
             "test_offline_reorg_reconciliation.py": 24,
             "test_offline_integration_status.py": 31,
-            "test_regtest_scanner_wire.py": 19,
+            "test_regtest_scanner_wire.py": 20,
             "test_core_artifact_staging.py": 20,
             "test_core_candidate_bridge.py": 14,
             "test_core_signed_release.py": 20,
@@ -199,6 +199,7 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
             "test_official_regtest_readiness.py": 5,
             "test_architecture_v1_traceability.py": 6,
             "test_wsp1_pinned_surface.py": 6,
+            "test_wsp1_scanner_only_rpc.py": 17,
         }
         self.assertEqual(MINIMUM_CASES, expected)
         self.assertEqual(MANDATORY_SUITES, tuple(expected))

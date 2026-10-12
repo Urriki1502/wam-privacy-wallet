@@ -45,6 +45,12 @@ GUI_TEST_IDS = frozenset({
 })
 # Security-critical original non-GUI identities; additive to original suite floors.
 CRITICAL_NON_GUI_IDS = frozenset({
+    "test_wsp1_scanner_only_rpc.WspScannerOnlyRpcTests.test_every_scan_call_requires_fresh_explicit_attest",
+    "test_wsp1_scanner_only_rpc.WspScannerOnlyRpcTests.test_disallow_all_write_methods_and_foreign_rpc_before_network",
+    "test_wsp1_scanner_only_rpc.WspScannerOnlyRpcTests.test_tip_changes_during_block_read_poison_session",
+    "test_wsp1_scanner_only_rpc.WspScannerOnlyRpcTests.test_http_auth_failure_redacts_node_response_and_revokes_session",
+    "test_wsp1_scanner_only_rpc.WspScannerOnlyRpcTests.test_opted_in_mempool_and_verbose_transaction_read_no_broadcast",
+    "test_regtest_scanner_wire.RegtestScannerReadBridgeTests.test_existing_diagnostic_wire_never_gains_transaction_lookup",
     "test_wsp1_pinned_surface.PinnedWspSourceTests.test_synthetic_source_detects_real_scanner_rpc_gap_without_enabling",
     "test_wsp1_pinned_surface.PinnedWspSourceTests.test_git_blob_byte_mutation_is_rejected_even_when_ast_still_valid",
     "test_wsp1_pinned_surface.PinnedWspSourceTests.test_ast_review_never_executes_external_signer_code",
@@ -198,7 +204,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 877
+FULL_MIN_CASES = 895
 
 
 def _cases(suite: unittest.TestSuite):

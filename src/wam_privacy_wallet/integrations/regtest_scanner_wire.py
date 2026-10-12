@@ -37,17 +37,22 @@ class RegtestScannerWireError(RuntimeError):
 class _ScannerOnlyWire:
     """Separate scanner RPC allowlist: no inherited diagnostic widening."""
 
-    __slots__ = ("_endpoint", "_auth", "_timeout")
+    __slots__ = ("_endpoint", "_auth", "_timeout", "_tx_read_allowed")
 
     def __init__(
         self, endpoint: LocalRegtestEndpoint, auth: ExplicitRpcAuth, *,
-        timeout: float,
+        timeout: float, allow_transaction_lookup: bool = False,
     ) -> None:
         if type(endpoint) is not LocalRegtestEndpoint or type(auth) is not ExplicitRpcAuth:
             raise ValueError("SCAN_RPC_LOCAL_AUTH_REQUIRED")
         if type(timeout) not in (int, float) or not 0 < timeout <= 10:
             raise ValueError("SCAN_RPC_TIMEOUT_INVALID")
+        if type(allow_transaction_lookup) is not bool:
+            raise ValueError("SCAN_RPC_TX_SCOPE_DENIED")
         self._endpoint, self._auth, self._timeout = endpoint, auth, timeout
+        # Default remains the original two-method scanner diagnostic boundary.
+        # Only an independently attested WSP scanner session may opt in.
+        self._tx_read_allowed = allow_transaction_lookup
 
     def call(self, method: str, params: list[object]) -> object:
         if method == "getblock":
@@ -58,6 +63,14 @@ class _ScannerOnlyWire:
                 raise RegtestScannerWireError("SCAN_RPC_PARAMS_DENIED")
         elif method == "getrawmempool":
             if type(params) is not list or params:
+                raise RegtestScannerWireError("SCAN_RPC_PARAMS_DENIED")
+        elif method == "getrawtransaction" and self._tx_read_allowed:
+            # WSP scanner uses JSON transaction views, never raw hex or
+            # implicit wallet-context read; bool is not a verbosity integer.
+            if (type(params) is not list or len(params) != 2
+                    or type(params[0]) is not str
+                    or _HASH.fullmatch(params[0]) is None
+                    or type(params[1]) is not int or params[1] not in (1, 2)):
                 raise RegtestScannerWireError("SCAN_RPC_PARAMS_DENIED")
         else:
             raise RegtestScannerWireError("SCAN_RPC_METHOD_DENIED")

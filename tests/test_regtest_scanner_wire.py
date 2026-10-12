@@ -138,6 +138,14 @@ class RegtestScannerReadBridgeTests(unittest.TestCase):
                     self.bridge._scanner.call(method, params)
         self.assertFalse(self.server.requests)
 
+    def test_existing_diagnostic_wire_never_gains_transaction_lookup(self):
+        # Expanding the separately scoped WSP-1 adapter must not broaden
+        # the original scanner diagnostics or the identity-only RPC.
+        with self.assertRaisesRegex(RegtestScannerWireError,
+                                    "^SCAN_RPC_METHOD_DENIED$"):
+            self.bridge._scanner.call("getrawtransaction", [TX, 2])
+        self.assertFalse(self.server.requests)
+
     def test_reject_remote_hosts_and_bad_transport_timeout(self):
         for host in ("localhost", "example.org", "8.8.8.8", "0.0.0.0"):
             with self.subTest(host=host), self.assertRaises(ValueError):
