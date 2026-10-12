@@ -66,9 +66,13 @@ def verify_binary(path: str | os.PathLike[str], sha256: str) -> Path:
                 digest.update(chunk)
             held = os.fstat(stream.fileno())
             after = src.lstat()
-            def identity(info: os.stat_result) -> tuple[int, int, int, int, int]:
-                return (info.st_dev, info.st_ino, info.st_size,
-                        info.st_mtime_ns, info.st_ctime_ns)
+            def identity(info: os.stat_result) -> tuple[int, ...]:
+                # Windows descriptor/path stat expose ctime inconsistently.
+                # Preserve stable file ID, device, size and mtime on all OSes;
+                # require ctime as an additional check on POSIX only.
+                stable = (info.st_dev, info.st_ino, info.st_size,
+                          info.st_mtime_ns)
+                return stable if os.name == "nt" else stable + (info.st_ctime_ns,)
             if (not stat.S_ISREG(after.st_mode)
                     or identity(opened) != identity(held)
                     or identity(held) != identity(after)):
