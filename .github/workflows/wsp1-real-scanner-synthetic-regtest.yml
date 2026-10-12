@@ -7,6 +7,8 @@ on:
     paths:
       - '.github/workflows/wsp1-real-scanner-synthetic-regtest.yml'
       - 'tools/ci_wsp1_scanner_loopback.py'
+      - 'src/wam_privacy_wallet/application/wsp_scan_coordinator.py'
+      - 'tests/test_app_wsp_scan_coordinator.py'
       - 'tools/wsp1_pinned_surface.py'
       - 'src/wam_privacy_wallet/integrations/wsp1_scanner_only_rpc.py'
       - 'src/wam_privacy_wallet/integrations/regtest_scanner_wire.py'
