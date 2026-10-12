@@ -28,7 +28,7 @@ _PORT_RE = re.compile(
 _GENESIS_RE = re.compile(
     r'assert\(consensus\.hashGenesisBlock\s*==\s*uint256S\("0x([0-9a-f]{64})"\)\);'
 )
-_BIP94_RE = re.compile(r"^\\s*consensus\\.enforce_BIP94\\s*=\\s*(true|false)\\s*;\\s*$", re.MULTILINE)
+_BIP94_RE = re.compile(r"^\s*consensus\.enforce_BIP94\s*=\s*(true|false)\s*;\s*$", re.MULTILINE)
 _BIP94_EXPECTED = {"mainnet": False, "testnet": False, "regtest": True}
 _BIP94_CLASSES = (
     ("mainnet", "class CMainParams : public CChainParams"),
