@@ -237,6 +237,47 @@ class WspScannerOnlyRpcTests(unittest.TestCase):
             ):
                 self.mempool.call("getrawtransaction", [TX, 2])
 
+    def test_pinned_upstream_block_transaction_limit_denied_before_scanner(self):
+        self.rpc.attest()
+        self.server.overrides["getblock"] = {
+            "hash": TIP,
+            "tx": [{"txid": format(i, "064x")} for i in range(10_001)],
+        }
+        with self.assertRaisesRegex(
+            WspScannerRpcError, "^WSP_SCAN_REPLY_DENIED$",
+        ):
+            self.rpc.call("getblock", [TIP, 3])
+
+    def test_pinned_upstream_mempool_id_limit_denied_before_scanner(self):
+        self.mempool.attest()
+        self.server.overrides["getrawmempool"] = [
+            format(i, "064x") for i in range(10_001)
+        ]
+        with self.assertRaisesRegex(
+            WspScannerRpcError, "^WSP_SCAN_REPLY_DENIED$",
+        ):
+            self.mempool.call("getrawmempool")
+
+    def test_pinned_upstream_verbose_transaction_input_cap_denied(self):
+        self.mempool.attest()
+        self.server.overrides["getrawtransaction"] = {
+            "txid": TX, "vin": [{}] * 2_049, "vout": [{}],
+        }
+        with self.assertRaisesRegex(
+            WspScannerRpcError, "^WSP_SCAN_REPLY_DENIED$",
+        ):
+            self.mempool.call("getrawtransaction", [TX, 2])
+
+    def test_pinned_upstream_verbose_transaction_output_cap_denied(self):
+        self.mempool.attest()
+        self.server.overrides["getrawtransaction"] = {
+            "txid": TX, "vin": [{}], "vout": [{}] * 4_097,
+        }
+        with self.assertRaisesRegex(
+            WspScannerRpcError, "^WSP_SCAN_REPLY_DENIED$",
+        ):
+            self.mempool.call("getrawtransaction", [TX, 2])
+
     def test_duplicate_or_bad_mempool_ids_cannot_enter_scanner(self):
         for ids in ([TX, TX], ["invalid"], None, {"txids": [TX]}):
             self.server.overrides["getrawmempool"] = ids
