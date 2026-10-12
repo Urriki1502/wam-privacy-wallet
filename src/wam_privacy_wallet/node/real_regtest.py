@@ -79,7 +79,15 @@ def verify_binary(path: str | os.PathLike[str], sha256: str) -> Path:
                 raise RealRegtestError("CORE_BINARY_CHANGED")
         if digest.hexdigest() != sha256:
             raise RealRegtestError("CORE_SHA256_MISMATCH")
-        return src.resolve(strict=True)
+        resolved = src.resolve(strict=True)
+        # Resolving a pathname is a distinct TOCTOU point, even after the
+        # descriptor was closed. Reject a visible swap during resolution;
+        # this is NOT immutable process-image binding or launch approval.
+        last = src.lstat()
+        if (not stat.S_ISREG(last.st_mode)
+                or identity(held) != identity(last)):
+            raise RealRegtestError("CORE_BINARY_CHANGED")
+        return resolved
     except RealRegtestError:
         raise
     except (OSError, TypeError, ValueError):
