@@ -8,6 +8,12 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 GUI_PATTERN = "test_gui_shell.py"
 GUI_TEST_IDS = frozenset({
+    "test_gui_shell.GuiShellSmokeTests.test_input_policy_review_actual_models_and_readonly_gui",
+    "test_gui_shell.GuiShellSmokeTests.test_input_policy_denied_consent_clears_previous_report",
+    "test_gui_shell.GuiShellSmokeTests.test_input_policy_bad_network_or_proposal_cannot_keep_pass",
+    "test_gui_shell.GuiShellSmokeTests.test_input_policy_replaces_receive_scanner_and_prior_evidence",
+    "test_gui_shell.GuiShellSmokeTests.test_input_policy_renderer_failure_invalidates_and_redacts",
+
     "test_gui_shell.GuiShellSmokeTests.test_real_wsp_scanner_result_renders_only_as_untrusted_receipt",
     "test_gui_shell.GuiShellSmokeTests.test_real_wsp_receipt_cleared_by_next_offline_update",
     "test_gui_shell.GuiShellSmokeTests.test_forged_real_wsp_receipt_denied_and_clears_existing",
@@ -258,7 +264,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 971
+FULL_MIN_CASES = 976
 
 
 def _cases(suite: unittest.TestSuite):

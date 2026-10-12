@@ -607,6 +607,77 @@ class GuiShellSmokeTests(unittest.TestCase):
         self.assertNotIn("MUST_NOT_LOG",
                          self.window.receive_vector_notice.text())
 
+    def _review_policy_inputs(self, **changes):
+        from test_network_plan_review import plan
+        from test_payjoin_proposal_review import fixtures
+        endpoints = changes.pop("endpoints", plan())
+        original, proposal = fixtures()
+        proposal = changes.pop("proposal", proposal)
+        self.window.review_offline_policy_inputs(
+            endpoints, original, proposal,
+            **(dict(payment_output_index=0, scope="synthetic-regtest", consent=True) | changes),
+        )
+
+    def test_input_policy_review_actual_models_and_readonly_gui(self):
+        self._review_policy_inputs()
+        state = self.window.offline_presentation_state
+        self.assertEqual((state.policy, state.authority), ("MODEL_ONLY", "BLOCKED"))
+        self.assertIn("UNTRUSTED", self.window.privacy_policy_status.text())
+        self.assertEqual(self.window.findChildren(QPushButton), [])
+        self.assertNotIn("synthetic-payment", self.window.privacy_policy_notice.text())
+        self.assertEqual(self.window.session_status.text(), "NO WALLET LOADED")
+
+    def test_input_policy_denied_consent_clears_previous_report(self):
+        self._review_policy_inputs()
+        revision = self.window.offline_presentation_state.revision
+        with self.assertRaisesRegex(ValueError, "^APP_GUI_POLICY_INPUT_REVIEW_DENIED$"):
+            self._review_policy_inputs(consent=False)
+        state = self.window.offline_presentation_state
+        self.assertGreater(state.revision, revision)
+        self.assertEqual((state.policy, state.authority), ("ABSENT", "BLOCKED"))
+        self.assertEqual(self.window.privacy_policy_status.text(), "NO SYNTHETIC POLICY EVIDENCE")
+
+    def test_input_policy_bad_network_or_proposal_cannot_keep_pass(self):
+        from test_network_plan_review import plan
+        from test_payjoin_proposal_review import fixtures
+        for bad in ("network", "payjoin"):
+            self._review_policy_inputs()
+            changes = {}
+            if bad == "network":
+                endpoints = plan()
+                endpoints[1]["route"] = "direct"
+                changes["endpoints"] = endpoints
+            else:
+                _, proposal = fixtures()
+                proposal["outputs"][0]["destination"] = "attacker"
+                changes["proposal"] = proposal
+            with self.assertRaisesRegex(ValueError, "^APP_GUI_POLICY_INPUT_REVIEW_DENIED$"):
+                self._review_policy_inputs(**changes)
+            self.assertEqual(self.window.offline_presentation_state.policy, "ABSENT")
+
+    def test_input_policy_replaces_receive_scanner_and_prior_evidence(self):
+        self.window.run_fixed_public_receive_demo()
+        self.window.present_wsp_scan_session_summary(WspScanSessionSummary(1, 1, 0, 0))
+        self._review_policy_inputs()
+        state = self.window.offline_presentation_state
+        self.assertEqual((state.receive, state.scanner_session), ("ABSENT", "ABSENT"))
+        self.assertEqual(self.window.receive_vector_status.text(), "NO PUBLIC SAMPLE · NO ADDRESS GENERATED")
+        self.assertNotIn("WSP-1 SCAN EXECUTED", self.window.wsp_session_status.text())
+
+    def test_input_policy_renderer_failure_invalidates_and_redacts(self):
+        from unittest.mock import patch
+        from wam_privacy_wallet.application.presentation_lifecycle import OfflineLifecycleError
+        original = MainWindow.present_offline_policy_report
+        def fail_render(window, report):
+            if window._managed_render_depth:
+                raise RuntimeError("PRIVATE_QT_DETAIL")
+            return original(window, report)
+        with patch.object(MainWindow, "present_offline_policy_report", autospec=True, side_effect=fail_render):
+            with self.assertRaisesRegex(OfflineLifecycleError, "^APP_OFFLINE_RENDER_DENIED$"):
+                self._review_policy_inputs()
+        self.assertEqual(self.window.offline_presentation_state.policy, "ABSENT")
+        self.assertEqual(self.window.privacy_policy_status.text(), "NO SYNTHETIC POLICY EVIDENCE")
+
     def test_legacy_demo_routes_through_controller_single_writer(self) -> None:
         self.window.run_fixed_public_receive_demo()
         state = self.window.offline_presentation_state
