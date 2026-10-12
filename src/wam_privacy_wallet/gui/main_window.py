@@ -818,6 +818,40 @@ class MainWindow(QMainWindow):
             "NETWORK & PAYJOIN MODEL RESULTS ONLY · NO RPC / SIGN / SEND"
         )
 
+    def review_offline_policy_inputs(
+        self, endpoints: object, original: object, proposal: object, *,
+        payment_output_index: object, scope: object, consent: object,
+        async_payjoin: object = False,
+    ) -> None:
+        """Evaluate explicit synthetic inputs and display only model vocabulary.
+
+        No input is retained by Qt. Clear the previous presentation before
+        evaluation so rejected input/consent cannot leave a stale PASS visible.
+        The existing single-writer controller owns all display transitions.
+        """
+        self.clear_offline_presentation()
+        from wam_privacy_wallet.application.network_plan_review import (
+            NetworkPlanReviewError, review_synthetic_network_plan,
+        )
+        from wam_privacy_wallet.application.payjoin_proposal_review import (
+            PayjoinProposalReviewError, review_synthetic_payjoin_proposal,
+        )
+        try:
+            review_synthetic_network_plan(
+                endpoints, scope=scope, consent=consent, async_payjoin=async_payjoin,
+            )
+            review_synthetic_payjoin_proposal(
+                original, proposal, payment_output_index=payment_output_index,
+                scope=scope, consent=consent,
+            )
+        except (NetworkPlanReviewError, PayjoinProposalReviewError):
+            raise ValueError("APP_GUI_POLICY_INPUT_REVIEW_DENIED") from None
+        self.present_offline_policy_report(SyntheticPolicyReport(
+            "PIN_RECORDED_UNATTESTED", "MODEL_PASS_UNTRUSTED",
+            "MODEL_PASS_UNTRUSTED", "MODEL_ONLY_NO_AUTHORITY",
+            "BLOCKED", "BLOCKED", "BLOCKED",
+        ))
+
     def run_fixed_offline_policy_demo(self) -> None:
         """Explicitly run a pinned, no-argument synthetic-only research demo.
 
