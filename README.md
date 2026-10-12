@@ -19,6 +19,10 @@ A proposed cross-platform, privacy-focused WAM desktop wallet. Its intended arch
 | Phase 007 — Opt-in verified Core regtest harness | Merged; requires separately verified local environment |
 | Phase 008 — WAM Core profile gate | Merged; fail-closed read-only profile checks |
 | Phase 009 — WAM Core source pin | Merged; source identity/drift evidence, not consensus approval |
+| Application scanning (#134–#139) | **Merged**; actual pinned WSP-1 Scanner.sync and SQLite, encrypted scan-only import and Qt scalar receipt exercised against a synthetic localhost regtest-shaped RPC peer in native Linux CI; no WAM Core execution or usable wallet |
+| BIP352 receive/replay/reorg → Qt (#140) | **Draft / review-gated**; native WSP-1 scanner and persistent test SQLite verify matched test P2TR output, no duplicate replay and rollback, with nonauthorizing GUI metrics; no confirmed real-node E2E |
+
+The WSP scanner-to-Qt testing above uses real upstream library code but **synthetic blockchain/RPC inputs**. It does not support creating or storing a real user wallet, operational scan buttons, real receive addresses, balances, signing, broadcast or mainnet. An authenticated WAM Core runner, durable scan-key custody and native release qualification remain blocked/review-gated. Original frozen WSP source review [#3](https://github.com/Urriki1502/wam-privacy-wallet/pull/3) is still not approved for production.
 
 The words *merged* and *CI passed* establish repository change status only; they **do not** establish wallet functional completeness, protocol correctness, signer safety or production acceptance.
 
