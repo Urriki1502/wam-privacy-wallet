@@ -29,26 +29,123 @@ OUTPUT = {
     "real_two_node_regtest_qualified": False,
     "wallet_ready": False,
     "broadcast_allowed": False,
+    "height": 3,
+    "window_start": 1,
+    "window_count": 3,
+    "independent_rpc_endpoints": 2,
+    "height_hash_read_passes": 2,
+    "reported_histories_agree": True,
 }
 
 
 class BoundedAncestryCliTests(unittest.TestCase):
     def _invoke(self, arguments=None, *, tty=True, secrets=("ONE", "TWO"),
-                audit_output=OUTPUT, audit_error=None):
+                audit_output=OUTPUT, audit_error=None, header_output=None,
+                header_error=None):
         stdout, stderr = io.StringIO(), io.StringIO()
         args = ARGUMENTS if arguments is None else arguments
         with patch("tools.audit_two_node_ancestry.sys.stdin") as stdin, \
              patch("tools.audit_two_node_ancestry.getpass.getpass",
                    side_effect=secrets) as prompt, \
              patch("tools.audit_two_node_ancestry.TwoNodeBoundedAncestry") as audit, \
+             patch("tools.audit_two_node_ancestry.TwoNodeHeaderLinkAuditor") as header_audit, \
              contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
             stdin.isatty.return_value = tty
             if audit_error is not None:
                 audit.return_value.audit.side_effect = audit_error
             else:
                 audit.return_value.audit.return_value = audit_output
+            header_audit.return_value.audit.return_value = (
+                self._default_header() if header_output is None else header_output
+            )
+            if header_error is not None:
+                header_audit.return_value.audit.side_effect = header_error
+            self.header_audit_mock = header_audit
             code = cli.main(args)
         return code, stdout.getvalue(), stderr.getvalue(), prompt, audit
+
+    @staticmethod
+    def _default_header():
+        return {
+            "status": "UNTRUSTED_TWO_NODE_RPC_HEADER_LINKS_ONLY",
+            "height": 3,
+            "window_start": 1,
+            "window_count": 3,
+            "independent_rpc_endpoints": 2,
+            "header_link_read_passes": 2,
+            "rpc_reported_parent_links_match": True,
+            "genuine_core_processes_verified": False,
+            "cryptographic_headers_verified": False,
+            "block_parent_links_verified": False,
+            "real_two_node_regtest_qualified": False,
+            "scanner_enabled": False,
+            "wallet_ready": False,
+            "signing_allowed": False,
+            "broadcast_allowed": False,
+            "mainnet_allowed": False,
+        }
+
+    def test_optional_header_review_reuses_one_tty_prompt_pair(self):
+        receipt = {**OUTPUT, "height": 3, "window_start": 1, "window_count": 3}
+        code, out, err, prompt, _ = self._invoke(
+            ARGUMENTS + ["--include-header-links"], audit_output=receipt,
+        )
+        self.assertEqual((code, err), (0, ""))
+        self.assertEqual(prompt.call_count, 2)
+        self.assertEqual(self.header_audit_mock.call_count, 1)
+        self.assertEqual(self.header_audit_mock.call_args.args[1].password, "ONE")
+        self.assertEqual(self.header_audit_mock.call_args.args[3].password, "TWO")
+        payload = json.loads(out)
+        self.assertTrue(payload["rpc_reported_parent_links_match"])
+        self.assertIs(payload["same_epoch_proven"], False)
+        self.assertIs(payload["cryptographic_headers_verified"], False)
+        self.assertIs(payload["signing_allowed"], False)
+
+    def test_default_cli_does_not_send_header_rpc_requests(self):
+        code, _, _, _, _ = self._invoke()
+        self.assertEqual(code, 0)
+        self.header_audit_mock.assert_not_called()
+
+    def test_header_forged_authority_and_missing_flags_denied(self):
+        receipt = {**OUTPUT, "height": 3, "window_start": 1, "window_count": 3}
+        for header in (
+            {**self._default_header(), "signing_allowed": True},
+            {**self._default_header(), "cryptographic_headers_verified": True},
+            {**self._default_header(), "rpc_reported_parent_links_match": False},
+            {"status": "APPROVED"},
+            {},
+        ):
+            with self.subTest(header=header.get("status")):
+                code, out, err, _, _ = self._invoke(
+                    ARGUMENTS + ["--include-header-links"], audit_output=receipt,
+                    header_output=header,
+                )
+                self.assertEqual((code, out), (2, ""))
+                self.assertEqual(err.strip(), "REGTEST_ANCESTRY_HEADER_AUTHORITY_DENIED")
+
+    def test_header_height_window_epoch_mismatch_is_denied(self):
+        receipt = {**OUTPUT, "height": 3, "window_start": 1, "window_count": 3}
+        for changed in (
+            {"height": 4}, {"window_start": 0}, {"window_count": 4},
+            {"height": True},
+        ):
+            with self.subTest(changed=changed):
+                code, out, err, _, _ = self._invoke(
+                    ARGUMENTS + ["--include-header-links"], audit_output=receipt,
+                    header_output={**self._default_header(), **changed},
+                )
+                self.assertEqual((code, out), (2, ""))
+                self.assertEqual(err.strip(), "REGTEST_ANCESTRY_HEADER_EPOCH_DENIED")
+
+    def test_header_transport_failure_redacted_and_no_output(self):
+        receipt = {**OUTPUT, "height": 3, "window_start": 1, "window_count": 3}
+        code, out, err, _, _ = self._invoke(
+            ARGUMENTS + ["--include-header-links"], audit_output=receipt,
+            header_error=cli.TwoNodeHeaderLinkError("REMOTE_SECRET_BODY"),
+        )
+        self.assertEqual((code, out), (2, ""))
+        self.assertEqual(err.strip(), "REGTEST_ANCESTRY_HEADER_RPC_DENIED")
+        self.assertNotIn("REMOTE_SECRET_BODY", err)
 
     def test_valid_interactive_run_is_nonauthorizing_json(self):
         code, out, err, prompt, audit = self._invoke()
@@ -151,6 +248,34 @@ class BoundedAncestryCliTests(unittest.TestCase):
                 code, out, err, _, _ = self._invoke(audit_output=report)
                 self.assertEqual((code, out), (2, ""))
                 self.assertEqual(err.strip(), "REGTEST_ANCESTRY_AUTHORITY_DENIED")
+
+    def test_secret_bearing_extra_ancestry_fields_are_refused(self):
+        for fake in (
+            {**OUTPUT, "rpc_password": "SUPER_SECRET"},
+            {**OUTPUT, "height": True},
+            {**OUTPUT, "reported_histories_agree": 1},
+            {**OUTPUT, "window_count": 17},
+        ):
+            with self.subTest(keys=tuple(fake)):
+                code, out, err, _, _ = self._invoke(audit_output=fake)
+                self.assertEqual((code, out), (2, ""))
+                self.assertEqual(err.strip(), "REGTEST_ANCESTRY_RECEIPT_DENIED")
+                self.assertNotIn("SUPER_SECRET", err)
+
+    def test_header_extra_fields_or_fake_pass_count_denied(self):
+        for fake in (
+            {**self._default_header(), "private_key": "SECRET"},
+            {**self._default_header(), "header_link_read_passes": 1},
+            {**self._default_header(), "independent_rpc_endpoints": True},
+        ):
+            with self.subTest(header=fake.get("header_link_read_passes")):
+                code, out, err, _, _ = self._invoke(
+                    ARGUMENTS + ["--include-header-links"],
+                    header_output=fake,
+                )
+                self.assertEqual((code, out), (2, ""))
+                self.assertEqual(err.strip(), "REGTEST_ANCESTRY_HEADER_AUTHORITY_DENIED")
+                self.assertNotIn("SECRET", err)
 
     def test_live_cli_boundary_never_launches_core(self):
         with patch.object(subprocess, "Popen",
