@@ -51,7 +51,7 @@ class KernelSealedEvidence:
 class KernelSealedReview:
     """Ephemeral closed-over fd; never exports an executable path or launch API."""
 
-    __slots__ = ("_descriptor", "_digest", "evidence", "_seals")
+    __slots__ = ("_descriptor", "_digest", "_identity", "evidence", "_seals")
 
     def __init__(self, descriptor: int, digest: str, size: int, seals: int):
         # The review object is NOT a launch permit. Nevertheless, callers
@@ -71,6 +71,11 @@ class KernelSealedReview:
         self._descriptor = descriptor
         self._digest = digest
         self._seals = seals
+        try:
+            info = os.fstat(descriptor)
+            self._identity = (info.st_dev, info.st_ino)
+        except OSError:
+            raise LinuxCoreSealError("CORE_SEAL_REVIEW_DENIED") from None
         self.evidence = KernelSealedEvidence(digest, size, True)
         # Bind the first receipt to an actual currently sealed kernel object.
         self.audit()
@@ -86,8 +91,11 @@ class KernelSealedReview:
             if self._descriptor < 0 or fcntl is None:
                 raise LinuxCoreSealError("CORE_SEAL_CLOSED")
             held = fcntl.fcntl(self._descriptor, fcntl.F_GET_SEALS)
-            size = os.fstat(self._descriptor).st_size
-            if held & self._seals != self._seals or size != self.evidence.byte_count:
+            info = os.fstat(self._descriptor)
+            size = info.st_size
+            if (held & self._seals != self._seals
+                    or size != self.evidence.byte_count
+                    or (info.st_dev, info.st_ino) != self._identity):
                 raise LinuxCoreSealError("CORE_SEAL_CHANGED")
             digest = hashlib.sha256()
             position = 0
