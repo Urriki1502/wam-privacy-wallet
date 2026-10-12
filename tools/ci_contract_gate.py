@@ -70,6 +70,7 @@ MINIMUM_CASES = {
     "test_core_signed_linux_memfd.py": 16,
     "test_core_elf_preflight.py": 13,
     "test_synthetic_linux_fd_exec_binding.py": 3,
+    "test_synthetic_linux_proc_identity.py": 4,
 }
 MANDATORY_SUITES = tuple(MINIMUM_CASES)
 
