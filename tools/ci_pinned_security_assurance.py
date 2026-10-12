@@ -24,10 +24,11 @@ def verify(root):
 
 
 def main():
-    if len(sys.argv) not in (2,3) or (len(sys.argv)==3 and sys.argv[2]!='--verify-only'):
+    if len(sys.argv) not in (2,3) or (len(sys.argv)==3 and sys.argv[2] not in ('--verify-only','--gui')):
         raise SystemExit('SECURITY_SOURCE_ARGUMENT_DENIED')
     root=Path(sys.argv[1]).resolve();verify(root)
-    if len(sys.argv)==3:return
+    if len(sys.argv)==3 and sys.argv[2]=='--verify-only':return
+    gui=len(sys.argv)==3 and sys.argv[2]=='--gui'
     if app._verify_source().resolve()!=root/'src/wam_security':raise SystemExit('SECURITY_INSTALLED_SOURCE_DENIED')
     original=unittest.TestLoader().discover(str(root/'tests'),pattern='test_provenance.py')
     if original.countTestCases()!=3:raise SystemExit('SECURITY_UPSTREAM_DISCOVERY_DENIED')
@@ -64,13 +65,43 @@ def main():
             finally:
                 path.unlink()
                 if created:directory.rmdir()
+    if gui:
+        import os
+        os.environ.setdefault('QT_QPA_PLATFORM','offscreen')
+        from PySide6.QtCore import QCoreApplication, QEvent
+        from PySide6.QtWidgets import QApplication, QPushButton
+        from wam_privacy_wallet.gui import MainWindow
+        class ActualSourceGuiTests(unittest.TestCase):
+            @classmethod
+            def setUpClass(cls):cls.qt=QApplication.instance() or QApplication([])
+            def setUp(self):self.window=MainWindow()
+            def tearDown(self):
+                self.window.close();self.window.deleteLater()
+                QCoreApplication.sendPostedEvents(None,QEvent.Type.DeferredDelete)
+                QCoreApplication.processEvents()
+            def test_actual_source_worker_to_qt_keeps_every_authority_blocked(self):
+                self.window.review_public_assurance_fixture(scope='synthetic-regtest',consent=True)
+                self.assertEqual(self.window.offline_presentation_state.assurance,'UNSIGNED_PUBLIC_PROVENANCE')
+                self.assertEqual(self.window.offline_presentation_state.authority,'BLOCKED')
+                self.assertEqual(self.window.session_status.text(),'NO WALLET LOADED')
+                self.assertIn('UNTRUSTED',self.window.assurance_review_status.text())
+                self.assertEqual(self.window.findChildren(QPushButton),[])
+            def test_withdrawn_consent_clears_actual_source_worker_receipt(self):
+                self.window.review_public_assurance_fixture(scope='synthetic-regtest',consent=True)
+                with self.assertRaisesRegex(ValueError,'^APP_GUI_ASSURANCE_DENIED$'):
+                    self.window.review_public_assurance_fixture(scope='synthetic-regtest',consent=False)
+                self.assertEqual(self.window.offline_presentation_state.assurance,'ABSENT')
+                self.assertEqual(self.window.offline_presentation_state.authority,'BLOCKED')
+
     suite=unittest.TestSuite((original,unittest.defaultTestLoader.loadTestsFromTestCase(ActualAssuranceTests)))
-    if suite.countTestCases()!=11:raise SystemExit('SECURITY_NATIVE_DISCOVERY_DENIED')
+    if gui:suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(ActualSourceGuiTests))
+    expected=13 if gui else 11
+    if suite.countTestCases()!=expected:raise SystemExit('SECURITY_NATIVE_DISCOVERY_DENIED')
     result=unittest.TextTestRunner(verbosity=2).run(suite)
     if not result.wasSuccessful() or result.skipped or result.expectedFailures or result.unexpectedSuccesses:
         raise SystemExit('SECURITY_NATIVE_TEST_DENIED')
     verify(root)
-    print(f'ACTUAL_PINNED_SECURITY_PROVENANCE_OK 11/11; {EXPECTED_DIGEST}; unsigned untrusted public fixture only')
+    print(f'ACTUAL_PINNED_SECURITY_PROVENANCE_OK {expected}/{expected}; GUI={gui}; {EXPECTED_DIGEST}; unsigned untrusted public fixture only')
 
 
 if __name__=='__main__':main()

@@ -30,7 +30,7 @@ def verify(root):
 
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('--source-root',required=True);parser.add_argument('--verify-only',action='store_true')
+    parser=argparse.ArgumentParser();parser.add_argument('--source-root',required=True);parser.add_argument('--verify-only',action='store_true');parser.add_argument('--gui',action='store_true')
     args=parser.parse_args();verify(Path(args.source_root).resolve())
     if args.verify_only: return
     name='wam-wallet-hpke-readonly.exe' if app.sys.platform=='win32' else 'wam-wallet-hpke-readonly'
@@ -69,11 +69,41 @@ def main():
             for role in ('incoming','audit'):
                 r=self.review(role=role)
                 self.assertNotIn('123456',repr(r));self.assertNotIn('PUBLIC WALLET HPKE FIXTURE',repr(r))
+    if args.gui:
+        import os
+        os.environ.setdefault('QT_QPA_PLATFORM','offscreen')
+        from PySide6.QtCore import QCoreApplication, QEvent
+        from PySide6.QtWidgets import QApplication, QPushButton
+        from wam_privacy_wallet.gui import MainWindow
+        class ActualSourceGuiTests(unittest.TestCase):
+            @classmethod
+            def setUpClass(cls):cls.qt=QApplication.instance() or QApplication([])
+            def setUp(self):self.window=MainWindow()
+            def tearDown(self):
+                self.window.close();self.window.deleteLater()
+                QCoreApplication.sendPostedEvents(None,QEvent.Type.DeferredDelete)
+                QCoreApplication.processEvents()
+            def test_actual_source_worker_to_qt_keeps_every_authority_blocked(self):
+                self.window.review_public_disclosure_fixture(role='incoming',scope='synthetic-regtest',consent=True)
+                self.assertEqual(self.window.offline_presentation_state.disclosure,'PUBLIC_HPKE_UNTRUSTED')
+                self.assertEqual(self.window.offline_presentation_state.authority,'BLOCKED')
+                self.assertEqual(self.window.session_status.text(),'NO WALLET LOADED')
+                self.assertIn('UNTRUSTED',self.window.disclosure_review_status.text())
+                self.assertEqual(self.window.findChildren(QPushButton),[])
+            def test_withdrawn_consent_clears_actual_source_worker_receipt(self):
+                self.window.review_public_disclosure_fixture(role='incoming',scope='synthetic-regtest',consent=True)
+                with self.assertRaisesRegex(ValueError,'^APP_GUI_DISCLOSURE_DENIED$'):
+                    self.window.review_public_disclosure_fixture(role='incoming',scope='synthetic-regtest',consent=False)
+                self.assertEqual(self.window.offline_presentation_state.disclosure,'ABSENT')
+                self.assertEqual(self.window.offline_presentation_state.authority,'BLOCKED')
+
     suite=unittest.defaultTestLoader.loadTestsFromTestCase(ActualHpkeTests)
-    if suite.countTestCases()!=8:raise SystemExit('HPKE_NATIVE_DISCOVERY_DENIED')
+    if args.gui:suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(ActualSourceGuiTests))
+    expected=10 if args.gui else 8
+    if suite.countTestCases()!=expected:raise SystemExit('HPKE_NATIVE_DISCOVERY_DENIED')
     result=unittest.TextTestRunner(verbosity=2).run(suite)
     if not result.wasSuccessful() or result.skipped or result.expectedFailures or result.unexpectedSuccesses:raise SystemExit('HPKE_NATIVE_TEST_DENIED')
-    print('ACTUAL_PINNED_HPKE_PUBLIC_FIXTURE_OK 8/8; untrusted experiment; review/spend/sign/send blocked')
+    print(f'ACTUAL_PINNED_HPKE_PUBLIC_FIXTURE_OK {expected}/{expected}; GUI={args.gui}; untrusted experiment; review/spend/sign/send blocked')
 
 
 if __name__=='__main__':main()

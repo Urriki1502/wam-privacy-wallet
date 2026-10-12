@@ -8,6 +8,19 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 GUI_PATTERN = "test_gui_shell.py"
 GUI_TEST_IDS = frozenset({
+    "test_gui_shell.GuiShellSmokeTests.test_new_privacy_panels_start_empty_and_scroll_without_actions",
+    "test_gui_shell.GuiShellSmokeTests.test_actual_normalized_coin_policy_reaches_readonly_gui",
+    "test_gui_shell.GuiShellSmokeTests.test_coin_policy_denied_consent_or_scope_clears_before_algorithm",
+    "test_gui_shell.GuiShellSmokeTests.test_forged_coin_signing_or_warning_claim_clears_whole_gui",
+    "test_gui_shell.GuiShellSmokeTests.test_public_disclosure_dto_is_only_untrusted_display_evidence",
+    "test_gui_shell.GuiShellSmokeTests.test_disclosure_denied_consent_clears_without_native_worker",
+    "test_gui_shell.GuiShellSmokeTests.test_disclosure_forged_external_review_or_spend_authority_is_denied",
+    "test_gui_shell.GuiShellSmokeTests.test_assurance_dto_display_is_unsigned_without_authentication_claim",
+    "test_gui_shell.GuiShellSmokeTests.test_assurance_denied_consent_clears_without_child_or_source_read",
+    "test_gui_shell.GuiShellSmokeTests.test_assurance_forged_digest_or_release_claim_clears_all_evidence",
+    "test_gui_shell.GuiShellSmokeTests.test_combined_privacy_receipts_replace_and_clear_with_single_writer",
+    "test_gui_shell.GuiShellSmokeTests.test_new_privacy_renderer_failures_invalidate_revision_and_redact",
+
     "test_gui_shell.GuiShellSmokeTests.test_psbt_panel_defaults_empty_without_actions",
     "test_gui_shell.GuiShellSmokeTests.test_psbt_scalar_dto_displays_untrusted_without_retaining_raw",
     "test_gui_shell.GuiShellSmokeTests.test_psbt_denied_consent_clears_prior_evidence_before_child",
@@ -284,7 +297,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 1062
+FULL_MIN_CASES = 1081
 
 
 def _cases(suite: unittest.TestSuite):

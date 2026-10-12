@@ -66,12 +66,17 @@ def _valid_presentation(s: object) -> bool:
         and type(s.recovery) is str
         and s.recovery in ("ABSENT", "REVIEW_ONLY_NOT_VERIFIED",
                            "RESCAN_REQUIRED", "MIGRATION_RESCAN_REQUIRED")
+        and type(s.scanner_session) is str and s.scanner_session in ("ABSENT", "LOCAL_RPC_OBSERVED_UNTRUSTED")
+        and type(s.psbt) is str and s.psbt in ("ABSENT", "UNSIGNED_PARSED_UNTRUSTED")
+        and type(s.coin_policy) is str and s.coin_policy in ("ABSENT", "NORMALIZED_POLICY_UNTRUSTED")
+        and type(s.disclosure) is str and s.disclosure in ("ABSENT", "PUBLIC_HPKE_UNTRUSTED")
+        and type(s.assurance) is str and s.assurance in ("ABSENT", "UNSIGNED_PUBLIC_PROVENANCE")
         and type(s.transition) is str
         and s.transition in ("INITIAL", "REPLACED", "CLEARED", "REJECTED")
         # Cleared/rejected/initial revisions cannot retain display evidence.
         and (
             s.transition == "REPLACED"
-            or (s.node, s.privacy, s.policy, s.receive, s.recovery, s.resume, s.rescan, s.reorg) == ("ABSENT",) * 8
+            or (s.node, s.privacy, s.policy, s.receive, s.recovery, s.resume, s.rescan, s.reorg, s.scanner_session, s.psbt, s.coin_policy, s.disclosure, s.assurance) == ("ABSENT",) * 13
         )
         and (
             (s.transition == "INITIAL" and s.revision == 0)
@@ -157,6 +162,11 @@ def inspect_offline_integration(
         presentation.resume != "ABSENT",
         presentation.rescan != "ABSENT",
         presentation.reorg != "ABSENT",
+        presentation.scanner_session != "ABSENT",
+        presentation.psbt != "ABSENT",
+        presentation.coin_policy != "ABSENT",
+        presentation.disclosure != "ABSENT",
+        presentation.assurance != "ABSENT",
     ))
     return OfflineIntegrationStatus(
         revision=presentation.revision,

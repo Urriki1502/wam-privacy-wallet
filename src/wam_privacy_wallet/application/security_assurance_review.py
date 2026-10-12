@@ -20,6 +20,7 @@ _BLOBS = {
     "supplychain/identities.py": "71787690f7fa0f2d71273aa48d25f8f03834a683",
     "supplychain/provenance.py": "5578d80d091431e75b366a5cf30cd560ac02065d",
 }
+_PUBLIC_PROVENANCE_DIGEST = "0700a9000944f1188eebafb4448823f11c6df8723feb6f0cedd6ff1243eb7424"
 _PUBLIC_ARTIFACT = b"PUBLIC WALLET ASSURANCE FIXTURE v1\n"
 
 
@@ -106,7 +107,7 @@ def review_public_assurance_fixture(*, scope: object, consent: object) -> Securi
             "publisher_authenticated","runtime_authenticated","release_allowed","sign_allowed","broadcast_allowed"}
         if (type(data) is not dict or set(data)!=expected
                 or type(data["provenance_digest"]) is not str or len(data["provenance_digest"])!=64
-                or any(c not in "0123456789abcdef" for c in data["provenance_digest"])
+                or data["provenance_digest"] != _PUBLIC_PROVENANCE_DIGEST
                 or type(data["subject_count"]) is not int or data["subject_count"]!=1
                 or type(data["dependency_count"]) is not int or data["dependency_count"]!=3
                 or data["source_commit"]!=_PIN or data["evidence"]!="PINNED_UNSIGNED_PUBLIC_PROVENANCE_UNTRUSTED"

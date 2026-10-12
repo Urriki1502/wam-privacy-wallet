@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 
-from wam_privacy_wallet.application.presentation_lifecycle import OfflinePresentationController, OfflineLifecycleError, _valid_recovery, _valid_resume, _valid_rescan, _valid_reorg, _valid_scanner, _valid_psbt
+from wam_privacy_wallet.application.presentation_lifecycle import OfflinePresentationController, OfflineLifecycleError, _valid_recovery, _valid_resume, _valid_rescan, _valid_reorg, _valid_scanner, _valid_psbt, _valid_coin_policy, _valid_disclosure, _valid_assurance
 from wam_privacy_wallet.application.node_status import NodeOverview
 from wam_privacy_wallet.application.scanner_session_workflow import ScannerReadOnlyObservation
 from wam_privacy_wallet.application.wsp_scan_coordinator import WspScanSessionSummary
@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QMainWindow,
     QSizePolicy,
+    QScrollArea,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -46,8 +47,8 @@ PAGE_CONTENT: tuple[tuple[str, str], ...] = (
     ),
     (
         "Privacy",
-        "Wallet privacy, PayJoin, and network safeguards will require "
-        "separate, reviewed adapters. None is enabled in this preview.",
+        "Public fixture reviews remain experimental and untrusted. "
+        "Viewing evidence does not enable a wallet or release.",
     ),
     (
         "Node",
@@ -181,7 +182,7 @@ class MainWindow(QMainWindow):
         column.addWidget(footer)
         return frame
 
-    def _build_page(self, title: str, description: str) -> QFrame:
+    def _build_page(self, title: str, description: str) -> QWidget:
         panel = QFrame(self)
         panel.setObjectName("pagePanel")
         column = QVBoxLayout(panel)
@@ -278,6 +279,15 @@ class MainWindow(QMainWindow):
             self.psbt_review_notice.setObjectName("smallText")
             self.psbt_review_notice.setWordWrap(True)
             column.addWidget(self.psbt_review_notice)
+            for prefix, caption, default, notice in (
+                ("coin_policy", "PRIVACY POLICY · EXPERIMENTAL", "NO COIN POLICY REVIEW", "NORMALIZED FIXTURES ONLY · NO OWNERSHIP / SPENDING AUTHORITY"),
+                ("disclosure", "SELECTIVE DISCLOSURE · PUBLIC FIXTURE", "NO PUBLIC VIEWING REVIEW", "EXTERNAL REVIEW PENDING · NO PRIVATE CONTENT OR SPEND CAPABILITY"),
+                ("assurance", "SOURCE EVIDENCE · PUBLIC FIXTURE", "NO UNSIGNED PROVENANCE REVIEW", "UNSIGNED / UNTRUSTED · NO PUBLISHER, RUNTIME OR RELEASE AUTHORITY"),
+            ):
+                label = QLabel(default); setattr(self, prefix + "_review_status", label)
+                column.addWidget(self._status_card(caption, label))
+                label = QLabel(notice); setattr(self, prefix + "_review_notice", label)
+                label.setObjectName("smallText"); label.setWordWrap(True); column.addWidget(label)
             placeholder = QLabel("SCANNING, SIGNING AND SENDING · BLOCKED")
             placeholder.setObjectName("notice")
             column.addWidget(placeholder)
@@ -331,6 +341,13 @@ class MainWindow(QMainWindow):
             column.addWidget(placeholder)
 
         column.addStretch(1)
+        if title == "Privacy":
+            scroll = QScrollArea(self)
+            scroll.setFrameShape(QFrame.Shape.NoFrame)
+            scroll.viewport().setStyleSheet("background: #111827;")
+            scroll.setWidgetResizable(True)
+            scroll.setWidget(panel)
+            return scroll
         return panel
 
     def _status_card(self, caption: str, value: QLabel) -> QFrame:
@@ -341,8 +358,10 @@ class MainWindow(QMainWindow):
         contents.setSpacing(7)
         label = QLabel(caption)
         label.setObjectName("sectionHeading")
+        label.setWordWrap(True)
         contents.addWidget(label)
         value.setObjectName("statusValue")
+        value.setWordWrap(True)
         contents.addWidget(value)
         return frame
 
@@ -355,7 +374,7 @@ class MainWindow(QMainWindow):
         """Attempt ALL panel resets and signal any failure without leaking Qt details.
 
         Partial cleanup is never silently accepted; a broken label setter must
-        not stop the other seven panels from being cleared.
+        not stop any other panel from being cleared.
         """
         self._managed_render_depth += 1
         failed = False
@@ -365,6 +384,9 @@ class MainWindow(QMainWindow):
                 self.clear_offline_privacy_readiness,
                 self.clear_offline_policy_report,
                 self.clear_unsigned_psbt_review,
+                self.clear_coin_policy_review,
+                self.clear_public_disclosure_review,
+                self.clear_public_assurance_review,
                 self.clear_public_receive_vector,
                 self.clear_offline_recovery_review,
                 self.clear_offline_resume_review,
@@ -423,8 +445,10 @@ class MainWindow(QMainWindow):
         recovery: object = None, resume: object = None,
         rescan: object = None, reorg: object = None,
         scanner_observation: object = None, psbt_review: object = None,
+        coin_policy_review: object = None, disclosure_review: object = None,
+        assurance_review: object = None,
     ) -> None:
-        """Atomically validate all eight synthetic DTOs before displaying."""
+        """Validate the complete untrusted replacement before displaying it."""
         self._begin_managed_transition()
         try:
             try:
@@ -433,6 +457,8 @@ class MainWindow(QMainWindow):
                     policy=policy, receive=receive, recovery=recovery, resume=resume,
                     rescan=rescan, reorg=reorg,
                     scanner_observation=scanner_observation, psbt_review=psbt_review,
+                    coin_policy_review=coin_policy_review, disclosure_review=disclosure_review,
+                    assurance_review=assurance_review,
                 )
             except OfflineLifecycleError:
                 # Validation already rejected the revision; still clear every
@@ -452,6 +478,12 @@ class MainWindow(QMainWindow):
                         self.present_offline_node_snapshot(node)
                     if state.privacy == "RESEARCH_ONLY":
                         self.present_offline_privacy_readiness(privacy)
+                    if state.coin_policy != "ABSENT":
+                        self.present_coin_policy_review(coin_policy_review)
+                    if state.disclosure != "ABSENT":
+                        self.present_public_disclosure_review(disclosure_review)
+                    if state.assurance != "ABSENT":
+                        self.present_public_assurance_review(assurance_review)
                     if state.psbt != "ABSENT":
                         self.present_unsigned_psbt_review(psbt_review)
                     if state.policy == "MODEL_ONLY":
@@ -826,6 +858,101 @@ class MainWindow(QMainWindow):
         self.privacy_policy_notice.setText(
             "NETWORK & PAYJOIN MODEL RESULTS ONLY · NO RPC / SIGN / SEND"
         )
+
+    def present_coin_policy_review(self, review: object) -> None:
+        if not _valid_coin_policy(review):
+            self.clear_offline_presentation()
+            raise ValueError("APP_GUI_COIN_POLICY_DENIED") from None
+        if not self._managed_render_depth:
+            self.replace_offline_presentation(
+                self._offline_controller.state.revision, coin_policy_review=review
+            )
+            return
+        self.coin_policy_review_status.setText(f"POLICY REVIEW · inputs {review.selected_inputs} · clusters {review.cluster_count} · UNTRUSTED")
+        self.coin_policy_review_notice.setText("SYNTHETIC ONLY · SOURCE db3d2dca · NO VERIFIED OWNERSHIP / SIGNING / SENDING")
+
+    def review_coin_policy_inputs(
+        self, coins: object, intents: object, fee_atoms: object, *,
+        scope: object, consent: object, allow_cluster_merge: object = False,
+        policy: object = None,
+    ) -> None:
+        self.clear_offline_presentation()
+        from wam_privacy_wallet.application.coin_selection_review import review_regtest_coin_selection, CoinSelectionReviewError
+        if type(scope) is not str or scope != "synthetic-regtest":
+            raise ValueError("APP_GUI_COIN_POLICY_DENIED") from None
+        try:
+            receipt = review_regtest_coin_selection(
+                coins, intents, fee_atoms, user_consented=consent,
+                allow_cluster_merge=allow_cluster_merge, policy=policy,
+            )
+        except CoinSelectionReviewError:
+            raise ValueError("APP_GUI_COIN_POLICY_DENIED") from None
+        self.present_coin_policy_review(receipt)
+
+    def clear_coin_policy_review(self) -> None:
+        if not self._managed_render_depth:
+            self.clear_offline_presentation()
+            return
+        self.coin_policy_review_status.setText("NO COIN POLICY REVIEW")
+        self.coin_policy_review_notice.setText("NORMALIZED FIXTURES ONLY · NO OWNERSHIP / SPENDING AUTHORITY")
+
+    def present_public_disclosure_review(self, review: object) -> None:
+        if not _valid_disclosure(review):
+            self.clear_offline_presentation()
+            raise ValueError("APP_GUI_DISCLOSURE_DENIED") from None
+        if not self._managed_render_depth:
+            self.replace_offline_presentation(
+                self._offline_controller.state.revision, disclosure_review=review
+            )
+            return
+        self.disclosure_review_status.setText(f"PUBLIC {review.role.upper()} VIEW · UNTRUSTED · EXTERNAL REVIEW PENDING")
+        self.disclosure_review_notice.setText("SYNTHETIC ONLY · SOURCE db3d2dca · NO PRIVATE CONTENT / SPEND CAPABILITY / SIGNING / SENDING")
+
+    def review_public_disclosure_fixture(self, *, role: object, scope: object, consent: object) -> None:
+        self.clear_offline_presentation()
+        from wam_privacy_wallet.application.selective_disclosure_review import review_public_disclosure_fixture, SelectiveDisclosureReviewError
+        try:
+            receipt = review_public_disclosure_fixture(
+                role=role, scope=scope, consent=consent
+            )
+        except SelectiveDisclosureReviewError:
+            raise ValueError("APP_GUI_DISCLOSURE_DENIED") from None
+        self.present_public_disclosure_review(receipt)
+
+    def clear_public_disclosure_review(self) -> None:
+        if not self._managed_render_depth:
+            self.clear_offline_presentation()
+            return
+        self.disclosure_review_status.setText("NO PUBLIC VIEWING REVIEW")
+        self.disclosure_review_notice.setText("EXTERNAL REVIEW PENDING · NO PRIVATE CONTENT OR SPEND CAPABILITY")
+
+    def present_public_assurance_review(self, review: object) -> None:
+        if not _valid_assurance(review):
+            self.clear_offline_presentation()
+            raise ValueError("APP_GUI_ASSURANCE_DENIED") from None
+        if not self._managed_render_depth:
+            self.replace_offline_presentation(
+                self._offline_controller.state.revision, assurance_review=review
+            )
+            return
+        self.assurance_review_status.setText("PUBLIC PROVENANCE · 1 FIXTURE / 3 PINS · UNSIGNED / UNTRUSTED")
+        self.assurance_review_notice.setText("SOURCE c9b1ce87 · DIGEST 0700a9000944 · NO PUBLISHER / RUNTIME / RELEASE / SIGN / SEND AUTHORITY")
+
+    def review_public_assurance_fixture(self, *, scope: object, consent: object) -> None:
+        self.clear_offline_presentation()
+        from wam_privacy_wallet.application.security_assurance_review import review_public_assurance_fixture, SecurityAssuranceReviewError
+        try:
+            receipt = review_public_assurance_fixture(scope=scope, consent=consent)
+        except SecurityAssuranceReviewError:
+            raise ValueError("APP_GUI_ASSURANCE_DENIED") from None
+        self.present_public_assurance_review(receipt)
+
+    def clear_public_assurance_review(self) -> None:
+        if not self._managed_render_depth:
+            self.clear_offline_presentation()
+            return
+        self.assurance_review_status.setText("NO UNSIGNED PROVENANCE REVIEW")
+        self.assurance_review_notice.setText("UNSIGNED / UNTRUSTED · NO PUBLISHER, RUNTIME OR RELEASE AUTHORITY")
 
     def present_unsigned_psbt_review(self, review: object) -> None:
         """Display a scalar receipt only; a supplied DTO is never attestation."""
