@@ -1,5 +1,7 @@
 # Architecture boundaries (proposal, not implementation)
 
+**Canonical V1 scope:** [Approved diagram traceability & three-stream integration plan](ARCHITECTURE_V1_PLAN.md). Machine-checked [14-box traceability manifest](ARCHITECTURE_V1_TRACEABILITY.json). Architecture edges denote dependencies and approved data-flow boundaries, **never** transferable signing, RPC or Core execution authority. In particular, an offline signer MUST NOT acquire RPC/network access from a diagram arrow.
+
 ## Objective
 
 A single Python/Qt desktop GUI for macOS and Windows, connected to a user-owned WAM Core validating full node. The app is an integration layer, not a protocol fork.
