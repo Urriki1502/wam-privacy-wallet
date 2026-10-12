@@ -39,3 +39,12 @@ Network review PR #155 merged at
 `743a450a2ed4e50c4151057611e49fb233ab4bb0`. This slice is now based
 on that main commit; exact-head native/GUI/CodeQL qualification is required
 after retargeting. Earlier stacked-branch checks do not qualify the main PR.
+
+## Primitive map boundary follow-up
+
+A shared `synthetic_input_shape` guard requires exact dict, bounded field count
+and exact str keys before key-set comparison. This rejects in-process
+str-subclass equality callbacks and oversized maps before source verification.
+Two additive adversarial regressions raise network/PayJoin floors to 15/17
+and full GUI floor to 978; upstream source bytes remain unchanged. This does
+not provide hostile-code isolation or any operational authorization.
