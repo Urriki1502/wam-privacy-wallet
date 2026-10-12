@@ -530,6 +530,24 @@ def _run(source_root: Path) -> None:
                     raise RuntimeError("WSP1_ACCOUNT_MISMATCH_CHANGED_VALID_SESSION")
                 print("WSP1_ACTUAL_SCANNER_FOREIGN_ACCOUNT_DB_DENIED_PASS")
 
+                # First process-equivalent retained scan at height 1 before
+                # switching the synthetic peer to height 2. The server's
+                # synthetic getblock RPC intentionally serves only its tip.
+                # This test must preserve that historical block in real
+                # upstream SQLite before the new payment arrives.
+                retained_dir = path / "retained-scan-regtest"
+                retained_dir.mkdir(mode=0o700)
+                provision_encrypted_scan_backup(retained_dir, envelope)
+                initial_retained = run_retained_scan_only(
+                    retained_dir, test_password,
+                    import_scan=import_scan, scanner_factory=Scanner,
+                    rpc=Wsp1ScannerOnlyRpc(endpoint, auth),
+                    user_consented=True, max_blocks=1,
+                )
+                if initial_retained.blocks_processed != 1:
+                    raise RuntimeError("WSP1_RETAINED_GENESIS_BOOTSTRAP_DENIED")
+                print("WSP1_RETAINED_HEIGHT1_SQLITE_BOOTSTRAP_PASS")
+
                 # Real pinned BIP352 derivation: a synthetic sender pays the
                 # synthetic scan account on fake regtest height 2. The actual
                 # upstream scanner must discover the matching P2TR output,
@@ -569,9 +587,6 @@ def _run(source_root: Path) -> None:
                 # Real encrypted backup -> real SQLite DB on disk -> reopen
                 # from a new Scanner/process-equivalent lifecycle. The WSP
                 # store owns schema/identity/version/locks, not our app.
-                retained_dir = path / "retained-scan-regtest"
-                retained_dir.mkdir(mode=0o700)
-                provision_encrypted_scan_backup(retained_dir, envelope)
                 print("WSP1_RETAINED_PRIVATE_BACKUP_STAGED")
                 try:
                     first_retained = run_retained_scan_only(
@@ -586,7 +601,7 @@ def _run(source_root: Path) -> None:
                     raise
                 print("WSP1_RETAINED_FIRST_SCANNER_CLOSED")
                 db_path = retained_dir / "scan-only-state.sqlite"
-                if (first_retained.blocks_processed != 2
+                if (first_retained.blocks_processed != 1
                         or not db_path.is_file()):
                     raise RuntimeError("WSP1_RETAINED_DB_FIRST_SCAN_DENIED")
                 with sqlite3.connect(
