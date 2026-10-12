@@ -30,6 +30,10 @@ FORK = "b" * 64
 COINBASE = "c" * 64
 MEMTX = "e" * 64
 PREV = "f" * 64
+PAYTIP = "9" * 64
+PAYTIP_FORK = "6" * 64
+PAYTX = "8" * 64
+COINBASE2 = "7" * 64
 
 
 class LocalSyntheticCoreShape(BaseHTTPRequestHandler):
@@ -40,24 +44,39 @@ class LocalSyntheticCoreShape(BaseHTTPRequestHandler):
         state = self.server
         state.observed_methods.append(method)
         if method == "getblockhash":
-            reply = WAM_REGTEST_GENESIS if params == [0] else state.tip
+            reply = (WAM_REGTEST_GENESIS if params == [0]
+                     else state.tip if params == [state.height]
+                     else FORK if state.height == 2 and params == [1]
+                     else "invalid-hash")
         elif method == "getblockcount":
-            reply = 1
+            reply = state.height
         elif method == "getbestblockhash":
             reply = state.tip
         elif method == "getblockchaininfo":
-            reply = {"chain": "regtest", "pruned": False, "blocks": 1, "headers": 1,
+            reply = {"chain": "regtest", "pruned": False,
+                     "blocks": state.height, "headers": state.height,
                      "bestblockhash": state.tip}
         elif method == "getblock" and params == [state.tip, 3]:
-            reply = {
-                "hash": state.tip, "height": 1,
-                "previousblockhash": WAM_REGTEST_GENESIS,
-                "tx": [{
-                    "txid": COINBASE, "vin": [{"coinbase": "0101"}],
+            if state.height == 2:
+                txs = [{
+                    "txid": COINBASE2, "vin": [{"coinbase": "0202"}],
                     "vout": [{"n": 0, "value": 0.01,
                               "scriptPubKey": {"hex": "51"}}],
-                }],
-            }
+                }]
+                if not state.discard_payment:
+                    txs.append(state.silent_payment)
+                reply = {"hash": state.tip, "height": 2,
+                         "previousblockhash": FORK, "tx": txs}
+            else:
+                reply = {
+                    "hash": state.tip, "height": 1,
+                    "previousblockhash": WAM_REGTEST_GENESIS,
+                    "tx": [{
+                        "txid": COINBASE, "vin": [{"coinbase": "0101"}],
+                        "vout": [{"n": 0, "value": 0.01,
+                                  "scriptPubKey": {"hex": "51"}}],
+                    }],
+                }
         elif method == "getrawmempool" and params == []:
             state.mempool_reads += 1
             reply = ([] if state.flip_mempool_second
@@ -108,7 +127,7 @@ def _run(source_root: Path) -> None:
         raise RuntimeError("WSP1_IMPORTED_SOURCE_UNPINNED")
 
     # This is the actual pinned scanner and its real OS lock/SQLite store.
-    from wam_sp.core import pub
+    from wam_sp.core import Input, pub, send
     from wam_sp.keystore import ScanAccount
     from wam_sp.scanner import Scanner
     from wam_sp.watcher import GENESIS
@@ -117,6 +136,9 @@ def _run(source_root: Path) -> None:
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), LocalSyntheticCoreShape)
     server.tip = TIP
+    server.height = 1
+    server.discard_payment = False
+    server.silent_payment = None
     server.observed_methods = []
     server.violations = []
     server.mempool_reads = 0
