@@ -18,6 +18,38 @@ class OfflinePresentationLifecycleTests(unittest.TestCase):
     def setUp(self):
         self.controller = OfflinePresentationController()
 
+    def test_psbt_receipt_is_untrusted_and_not_retained_in_state(self):
+        from wam_privacy_wallet.application.psbt_v2_review import PsbtV2Review
+        s = self.controller.replace(0, psbt_review=PsbtV2Review(1, 2))
+        self.assertEqual((s.psbt, s.authority), ("UNSIGNED_PARSED_UNTRUSTED", "BLOCKED"))
+        self.assertFalse(hasattr(s, "input_count") or hasattr(s, "source_root"))
+
+    def test_psbt_receipt_omission_and_reset_clear_it(self):
+        from wam_privacy_wallet.application.psbt_v2_review import PsbtV2Review
+        self.controller.replace(0, psbt_review=PsbtV2Review(1, 1))
+        self.assertEqual(self.controller.replace(1).psbt, "ABSENT")
+        self.controller.replace(2, psbt_review=PsbtV2Review(1, 1))
+        self.assertEqual(self.controller.reset().psbt, "ABSENT")
+
+    def test_psbt_forged_authority_or_pin_rejects_whole_snapshot(self):
+        from dataclasses import replace
+        from wam_privacy_wallet.application.psbt_v2_review import PsbtV2Review
+        for kw in ({"sign_allowed": True}, {"broadcast_allowed": True},
+                   {"ownership_verified": True}, {"chain_verified": True},
+                   {"source_commit": "forged"}, {"evidence": "VERIFIED"}):
+            c = OfflinePresentationController()
+            c.replace(0, node=node())
+            with self.assertRaises(OfflineLifecycleError):
+                c.replace(1, psbt_review=replace(PsbtV2Review(1, 1), **kw))
+            self.assertEqual((c.state.psbt, c.state.node), ("ABSENT", "ABSENT"))
+
+    def test_psbt_nonprimitive_or_out_of_range_counts_are_denied(self):
+        from wam_privacy_wallet.application.psbt_v2_review import PsbtV2Review
+        for a, b in ((True, 1), (1, False), (0, 1), (129, 1), (1, 257)):
+            with self.assertRaises(OfflineLifecycleError):
+                self.controller.replace(self.controller.state.revision, psbt_review=PsbtV2Review(a, b))
+        self.assertEqual(self.controller.state.psbt, "ABSENT")
+
     def test_initial_state_is_unprivileged_and_empty(self):
         s = self.controller.state
         self.assertEqual((s.revision, s.transition), (0, "INITIAL"))

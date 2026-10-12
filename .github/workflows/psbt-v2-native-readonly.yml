@@ -11,6 +11,9 @@ on:
       - 'tools/ci_pinned_psbt_v2.py'
       - 'tests/test_psbt_v2_review.py'
       - 'tests/test_psbt_v2_worker_boundary.py'
+      - 'src/wam_privacy_wallet/gui/main_window.py'
+      - 'src/wam_privacy_wallet/application/presentation_lifecycle.py'
+      - 'tests/test_gui_shell.py'
   workflow_dispatch:
 
 permissions:
@@ -31,6 +34,7 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
     env:
       PYTHONDONTWRITEBYTECODE: '1'
+      QT_QPA_PLATFORM: offscreen
     steps:
       - name: Preserve raw source Git blob bytes
         run: git config --global core.autocrlf false
@@ -60,12 +64,15 @@ jobs:
           from wam_privacy_wallet.integrations.wsp1_source_closure import verify_wsp1_full_source_closure
           assert struct.calcsize('P') == 8
           verify_wsp1_full_source_closure(Path('wsp-source').resolve())
+      - name: Install Linux Qt runtime
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0 libxkbcommon0
       - name: Install only exact pinned upstream dependencies and wallet
-        run: python -m pip install --disable-pip-version-check -e ./wsp-source -e .
+        run: python -m pip install --disable-pip-version-check -e ./wsp-source -e ".[gui]"
       - name: Verify dependency consistency
         run: python -m pip check
       - name: Actual unsigned decoder and adversarial source-pinned tests
-        run: python -B -m tools.ci_pinned_psbt_v2 --source-root "${{ github.workspace }}/wsp-source"
+        run: python -B -m tools.ci_pinned_psbt_v2 --gui --source-root "${{ github.workspace }}/wsp-source"
 
   win32-parser-denial:
     name: Windows x86 parser UNQUALIFIED / denial only

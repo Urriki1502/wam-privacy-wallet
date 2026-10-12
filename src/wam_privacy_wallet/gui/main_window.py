@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 
-from wam_privacy_wallet.application.presentation_lifecycle import OfflinePresentationController, OfflineLifecycleError, _valid_recovery, _valid_resume, _valid_rescan, _valid_reorg, _valid_scanner
+from wam_privacy_wallet.application.presentation_lifecycle import OfflinePresentationController, OfflineLifecycleError, _valid_recovery, _valid_resume, _valid_rescan, _valid_reorg, _valid_scanner, _valid_psbt
 from wam_privacy_wallet.application.node_status import NodeOverview
 from wam_privacy_wallet.application.scanner_session_workflow import ScannerReadOnlyObservation
 from wam_privacy_wallet.application.wsp_scan_coordinator import WspScanSessionSummary
@@ -272,6 +272,12 @@ class MainWindow(QMainWindow):
             self.privacy_policy_notice.setObjectName("smallText")
             self.privacy_policy_notice.setWordWrap(True)
             column.addWidget(self.privacy_policy_notice)
+            self.psbt_review_status = QLabel("NO UNSIGNED PSBT REVIEW")
+            column.addWidget(self._status_card("UNSIGNED PSBT · EXPERIMENTAL", self.psbt_review_status))
+            self.psbt_review_notice = QLabel("NO VERIFIED OWNERSHIP OR CHAIN · SIGNING / SENDING BLOCKED")
+            self.psbt_review_notice.setObjectName("smallText")
+            self.psbt_review_notice.setWordWrap(True)
+            column.addWidget(self.psbt_review_notice)
             placeholder = QLabel("SCANNING, SIGNING AND SENDING · BLOCKED")
             placeholder.setObjectName("notice")
             column.addWidget(placeholder)
@@ -358,6 +364,7 @@ class MainWindow(QMainWindow):
                 self.clear_offline_node_snapshot,
                 self.clear_offline_privacy_readiness,
                 self.clear_offline_policy_report,
+                self.clear_unsigned_psbt_review,
                 self.clear_public_receive_vector,
                 self.clear_offline_recovery_review,
                 self.clear_offline_resume_review,
@@ -415,7 +422,7 @@ class MainWindow(QMainWindow):
         privacy: object = None, policy: object = None, receive: object = None,
         recovery: object = None, resume: object = None,
         rescan: object = None, reorg: object = None,
-        scanner_observation: object = None,
+        scanner_observation: object = None, psbt_review: object = None,
     ) -> None:
         """Atomically validate all eight synthetic DTOs before displaying."""
         self._begin_managed_transition()
@@ -425,7 +432,7 @@ class MainWindow(QMainWindow):
                     expected_revision, node=node, privacy=privacy,
                     policy=policy, receive=receive, recovery=recovery, resume=resume,
                     rescan=rescan, reorg=reorg,
-                    scanner_observation=scanner_observation,
+                    scanner_observation=scanner_observation, psbt_review=psbt_review,
                 )
             except OfflineLifecycleError:
                 # Validation already rejected the revision; still clear every
@@ -445,6 +452,8 @@ class MainWindow(QMainWindow):
                         self.present_offline_node_snapshot(node)
                     if state.privacy == "RESEARCH_ONLY":
                         self.present_offline_privacy_readiness(privacy)
+                    if state.psbt != "ABSENT":
+                        self.present_unsigned_psbt_review(psbt_review)
                     if state.policy == "MODEL_ONLY":
                         self.present_offline_policy_report(policy)
                     if state.receive == "PUBLIC_FIXTURE":
@@ -816,6 +825,48 @@ class MainWindow(QMainWindow):
         )
         self.privacy_policy_notice.setText(
             "NETWORK & PAYJOIN MODEL RESULTS ONLY · NO RPC / SIGN / SEND"
+        )
+
+    def present_unsigned_psbt_review(self, review: object) -> None:
+        """Display a scalar receipt only; a supplied DTO is never attestation."""
+        if not _valid_psbt(review):
+            self.clear_offline_presentation()
+            raise ValueError("APP_GUI_PSBT_REVIEW_DENIED") from None
+        if not self._managed_render_depth:
+            self.replace_offline_presentation(
+                self._offline_controller.state.revision, psbt_review=review
+            )
+            return
+        self.psbt_review_status.setText(
+            f"UNSIGNED PARSE · inputs {review.input_count} · outputs {review.output_count} · UNTRUSTED"
+        )
+        self.psbt_review_notice.setText(
+            "SYNTHETIC ONLY · SOURCE ac55f134 · NO VERIFIED OWNERSHIP OR CHAIN · SIGNING / SENDING BLOCKED"
+        )
+
+    def review_unsigned_psbt_fixture(
+        self, raw: object, *, source_root: object, scope: object, consent: object,
+    ) -> None:
+        """Explicit synthetic review; clear stale evidence before consent checks."""
+        self.clear_offline_presentation()
+        from wam_privacy_wallet.application.psbt_v2_review import (
+            PsbtV2ReviewError, review_synthetic_psbt_v2,
+        )
+        try:
+            review = review_synthetic_psbt_v2(
+                raw, source_root=source_root, scope=scope, consent=consent,
+            )
+        except PsbtV2ReviewError:
+            raise ValueError("APP_GUI_PSBT_REVIEW_DENIED") from None
+        self.present_unsigned_psbt_review(review)
+
+    def clear_unsigned_psbt_review(self) -> None:
+        if not self._managed_render_depth:
+            self.clear_offline_presentation()
+            return
+        self.psbt_review_status.setText("NO UNSIGNED PSBT REVIEW")
+        self.psbt_review_notice.setText(
+            "NO VERIFIED OWNERSHIP OR CHAIN · SIGNING / SENDING BLOCKED"
         )
 
     def review_offline_policy_inputs(

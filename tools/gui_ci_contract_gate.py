@@ -8,6 +8,13 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 GUI_PATTERN = "test_gui_shell.py"
 GUI_TEST_IDS = frozenset({
+    "test_gui_shell.GuiShellSmokeTests.test_psbt_panel_defaults_empty_without_actions",
+    "test_gui_shell.GuiShellSmokeTests.test_psbt_scalar_dto_displays_untrusted_without_retaining_raw",
+    "test_gui_shell.GuiShellSmokeTests.test_psbt_denied_consent_clears_prior_evidence_before_child",
+    "test_gui_shell.GuiShellSmokeTests.test_psbt_forged_authority_clears_whole_gui",
+    "test_gui_shell.GuiShellSmokeTests.test_psbt_next_replacement_and_direct_clear_remove_receipt",
+    "test_gui_shell.GuiShellSmokeTests.test_psbt_render_failure_invalidates_and_redacts",
+
     "test_gui_shell.GuiShellSmokeTests.test_input_policy_review_actual_models_and_readonly_gui",
     "test_gui_shell.GuiShellSmokeTests.test_input_policy_denied_consent_clears_previous_report",
     "test_gui_shell.GuiShellSmokeTests.test_input_policy_bad_network_or_proposal_cannot_keep_pass",
@@ -270,7 +277,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 1006
+FULL_MIN_CASES = 1016
 
 
 def _cases(suite: unittest.TestSuite):

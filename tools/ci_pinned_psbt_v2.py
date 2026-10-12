@@ -16,6 +16,7 @@ PUBLIC_X = bytes.fromhex('79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f281
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--source-root',required=True)
+    parser.add_argument('--gui', action='store_true', help='Also exercise actual parser-to-Qt path')
     args=parser.parse_args()
     root=Path(args.source_root).resolve()
     sys.dont_write_bytecode=True
@@ -99,12 +100,48 @@ def main():
             self.assertFalse(any((root/'src/wam_sp').rglob('*.pyc')))
             verify_wsp1_full_source_closure(root)
 
+    if args.gui:
+        import os
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtCore import QCoreApplication, QEvent
+        from PySide6.QtWidgets import QApplication, QPushButton
+        from wam_privacy_wallet.gui import MainWindow
+
+        class ActualParserGuiTests(unittest.TestCase):
+            @classmethod
+            def setUpClass(cls):
+                cls.app = QApplication.instance() or QApplication([])
+            def setUp(self): self.window = MainWindow()
+            def tearDown(self):
+                self.window.close(); self.window.deleteLater()
+                QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+                QCoreApplication.processEvents()
+            def test_actual_worker_to_qt_has_only_scalar_untrusted_receipt(self):
+                self.window.review_unsigned_psbt_fixture(raw, source_root=root, scope='synthetic-regtest', consent=True)
+                self.assertEqual(self.window.offline_presentation_state.psbt, 'UNSIGNED_PARSED_UNTRUSTED')
+                self.assertIn('inputs 1', self.window.psbt_review_status.text())
+                self.assertIn('UNTRUSTED', self.window.psbt_review_status.text())
+                self.assertIn('ac55f134', self.window.psbt_review_notice.text())
+                self.assertEqual(self.window.session_status.text(), 'NO WALLET LOADED')
+                self.assertEqual(self.window.findChildren(QPushButton), [])
+            def test_actual_worker_rejection_and_withdrawn_consent_clear_prior_parse(self):
+                for data, consent in ((raw+b'PRIVATE', True), (raw, False)):
+                    self.window.review_unsigned_psbt_fixture(raw, source_root=root, scope='synthetic-regtest', consent=True)
+                    with self.assertRaisesRegex(ValueError, '^APP_GUI_PSBT_REVIEW_DENIED$'):
+                        self.window.review_unsigned_psbt_fixture(data, source_root=root, scope='synthetic-regtest', consent=consent)
+                    self.assertEqual(self.window.offline_presentation_state.psbt, 'ABSENT')
+                    self.assertEqual(self.window.psbt_review_status.text(), 'NO UNSIGNED PSBT REVIEW')
+                    self.assertEqual(self.window.offline_presentation_state.authority, 'BLOCKED')
+
     suite=unittest.defaultTestLoader.loadTestsFromTestCase(ActualPinnedPsbtTests)
-    if suite.countTestCases()!=21: raise SystemExit('NATIVE_PSBT_DISCOVERY_DENIED')
+    if args.gui:
+        suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(ActualParserGuiTests))
+    expected = 23 if args.gui else 21
+    if suite.countTestCases()!=expected: raise SystemExit('NATIVE_PSBT_DISCOVERY_DENIED')
     result=unittest.TextTestRunner(verbosity=2).run(suite)
     if not result.wasSuccessful() or result.skipped or result.expectedFailures or result.unexpectedSuccesses:
         raise SystemExit('NATIVE_PSBT_TESTS_DENIED')
-    print('NATIVE_PINNED_UNSIGNED_PSBT_V2_OK 21/21; no ownership/chain/sign/broadcast authority')
+    print(f'NATIVE_PINNED_UNSIGNED_PSBT_V2_OK {expected}/{expected}; GUI={args.gui}; no ownership/chain/sign/broadcast authority')
 
 
 if __name__=='__main__': main()
