@@ -14,6 +14,7 @@ from wam_privacy_wallet.application.policy_evidence import (
 from wam_privacy_wallet.application import receive_vector as rv
 
 from wam_privacy_wallet.application.node_status import NodeOverview, node_overview
+from wam_privacy_wallet.application.scanner_session_workflow import ScannerReadOnlyObservation
 from wam_privacy_wallet.node.attestation import ChainIdentity, WAM_REGTEST_GENESIS
 from wam_privacy_wallet.node.core_profile import VerifiedCoreProfile
 from wam_privacy_wallet.node.endpoint import LocalRegtestEndpoint
@@ -43,6 +44,50 @@ class GuiShellSmokeTests(unittest.TestCase):
         self.window.deleteLater()
         QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
         QCoreApplication.processEvents()
+
+    def test_local_scanner_rpc_observation_is_untrusted_gui_only(self) -> None:
+        preview = ScannerReadOnlyObservation(3, 2, 4, 0)
+        self.window.replace_offline_presentation(0, scanner_observation=preview)
+        self.assertEqual(
+            self.window.offline_presentation_state.scanner_session,
+            "LOCAL_RPC_OBSERVED_UNTRUSTED",
+        )
+        self.assertIn("blocks read 2", self.window.scanner_read_only_status.text())
+        self.assertIn("NO WALLET SCAN", self.window.scanner_read_only_status.text())
+        self.assertIn("NO VALIDATED CORE", self.window.scanner_read_only_notice.text())
+        self.assertEqual(self.window.findChildren(QPushButton), [])
+        self.assertEqual(self.window.session_status.text(), "NO WALLET LOADED")
+
+    def test_forged_scanner_enable_flag_clears_gui_lifecycle(self) -> None:
+        from wam_privacy_wallet.application.presentation_lifecycle import OfflineLifecycleError
+        safe = ScannerReadOnlyObservation(3, 2, 4, 0)
+        self.window.replace_offline_presentation(0, scanner_observation=safe)
+        forged = ScannerReadOnlyObservation(3, 2, 4, 0)
+        object.__setattr__(forged, "scanner_enabled", True)
+        with self.assertRaisesRegex(
+            OfflineLifecycleError, "^APP_OFFLINE_LIFECYCLE_DENIED$",
+        ):
+            self.window.replace_offline_presentation(
+                self.window.offline_presentation_state.revision,
+                scanner_observation=forged,
+            )
+        self.assertEqual(
+            self.window.scanner_read_only_status.text(),
+            "NO LOCAL SCANNER OBSERVATION",
+        )
+        self.assertEqual(self.window.offline_presentation_state.scanner_session, "ABSENT")
+
+    def test_lifecycle_replacement_never_carries_scanner_preview_forward(self) -> None:
+        preview = ScannerReadOnlyObservation(3, 2, 4, 2)
+        self.window.replace_offline_presentation(0, scanner_observation=preview)
+        self.window.replace_offline_presentation(
+            self.window.offline_presentation_state.revision
+        )
+        self.assertEqual(self.window.offline_presentation_state.scanner_session, "ABSENT")
+        self.assertEqual(
+            self.window.scanner_read_only_status.text(),
+            "NO LOCAL SCANNER OBSERVATION",
+        )
 
     def test_pages_and_navigation_are_consistent(self) -> None:
         self.assertEqual(
