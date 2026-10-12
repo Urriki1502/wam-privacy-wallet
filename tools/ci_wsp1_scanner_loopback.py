@@ -22,6 +22,9 @@ from tools.wsp1_full_source_closure import verify_wsp1_full_source_closure
 from wam_privacy_wallet.application.wsp_scan_coordinator import (
     ApplicationScanError, run_consented_wsp_scan,
 )
+from wam_privacy_wallet.application.scan_only_account_session import (
+    ScanOnlySessionError, run_disposable_scan_only_backup,
+)
 from wam_privacy_wallet.integrations.wsp1_scanner_only_rpc import (
     Wsp1ScannerOnlyRpc, WspScannerRpcError,
 )
@@ -140,7 +143,7 @@ def _run(source_root: Path) -> None:
 
     # This is the actual pinned scanner and its real OS lock/SQLite store.
     from wam_sp.core import Input, pub, send
-    from wam_sp.keystore import ScanAccount
+    from wam_sp.keystore import ScanAccount, export_scan, import_scan
     from wam_sp.scanner import Scanner
     from wam_sp.watcher import GENESIS
     if GENESIS != WAM_REGTEST_GENESIS:
@@ -225,6 +228,42 @@ def _run(source_root: Path) -> None:
                     raise RuntimeError("WSP1_ACTUAL_APP_SCANNER_SYNC_FAILED")
                 print("WSP1_ACTUAL_APP_COORDINATOR_CONSENT_SYNC_PASS")
                 print("WSP1_ACTUAL_SCANNER_LOCAL_SYNTHETIC_SYNC_PASS")
+
+                # Actual pinned AES-GCM scan-only export/import + new genuine
+                # WSP Scanner/SQLite session, in a freshly discarded temp
+                # workspace. Never import Keyring or a spend-key backup.
+                test_password = b"native-disposable-regtest-only"
+                envelope = export_scan((account,), test_password)
+                pre_denial = len(server.observed_methods)
+                try:
+                    run_disposable_scan_only_backup(
+                        envelope, b"wrong-native-test-password",
+                        import_scan=import_scan, scanner_factory=Scanner,
+                        rpc=Wsp1ScannerOnlyRpc(endpoint, auth),
+                        user_consented=True,
+                    )
+                except ScanOnlySessionError as exc:
+                    if str(exc) != "APP_SCAN_ONLY_RUNTIME_DENIED":
+                        raise
+                else:
+                    raise RuntimeError("WSP1_INVALID_SCAN_ENVELOPE_ACCEPTED")
+                if len(server.observed_methods) != pre_denial:
+                    raise RuntimeError("WSP1_BAD_SCAN_BACKUP_SENT_WIRE")
+
+                intake = run_disposable_scan_only_backup(
+                    envelope, test_password,
+                    import_scan=import_scan, scanner_factory=Scanner,
+                    rpc=Wsp1ScannerOnlyRpc(endpoint, auth),
+                    user_consented=True, max_blocks=1,
+                )
+                if (intake.blocks_processed != 1
+                        or intake.transactions_processed != 1
+                        or intake.status != "WSP1_SCAN_EXECUTED_UNTRUSTED_CORE"
+                        or intake.wallet_operational is not False
+                        or intake.signer_enabled is not False
+                        or intake.mainnet_allowed is not False):
+                    raise RuntimeError("WSP1_REAL_SCAN_ONLY_INTAKE_FAILED")
+                print("WSP1_REAL_ENCRYPTED_SCAN_ONLY_DISPOSABLE_INTAKE_PASS")
 
                 # A retained old RPC session cannot silently follow a fork.
                 server.tip = FORK

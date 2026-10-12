@@ -48,6 +48,8 @@ GUI_TEST_IDS = frozenset({
 })
 # Security-critical original non-GUI identities; additive to original suite floors.
 CRITICAL_NON_GUI_IDS = frozenset({
+    "test_scan_only_account_session.DisposableScanOnlyTests.test_disposable_database_path_is_removed_and_scanner_closed",
+    "test_scan_only_account_session.DisposableScanOnlyTests.test_consent_denied_before_any_decryption_or_io",
     "test_wsp1_full_source_closure.WspFullSourceClosureTests.test_non_api_transitive_module_tampering_denied",
     "test_wsp1_full_source_closure.WspFullSourceClosureTests.test_one_untracked_importable_module_denied_even_with_api_pins",
     "test_wsp1_full_source_closure.WspFullSourceClosureTests.test_pinned_whole_package_passes_with_no_operational_authority",
