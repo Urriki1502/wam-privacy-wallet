@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # Baseline test-count floors measured on all four PR #26 CI platforms.
 # These protect against accidental shrinking of a named test module.
 MINIMUM_CASES = {
+    "test_two_node_readiness.py": 5,
     "test_scaffold.py": 5,
     "test_core_profile.py": 9,
     "test_core_source_pin.py": 14,
