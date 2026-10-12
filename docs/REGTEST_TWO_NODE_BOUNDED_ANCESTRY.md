@@ -14,6 +14,19 @@ The merged live two-node transition observer (#89) already samples tip and immed
 
 These reads are **not an atomic ledger snapshot**. They reduce (but cannot eliminate) read-window inconsistency and cannot rule out malicious/racing RPC servers, ABA mutations between reads, hidden network sockets, untrusted process images or forged WAM Core responses. Values returned by `getblockhash(height)` alone do **not** cryptographically prove that blocks link as parent/child. The output explicitly sets `block_parent_links_verified=false`, `genuine_core_processes_verified=false`, `real_two_node_regtest_qualified=false`, and disables scanner/wallet/signing/broadcast/mainnet authority.
 
+## TTY-only operator CLI (stacked PR #93)
+
+After two genuine, independently approved regtest RPC endpoints **already exist**, the operator can initiate a one-shot ancestry audit:
+
+```sh
+PYTHONPATH=src python -m tools.audit_two_node_ancestry \
+  --node-a-host 127.0.0.1 --node-a-port <A_RPC_PORT> --node-a-rpc-user <A_USER> \
+  --node-b-host 127.0.0.1 --node-b-port <B_RPC_PORT> --node-b-rpc-user <B_USER> \
+  --window-size 8
+```
+
+All ports are explicitly provided and numeric loopback only; no public address, DNS, cookie autodiscovery, Core subprocess or default port. Distinct disposable credentials are prompted through an interactive terminal; no passwords in argv or env, and non-TTY invocations **fail closed**. The output remains scalar non-authorizing JSON, with no secrets, block hashes or process-identity claims. The CLI adds 10 input/redaction/no-launch regressions on top of 15 actual TCP fixture tests from the core module. These CLI tests verify boundaries, **not** a genuine WAM Core process.
+
 ## Native real-transport regressions
 15 additive tests exercise **two actual independent TCP/HTTP servers** used solely as adversarial protocol fixtures: consistent history, height-zero genesis, bounded windows, same-tip/different-interior fork, silent inner-window rewrite, chain-height/genesis/chain/pruned mismatch, malformed hashes and authentication, redacted output and no subprocess invocation.
 
