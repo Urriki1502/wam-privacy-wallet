@@ -45,6 +45,7 @@ GUI_TEST_IDS = frozenset({
 })
 # Security-critical original non-GUI identities; additive to original suite floors.
 CRITICAL_NON_GUI_IDS = frozenset({
+    "test_core_linux_sealed_snapshot.LinuxKernelSealedRegtestTests.test_live_review_rejects_swapped_equivalent_sealed_fd",
     "test_core_linux_sealed_snapshot.LinuxKernelSealedRegtestTests.test_closed_review_cannot_attach_to_reused_valid_sealed_fd",
     "test_core_linux_sealed_snapshot.LinuxKernelSealedRegtestTests.test_seal_receipt_denies_forged_zero_seal_mask",
     "test_core_linux_sealed_snapshot.LinuxKernelSealedRegtestTests.test_unsealed_kernel_fd_cannot_claim_verified_seals",
@@ -172,7 +173,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 837
+FULL_MIN_CASES = 838
 
 
 def _cases(suite: unittest.TestSuite):
