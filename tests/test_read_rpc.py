@@ -72,6 +72,35 @@ class LocalReadOnlyRpcTests(unittest.TestCase):
         with self.assertRaisesRegex(LocalRpcError, "^WAM_RPC_INVALID_PARAMS$"):
             self.rpc.call("getblockchaininfo", [0])
 
+    def test_verbose_blockheader_is_explicit_bounded_read_only(self):
+        self.server.reply = b'{"result":{"hash":"' + b"a" * 64 + b'","height":0},"error":null,"id":1}'
+        result = self.rpc.call("getblockheader", ["a" * 64, True])
+        self.assertEqual(result["height"], 0)
+        self.assertEqual(json.loads(self.server.observed[-1][2])["params"], ["a" * 64, True])
+
+    def test_header_invalid_hash_or_verbosity_fails_without_network(self):
+        malformed = [
+            [], ["a" * 64], ["a" * 64, False], ["a" * 64, 1],
+            ["a" * 64, "true"], ["A" * 64, True], ["g" * 64, True],
+            ["a" * 63, True], ["a" * 65, True], [None, True],
+            ["a" * 64, True, True],
+        ]
+        for params in malformed:
+            with self.subTest(params=params), self.assertRaisesRegex(
+                LocalRpcError, "^WAM_RPC_INVALID_PARAMS$",
+            ):
+                self.rpc.call("getblockheader", params)
+        self.assertEqual(self.server.observed, [])
+
+    def test_header_method_does_not_enable_mutating_rpc_methods(self):
+        for method in ("getblock", "sendrawtransaction", "submitblock",
+                       "getwalletinfo", "importprivkey", "getrawtransaction"):
+            with self.subTest(method=method), self.assertRaisesRegex(
+                LocalRpcError, "^WAM_RPC_METHOD_DENIED$",
+            ):
+                self.rpc.call(method, ["a" * 64, True])
+        self.assertEqual(self.server.observed, [])
+
     def test_write_methods_rejected_before_socket(self):
         for method in ('sendrawtransaction', 'getwalletinfo', 'stop', 'getblock', 'getrawtransaction', '', None, True):
             with self.subTest(method=method):
