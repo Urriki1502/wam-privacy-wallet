@@ -46,7 +46,7 @@ def load_core_manifest(path: Path) -> dict:
         manifest = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, ValueError):
         raise CoreSourceContractError("CORE_MANIFEST_INVALID") from None
-    if not isinstance(manifest, dict) or type(manifest.get("schema")) is not int or manifest["schema"] != 1:
+    if not isinstance(manifest, dict) or type(manifest.get("schema")) is not int or manifest["schema"] != 2:
         raise CoreSourceContractError("CORE_MANIFEST_INVALID")
     if manifest.get("repository") != "wamcoin-core-dev/wam-coin":
         raise CoreSourceContractError("CORE_MANIFEST_WRONG_SOURCE")
@@ -59,6 +59,11 @@ def load_core_manifest(path: Path) -> dict:
         raise CoreSourceContractError("CORE_MANIFEST_INVALID")
     if any(type(v) is not str or _HEX40.fullmatch(v) is None for v in blobs.values()):
         raise CoreSourceContractError("CORE_MANIFEST_INVALID")
+    if (type(manifest.get("consensus_bip94")) is not dict
+            or set(manifest["consensus_bip94"]) != set(_BIP94_EXPECTED)
+            or any(type(value) is not bool for value in manifest["consensus_bip94"].values())
+            or manifest["consensus_bip94"] != _BIP94_EXPECTED):
+        raise CoreSourceContractError("CORE_MANIFEST_BIP94_INVALID")
     if manifest.get("regtest_genesis") != WAM_REGTEST_GENESIS:
         raise CoreSourceContractError("CORE_MANIFEST_GENESIS_MISMATCH")
     if type(manifest.get("network_ports")) is not dict:
@@ -113,11 +118,32 @@ def verify_core_source(manifest: dict, files: Mapping[str, bytes]) -> dict:
     hashes = _GENESIS_RE.findall(regtest)
     if len(hashes) != 1 or hashes[0] != manifest["regtest_genesis"]:
         raise CoreSourceContractError("CORE_SOURCE_GENESIS_DRIFT")
+    # WAM Core changed an uninitialised consensus field (WAM-F6).
+    # Re-qualify exact per-network semantics, not merely refreshed blob SHAs.
+    positions = []
+    for name, marker in _BIP94_CLASSES:
+        if chains.count(marker) != 1:
+            raise CoreSourceContractError("CORE_SOURCE_BIP94_SHAPE_DRIFT")
+        positions.append((name, chains.index(marker)))
+    if positions != sorted(positions, key=lambda item: item[1]):
+        raise CoreSourceContractError("CORE_SOURCE_BIP94_SHAPE_DRIFT")
+    observed = {}
+    for idx, (name, start) in enumerate(positions):
+        end = positions[idx + 1][1] if idx + 1 < len(positions) else len(chains)
+        matches = _BIP94_RE.findall(chains[start:end])
+        if len(matches) != 1:
+            raise CoreSourceContractError("CORE_SOURCE_BIP94_DRIFT")
+        observed[name] = matches[0] == "true"
+    if (observed != _BIP94_EXPECTED
+            or observed != manifest["consensus_bip94"]
+            or len(_BIP94_RE.findall(chains)) != 3):
+        raise CoreSourceContractError("CORE_SOURCE_BIP94_DRIFT")
     if patch.count(_REGTEST_RPC_PATCH) != 1:
         raise CoreSourceContractError("CORE_SOURCE_RPC_PATCH_DRIFT")
     return {
         "network_ports": found,
         "regtest_genesis": hashes[0],
+        "consensus_bip94": observed,
         "source_commit": manifest["inspected_commit"],
         "source_blobs": dict(manifest["source_blobs"]),
     }
