@@ -39,11 +39,11 @@ jobs:
       - name: Preserve raw source Git blob bytes
         run: git config --global core.autocrlf false
       - name: Checkout wallet without credentials
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Checkout immutable WSP source without credentials
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: Urriki1502/wam-silent-payments
           ref: ac55f13423620252bdbf848c7e8a280c3b84721e
@@ -80,7 +80,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout wallet without credentials
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Set up actual 32-bit Python 3.12
