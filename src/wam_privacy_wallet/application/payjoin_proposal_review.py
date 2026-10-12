@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import re
 
 from .synthetic_policy_demo import _verify_source_bytes
+from .synthetic_input_shape import has_exact_primitive_fields
 
 _INPUT_FIELDS = frozenset(("txid", "vout", "atoms", "owner", "sequence",
                           "finalized", "utxo_present", "has_keypaths", "has_partial_signature"))
@@ -28,7 +29,7 @@ class PayjoinProposalReview:
 
 
 def _shape(tx: object) -> None:
-    if type(tx) is not dict or set(tx) != _TX_FIELDS:
+    if not has_exact_primitive_fields(tx, _TX_FIELDS):
         raise ValueError
     # Bounds precede object construction and policy evaluation.
     if type(tx["version"]) is not int or type(tx["locktime"]) is not int:
@@ -38,7 +39,7 @@ def _shape(tx: object) -> None:
         if type(rows) is not tuple or not 1 <= len(rows) <= bound:
             raise ValueError
         for row in rows:
-            if type(row) is not dict or set(row) != fields:
+            if not has_exact_primitive_fields(row, fields):
                 raise ValueError
             if type(row["atoms"]) is not int or type(row["owner"]) is not str:
                 raise ValueError

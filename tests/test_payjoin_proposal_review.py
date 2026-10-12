@@ -134,6 +134,30 @@ class PayjoinProposalReviewTests(unittest.TestCase):
         with patch('wam_privacy_wallet.research_models.payjoin_safety.validator.validate_proposal', side_effect=RuntimeError('PRIVATE')):
             self.denied()
 
+    def test_nonprimitive_keys_denied_before_comparison_or_source_reads(self):
+        class CallbackKey(str):
+            calls = 0
+            __hash__ = str.__hash__
+            def __eq__(self, other):
+                type(self).calls += 1
+                return str.__eq__(self, other)
+        for level in ("transaction", "input", "output"):
+            a, b = fixtures()
+            row, field = (b, "version") if level == "transaction" else (
+                (b["inputs"][0], "owner") if level == "input" else
+                (b["outputs"][0], "destination"))
+            row[CallbackKey(field)] = row.pop(field)
+            CallbackKey.calls = 0
+            with patch("wam_privacy_wallet.application.payjoin_proposal_review._verify_source_bytes") as verify:
+                self.denied((a, b))
+                verify.assert_not_called()
+            self.assertEqual(CallbackKey.calls, 0)
+        a, b = fixtures()
+        b.update({f"extra-{n}": n for n in range(1000)})
+        with patch("wam_privacy_wallet.application.payjoin_proposal_review._verify_source_bytes") as verify:
+            self.denied((a, b))
+            verify.assert_not_called()
+
     def test_no_network_process_or_retained_input_and_immutable(self):
         a, b = fixtures()
         before = deepcopy((a, b))

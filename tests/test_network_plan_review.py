@@ -108,6 +108,27 @@ class NetworkPlanReviewTests(unittest.TestCase):
         with patch("wam_privacy_wallet.research_models.network_privacy.policy.validate_network_plan", side_effect=RuntimeError("PRIVATE")):
             self.denied()
 
+    def test_nonprimitive_keys_denied_without_caller_comparison(self):
+        class CallbackKey(str):
+            calls = 0
+            __hash__ = str.__hash__
+            def __eq__(self, other):
+                type(self).calls += 1
+                return str.__eq__(self, other)
+        a, b = plan()
+        a[CallbackKey("role")] = a.pop("role")
+        CallbackKey.calls = 0
+        with patch("wam_privacy_wallet.application.network_plan_review._verify_source_bytes") as verify:
+            self.denied((a, b))
+            verify.assert_not_called()
+        self.assertEqual(CallbackKey.calls, 0)
+        # Oversized schema denied before key comparison/source reads too.
+        a, b = plan()
+        a.update({f"extra-{n}": n for n in range(1000)})
+        with patch("wam_privacy_wallet.application.network_plan_review._verify_source_bytes") as verify:
+            self.denied((a, b))
+            verify.assert_not_called()
+
     def test_no_network_or_subprocess_and_no_input_retention(self):
         with (patch.object(socket, "socket", side_effect=AssertionError),
               patch.object(socket, "create_connection", side_effect=AssertionError),

@@ -8,6 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .synthetic_policy_demo import _verify_source_bytes
+from .synthetic_input_shape import has_exact_primitive_fields
 
 _FIELDS = frozenset(("role", "host", "port", "route", "encrypted_transport",
                      "authenticated_transport", "fallback"))
@@ -43,7 +44,7 @@ def review_synthetic_network_plan(
                 or type(endpoints) is not tuple or not 1 <= len(endpoints) <= 32):
             raise ValueError
         for row in endpoints:
-            if type(row) is not dict or set(row) != _FIELDS:
+            if not has_exact_primitive_fields(row, _FIELDS):
                 raise ValueError
             for key, limit in (("role", 32), ("host", 255), ("route", 16)):
                 value = row[key]

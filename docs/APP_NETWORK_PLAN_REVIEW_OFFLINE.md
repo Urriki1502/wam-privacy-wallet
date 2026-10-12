@@ -47,3 +47,12 @@ CORE-003 excluded. #9/#82/#86/#153 remain blocked/open as appropriate;
 #148/#151 trusted anti-rollback stays unsupported/review-required, and WSP
 upstream review gates stay unchanged. No Core launch, network transport,
 scanner enablement, real keys/funds, signer, broadcast, mainnet or release claim.
+
+## Primitive map boundary follow-up
+
+A shared `synthetic_input_shape` guard requires exact dict, bounded field count
+and exact str keys before key-set comparison. This rejects in-process
+str-subclass equality callbacks and oversized maps before source verification.
+Two additive adversarial regressions raise network/PayJoin floors to 15/17
+and full GUI floor to 978; upstream source bytes remain unchanged. This does
+not provide hostile-code isolation or any operational authorization.
