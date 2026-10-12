@@ -48,6 +48,9 @@ GUI_TEST_IDS = frozenset({
 })
 # Security-critical original non-GUI identities; additive to original suite floors.
 CRITICAL_NON_GUI_IDS = frozenset({
+    "test_wsp1_full_source_closure.WspFullSourceClosureTests.test_non_api_transitive_module_tampering_denied",
+    "test_wsp1_full_source_closure.WspFullSourceClosureTests.test_one_untracked_importable_module_denied_even_with_api_pins",
+    "test_wsp1_full_source_closure.WspFullSourceClosureTests.test_pinned_whole_package_passes_with_no_operational_authority",
     "test_app_wsp_scan_coordinator.AppWspScanCoordinatorTests.test_consent_is_required_before_any_scanner_method",
     "test_app_wsp_scan_coordinator.AppWspScanCoordinatorTests.test_default_real_engine_contract_returns_only_scalar_untrusted_summary",
     "test_app_wsp_scan_coordinator.AppWspScanCoordinatorTests.test_upstream_failure_denied_no_mock_success_fallback",
@@ -221,7 +224,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 931
+FULL_MIN_CASES = 941
 
 
 def _cases(suite: unittest.TestSuite):

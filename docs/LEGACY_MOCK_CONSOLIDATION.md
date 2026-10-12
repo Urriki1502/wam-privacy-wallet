@@ -27,3 +27,11 @@
 2. **Scan-only account custody:** the external WSP engine stores sensitive scan secrets. Implement reviewed provisioning, encrypted storage and shutdown semantics before enabling scan in the GUI; do not reuse spend keys.
 3. **Application/GUI unification:** replace offline fixture-based scanner status with strictly qualified scan run evidence in a separate explicit UI workflow. Keep harmless RPC-observation state until then.
 4. **Core:** executable stack (`GNU_STACK RWE`) of signed WAM v0.1.11 remains DEV HOLD; no real Core process, no two-node E2E or signing authority.
+
+## Checkpoint: full WSP-1 import closure (PR #136)
+
+- **Real requirement:** importing the actual external WSP scanner transitively loads `keystore`, `core`, `store`, `watcher`, `limits` and other package Python sources. Four API blobs alone do not qualify their bytes.
+- **Integrated control:** check exact upstream Git commit, every committed `src/wam_sp` Python blob and declared exact dependencies, reject missing, modified, symlinked or extra importable Python/native-extension files **before any import** in native synthetic regtest CI.
+- **Mock assessment:** `tests/test_wsp1_full_source_closure.py` uses a synthetic Git tree and is **test-only**. Keep it for tampering/negative cases. Native source qualification uses a real Git checkout and real pinned WSP scanner/SQLite. No production mock fallback is introduced.
+- **Removal decision:** no legacy test or module meets evidence-backed deletion conditions in this slice; leave runtime `scanner_session_workflow.py` as explicitly labeled untrusted RPC observation until GUI scanner state can be bound to a qualified external engine without exposing scan secrets.
+- **Remaining:** this gate is a CI/source provenance prerequisite, NOT an operational loader, hardware trust or transitive native dependency attestation. Actual user scan accounts / encryption / GUI activation and WAM Core approval are still separate gates.
