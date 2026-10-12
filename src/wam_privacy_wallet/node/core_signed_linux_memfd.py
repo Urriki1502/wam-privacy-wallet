@@ -11,6 +11,7 @@ import hashlib
 import os
 from pathlib import Path
 import sys
+import stat
 import tarfile
 from typing import Iterator
 
@@ -38,10 +39,28 @@ _CHUNK = 1 << 20
 # Linux UAPI MFD_NOEXEC_SEAL: disallow executing the review descriptor. If
 # the host does not support it, do not fall back to executable anonymous fd.
 _MFD_NOEXEC_SEAL = 0x0008
+# Linux UAPI F_SEAL_EXEC; not all supported Python fcntl builds export it.
+_F_SEAL_EXEC = 0x0020
 
 
 class SignedNodeSealError(ValueError):
     """Fixed denial, never filename, key path, archive member or GPG output."""
+
+
+def _assert_kernel_noexec(fd: int) -> None:
+    """Require kernel-pinned NX mode AND F_SEAL_EXEC on the signed review fd.
+
+    This protects a nonexecuting review buffer. It never grants a launch
+    capability or claims process-image binding (issue #36).
+    """
+    try:
+        mode = os.fstat(fd).st_mode
+        seals = fcntl.fcntl(fd, fcntl.F_GET_SEALS)
+        if (mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+                or not (seals & _F_SEAL_EXEC)):
+            raise SignedNodeSealError("CORE_SIGNED_SEAL_NOEXEC_DENIED")
+    except (OSError, ValueError, TypeError):
+        raise SignedNodeSealError("CORE_SIGNED_SEAL_NOEXEC_DENIED") from None
 
 
 @contextmanager
@@ -102,6 +121,9 @@ def sealed_signed_linux_wamd(
                 "wam-signed-release-review-noexec",
                 os.MFD_CLOEXEC | os.MFD_ALLOW_SEALING | _MFD_NOEXEC_SEAL,
             )
+            # The flag alone is not proof; inspect actual kernel seals and NX
+            # before ingesting signed bytes, and again after all writes/seals.
+            _assert_kernel_noexec(fd)
             digest = hashlib.sha256()
             count = 0
             found = 0
@@ -139,10 +161,12 @@ def sealed_signed_linux_wamd(
             seals = (fcntl.F_SEAL_WRITE | fcntl.F_SEAL_GROW
                      | fcntl.F_SEAL_SHRINK | fcntl.F_SEAL_SEAL)
             fcntl.fcntl(fd, fcntl.F_ADD_SEALS, seals)
+            _assert_kernel_noexec(fd)
             review = KernelSealedReview(fd, _MEMBER_SHA, count, seals)
             review.audit()
             yield review
             review.audit()
+            _assert_kernel_noexec(fd)
     except SignedNodeSealError:
         raise
     except (CoreReleaseSignatureError, CoreArchiveInventoryError,
