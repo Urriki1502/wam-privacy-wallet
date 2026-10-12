@@ -45,6 +45,10 @@ GUI_TEST_IDS = frozenset({
 })
 # Security-critical original non-GUI identities; additive to original suite floors.
 CRITICAL_NON_GUI_IDS = frozenset({
+    "test_official_regtest_readiness.OfficialRegtestReadinessTests.test_known_signed_exec_stack_is_explicitly_blocked",
+    "test_official_regtest_readiness.OfficialRegtestReadinessTests.test_clean_elf_still_cannot_grant_wam_process_launch",
+    "test_official_regtest_readiness.OfficialRegtestReadinessTests.test_untrusted_review_claim_is_denied_before_elf_read",
+    "test_official_regtest_readiness.OfficialRegtestReadinessTests.test_failed_signature_emits_only_redacted_error_without_json",
     "test_synthetic_linux_fd_exec_binding.SyntheticKernelDescriptorBindingTests.test_fd_directed_kernel_exec_ignores_late_path_replacement",
     "test_synthetic_linux_fd_exec_binding.SyntheticKernelDescriptorBindingTests.test_noexec_sealed_fd_kernel_denies_even_synthetic_fixture",
     "test_synthetic_linux_fd_exec_binding.SyntheticKernelDescriptorBindingTests.test_production_wam_core_launch_gate_still_unconditionally_blocks",
@@ -182,7 +186,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 856
+FULL_MIN_CASES = 861
 
 
 def _cases(suite: unittest.TestSuite):
