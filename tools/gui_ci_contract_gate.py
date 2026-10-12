@@ -45,6 +45,9 @@ GUI_TEST_IDS = frozenset({
 })
 # Security-critical original non-GUI identities; additive to original suite floors.
 CRITICAL_NON_GUI_IDS = frozenset({
+    "test_two_node_p2p_readonly.TwoNodeP2PRealTcpTests.test_both_genuine_localhost_sockets_receive_p2p_methods",
+    "test_two_node_p2p_readonly.TwoNodeP2PRealTcpTests.test_remote_peer_address_denied",
+    "test_two_node_p2p_readonly.TwoNodeP2PRealTcpTests.test_no_core_subprocess_network_reconfiguration_or_wallet_file",
     "test_regtest_scanner_wire.RegtestScannerReadBridgeTests.test_parent_hash_change_with_stable_tip_is_denied",
     "test_regtest_scanner_wire.RegtestScannerReadBridgeTests.test_mismatched_external_parent_denied_before_block_read",
     "test_probe_existing_regtest.ExistingRegtestCliTests.test_block_height_only_fetches_parent_directly_over_node_rpc",
@@ -148,7 +151,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 782
+FULL_MIN_CASES = 802
 
 
 def _cases(suite: unittest.TestSuite):
