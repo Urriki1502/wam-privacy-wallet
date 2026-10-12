@@ -45,6 +45,9 @@ GUI_TEST_IDS = frozenset({
 })
 # Security-critical original non-GUI identities; additive to original suite floors.
 CRITICAL_NON_GUI_IDS = frozenset({
+    "test_synthetic_linux_fd_exec_binding.SyntheticKernelDescriptorBindingTests.test_fd_directed_kernel_exec_ignores_late_path_replacement",
+    "test_synthetic_linux_fd_exec_binding.SyntheticKernelDescriptorBindingTests.test_noexec_sealed_fd_kernel_denies_even_synthetic_fixture",
+    "test_synthetic_linux_fd_exec_binding.SyntheticKernelDescriptorBindingTests.test_production_wam_core_launch_gate_still_unconditionally_blocks",
     "test_core_elf_preflight.SealedElfStaticTests.test_executable_stack_segment_denied",
     "test_core_elf_preflight.SealedElfStaticTests.test_writable_executable_load_denied",
     "test_core_elf_preflight.SealedElfStaticTests.test_sealed_but_executable_memfd_is_denied",
@@ -179,7 +182,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 853
+FULL_MIN_CASES = 856
 
 
 def _cases(suite: unittest.TestSuite):
