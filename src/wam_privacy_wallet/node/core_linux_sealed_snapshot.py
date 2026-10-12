@@ -51,13 +51,39 @@ class KernelSealedEvidence:
 class KernelSealedReview:
     """Ephemeral closed-over fd; never exports an executable path or launch API."""
 
-    __slots__ = ("_descriptor", "_digest", "evidence", "_seals")
+    __slots__ = ("_descriptor", "_digest", "_identity", "evidence", "_seals")
 
     def __init__(self, descriptor: int, digest: str, size: int, seals: int):
+        # The review object is NOT a launch permit. Nevertheless, callers
+        # cannot manufacture seal_flags_verified=True by passing seal mask 0
+        # or an unsealed descriptor, even with matching synthetic bytes.
+        if (fcntl is None
+                or any(not hasattr(fcntl, key) for key in
+                       ("F_SEAL_WRITE", "F_SEAL_GROW", "F_SEAL_SHRINK", "F_SEAL_SEAL"))
+                or type(descriptor) is not int or descriptor < 0
+                or type(digest) is not str or len(digest) != 64
+                or any(ch not in "0123456789abcdef" for ch in digest)
+                or type(size) is not int or not 1 <= size <= _MAX_SEAL_BYTES
+                or type(seals) is not int
+                or seals != (fcntl.F_SEAL_WRITE | fcntl.F_SEAL_GROW
+                             | fcntl.F_SEAL_SHRINK | fcntl.F_SEAL_SEAL)):
+            raise LinuxCoreSealError("CORE_SEAL_REVIEW_DENIED")
         self._descriptor = descriptor
         self._digest = digest
         self._seals = seals
+        try:
+            info = os.fstat(descriptor)
+            self._identity = (info.st_dev, info.st_ino)
+        except OSError:
+            raise LinuxCoreSealError("CORE_SEAL_REVIEW_DENIED") from None
         self.evidence = KernelSealedEvidence(digest, size, True)
+        # Bind the first receipt to an actual currently sealed kernel object.
+        self.audit()
+
+    def _invalidate(self) -> None:
+        # Poison the numeric fd before the context closes it. An unrelated
+        # future fd with the same number can never revive old evidence.
+        self._descriptor = -1
 
     def audit(self) -> bool:
         """Check current kernel seal bits and bounded fd contents, no execution."""
@@ -65,8 +91,11 @@ class KernelSealedReview:
             if self._descriptor < 0 or fcntl is None:
                 raise LinuxCoreSealError("CORE_SEAL_CLOSED")
             held = fcntl.fcntl(self._descriptor, fcntl.F_GET_SEALS)
-            size = os.fstat(self._descriptor).st_size
-            if held & self._seals != self._seals or size != self.evidence.byte_count:
+            info = os.fstat(self._descriptor)
+            size = info.st_size
+            if (held & self._seals != self._seals
+                    or size != self.evidence.byte_count
+                    or (info.st_dev, info.st_ino) != self._identity):
                 raise LinuxCoreSealError("CORE_SEAL_CHANGED")
             digest = hashlib.sha256()
             position = 0
@@ -105,6 +134,7 @@ def sealed_linux_regtest_review(
                     "F_SEAL_GROW", "F_SEAL_SHRINK", "F_SEAL_SEAL"))):
         raise LinuxCoreSealError("CORE_SEAL_PLATFORM_DENIED")
     fd = -1
+    review: KernelSealedReview | None = None
     try:
         with stage_untrusted_core_artifact(
             source, claimed_sha256, network="regtest",
@@ -146,5 +176,7 @@ def sealed_linux_regtest_review(
     except (CoreArtifactStagingError, OSError, TypeError, ValueError):
         raise LinuxCoreSealError("CORE_SEAL_INPUT_DENIED") from None
     finally:
+        if review is not None:
+            review._invalidate()
         if fd >= 0:
             os.close(fd)

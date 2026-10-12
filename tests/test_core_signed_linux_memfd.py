@@ -114,6 +114,30 @@ class SignedLinuxCoreMemfdTests(unittest.TestCase):
         with self.assertRaises(bridge.LinuxCoreSealError):
             review.audit()
 
+    def test_signed_review_closed_receipt_cannot_revive_after_fd_reuse(self):
+        if not self._supported():
+            self._denies_platform()
+            return
+        a, b, c, d = self._patch_verified()
+        with a, b, c, d:
+            with bridge.sealed_signed_linux_wamd(**self.inputs) as previous:
+                old_number = previous._descriptor
+                self.assertTrue(previous.audit())
+            self.assertEqual(previous._descriptor, -1)
+            with bridge.sealed_signed_linux_wamd(**self.inputs) as replacement:
+                reused_directly = replacement._descriptor == old_number
+                if not reused_directly:
+                    os.dup2(replacement._descriptor, old_number)
+                try:
+                    self.assertTrue(replacement.audit())
+                    with self.assertRaisesRegex(
+                        bridge.LinuxCoreSealError, "^CORE_SEAL_CLOSED$",
+                    ):
+                        previous.audit()
+                finally:
+                    if not reused_directly:
+                        os.close(old_number)
+
     def test_never_opens_real_core_subprocess_or_popen(self):
         if not self._supported():
             self._denies_platform()

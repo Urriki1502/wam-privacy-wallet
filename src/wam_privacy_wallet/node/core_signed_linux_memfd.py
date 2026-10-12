@@ -72,6 +72,7 @@ def sealed_signed_linux_wamd(
         raise SignedNodeSealError("CORE_SIGNED_SEAL_ASSET_DENIED")
 
     fd = -1
+    review: KernelSealedReview | None = None
     try:
         # The verifier actually invokes GnuPG with the independently pinned
         # WAM primary signing fingerprint; SHA from caller alone is not trust.
@@ -149,5 +150,7 @@ def sealed_signed_linux_wamd(
             tarfile.TarError, EOFError, ValueError, TypeError, MemoryError):
         raise SignedNodeSealError("CORE_SIGNED_SEAL_DENIED") from None
     finally:
+        if review is not None:
+            review._invalidate()
         if fd >= 0:
             os.close(fd)
