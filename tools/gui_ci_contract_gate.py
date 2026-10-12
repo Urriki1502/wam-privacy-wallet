@@ -52,7 +52,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_app_wsp_scan_coordinator.AppWspScanCoordinatorTests.test_default_real_engine_contract_returns_only_scalar_untrusted_summary",
     "test_app_wsp_scan_coordinator.AppWspScanCoordinatorTests.test_upstream_failure_denied_no_mock_success_fallback",
     "test_app_wsp_scan_coordinator.AppWspScanCoordinatorTests.test_mempool_opt_in_requires_dedicated_rpc_before_engine",
-    "test_app_wsp_scan_coordinator.AppWspScanCoordinatorTests.test_all_wallet_spending_or_consensus_authority_flags_never_returned",
+    "test_app_wsp_scan_coordinator.AppWspScanCoordinatorTests.test_no_wallet_spending_or_consensus_authority_ever_returned",
     "test_wsp1_scanner_only_rpc.WspScannerOnlyRpcTests.test_pinned_upstream_block_transaction_limit_denied_before_scanner",
     "test_wsp1_scanner_only_rpc.WspScannerOnlyRpcTests.test_pinned_upstream_mempool_id_limit_denied_before_scanner",
     "test_wsp1_scanner_only_rpc.WspScannerOnlyRpcTests.test_pinned_upstream_verbose_transaction_input_cap_denied",
