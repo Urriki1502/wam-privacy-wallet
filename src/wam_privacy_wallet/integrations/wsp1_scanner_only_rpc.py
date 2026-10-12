@@ -21,8 +21,14 @@ _IDENTITY = frozenset(("getblockhash", "getblockcount", "getbestblockhash"))
 _BLOCK = frozenset(("getblock",))
 _MEMPOOL = frozenset(("getrawmempool", "getrawtransaction"))
 _MAX_HEIGHT = 100_000_000
-_MAX_BLOCK_TX = 16_384
-_MAX_MEMPOOL_TX = 20_000
+# Exact scanner limits at pinned WSP-1 commit ac55f13423620252bdbf848c7e8a280c3b84721e:
+# wam_sp.limits.DEFAULT.max_block_transactions = 10000,
+# max_inputs = 2048, max_outputs = 4096, Scanner.sync_mempool <= 10000.
+# Reject upstream-invalid records at the RPC edge, before scanner DB work.
+_MAX_BLOCK_TX = 10_000
+_MAX_MEMPOOL_TX = 10_000
+_MAX_TX_INPUTS = 2_048
+_MAX_TX_OUTPUTS = 4_096
 
 
 class WspScannerRpcError(RuntimeError):
@@ -129,8 +135,8 @@ class Wsp1ScannerOnlyRpc:
             if (type(result) is not dict or result.get("txid") != params[0]
                     or type(result.get("vin")) is not list
                     or type(result.get("vout")) is not list
-                    or not 1 <= len(result["vin"]) <= _MAX_BLOCK_TX
-                    or not 1 <= len(result["vout"]) <= _MAX_BLOCK_TX):
+                    or not 1 <= len(result["vin"]) <= _MAX_TX_INPUTS
+                    or not 1 <= len(result["vout"]) <= _MAX_TX_OUTPUTS):
                 raise WspScannerRpcError("WSP_SCAN_REPLY_DENIED")
 
     def call(self, method: str, params: list[object] | None = None) -> object:
