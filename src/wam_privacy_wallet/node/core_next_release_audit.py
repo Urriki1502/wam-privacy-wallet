@@ -64,7 +64,7 @@ def _check_elf(blob: bytes) -> None:
              _ELF_HEADER.unpack_from(blob, 16)
          )
         if (typ not in (2, 3) or arch != 62 or version != 1
-                or entry == 0 or ehsize != 64
+                or (typ == 2 and entry == 0) or ehsize != 64
                 or phentsize != _ELF_PROGRAM.size
                 or not 1 <= phnum <= 128
                 or phoff < 64 or phoff + phnum * phentsize > len(blob)):
