@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import stat
 import tarfile
 import tempfile
 import unittest
@@ -91,6 +92,41 @@ class SignedLinuxCoreMemfdTests(unittest.TestCase):
                 self.assertFalse(review.evidence.core_execution_allowed)
         verify.assert_called_once()
         inspect.assert_called_once()
+
+    def test_signed_memfd_kernel_exec_seal_blocks_x_bit_change(self):
+        if not self._supported():
+            self._denies_platform()
+            return
+        a, b, c, d = self._patch_verified()
+        with a, b, c, d:
+            with bridge.sealed_signed_linux_wamd(**self.inputs) as review:
+                fd = review._descriptor
+                self.assertEqual(
+                    bridge.fcntl.fcntl(fd, bridge.fcntl.F_GET_SEALS)
+                    & bridge._F_SEAL_EXEC,
+                    bridge._F_SEAL_EXEC,
+                )
+                self.assertEqual(os.fstat(fd).st_mode & 0o111, 0)
+                with self.assertRaises(OSError):
+                    os.fchmod(fd, os.fstat(fd).st_mode | stat.S_IXUSR)
+                self.assertTrue(review.audit())
+                self.assertIs(review.evidence.core_execution_allowed, False)
+
+    def test_absent_exec_seal_denies_before_signed_member_stream(self):
+        if not self._supported():
+            self._denies_platform()
+            return
+        a, b, c, d = self._patch_verified()
+        # Model a kernel or API that has not applied the required EXEC seal.
+        # Never trust only MFD_NOEXEC_SEAL flag supplied at creation.
+        with a, b, c, d, patch.object(bridge, "_F_SEAL_EXEC", 0x40000000), \
+             patch.object(bridge.tarfile, "open",
+                          side_effect=AssertionError("MUST_NOT_STREAM")):
+            with self.assertRaisesRegex(
+                bridge.SignedNodeSealError, "^CORE_SIGNED_SEAL_NOEXEC_DENIED$",
+            ):
+                with bridge.sealed_signed_linux_wamd(**self.inputs):
+                    self.fail("unsealed executable inode cannot be reviewed")
 
     def test_kernel_prohibits_post_seal_write_and_truncation(self):
         if not self._supported():
