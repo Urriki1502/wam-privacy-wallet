@@ -50,6 +50,41 @@ class BinaryPathRacePreflightTests(unittest.TestCase):
                 with self.assertRaisesRegex(RealRegtestError, "CORE_BINARY_CHANGED"):
                     verify_binary(path, hashlib.sha256(b"original").hexdigest())
 
+    def test_same_bytes_path_replaced_during_resolve_is_rejected(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "wamd"
+            replacement = Path(d) / "replacement"
+            path.write_bytes(b"identical-synthetic-artifact")
+            replacement.write_bytes(b"identical-synthetic-artifact")
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            original_resolve = type(path).resolve
+
+            def swap_after_hash(current, *args, **kwargs):
+                if current == path:
+                    # Descriptor has been closed, so Windows can also rename.
+                    os.replace(replacement, path)
+                return original_resolve(current, *args, **kwargs)
+
+            with patch.object(type(path), "resolve", swap_after_hash):
+                with self.assertRaisesRegex(RealRegtestError, "CORE_BINARY_CHANGED"):
+                    verify_binary(path, digest)
+
+    def test_path_deleted_during_resolve_cannot_qualify(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "wamd"
+            path.write_bytes(b"synthetic")
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            original_resolve = type(path).resolve
+
+            def delete_after_hash(current, *args, **kwargs):
+                if current == path:
+                    path.unlink()
+                return original_resolve(current, *args, **kwargs)
+
+            with patch.object(type(path), "resolve", delete_after_hash):
+                with self.assertRaisesRegex(RealRegtestError, "CORE_BINARY_UNAVAILABLE"):
+                    verify_binary(path, digest)
+
     def test_launcher_remains_interlocked_even_with_correct_digest(self):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "wamd"
