@@ -25,6 +25,10 @@ OUTPUT = {
     "signing_allowed": False,
     "mainnet_allowed": False,
     "genuine_core_processes_verified": False,
+    "block_parent_links_verified": False,
+    "real_two_node_regtest_qualified": False,
+    "wallet_ready": False,
+    "broadcast_allowed": False,
 }
 
 
@@ -124,6 +128,29 @@ class BoundedAncestryCliTests(unittest.TestCase):
         self.assertEqual(err.strip(), "REGTEST_ANCESTRY_RPC_DENIED")
         self.assertNotIn("SECRET", err)
         self.assertEqual(audit.call_count, 1)
+
+    def test_forged_true_authority_is_redacted_and_denied(self):
+        for field in ("scanner_enabled", "wallet_ready", "signing_allowed",
+                      "broadcast_allowed", "mainnet_allowed",
+                      "genuine_core_processes_verified",
+                      "block_parent_links_verified",
+                      "real_two_node_regtest_qualified"):
+            with self.subTest(field=field):
+                code, out, err, _, _ = self._invoke(
+                    audit_output={**OUTPUT, field: True},
+                )
+                self.assertEqual((code, out), (2, ""))
+                self.assertEqual(err.strip(), "REGTEST_ANCESTRY_AUTHORITY_DENIED")
+
+    def test_missing_or_malformed_review_receipt_is_refused(self):
+        for report in (
+            {}, [], None, {**OUTPUT, "status": "CORE_APPROVED"},
+            {key: value for key, value in OUTPUT.items() if key != "wallet_ready"},
+        ):
+            with self.subTest(type=type(report).__name__):
+                code, out, err, _, _ = self._invoke(audit_output=report)
+                self.assertEqual((code, out), (2, ""))
+                self.assertEqual(err.strip(), "REGTEST_ANCESTRY_AUTHORITY_DENIED")
 
     def test_live_cli_boundary_never_launches_core(self):
         with patch.object(subprocess, "Popen",
