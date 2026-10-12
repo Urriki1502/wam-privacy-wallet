@@ -11,7 +11,7 @@ import re
 from typing import Literal
 
 SOURCE_REPOSITORY = "wamcoin-core-dev/wam-coin"
-REVIEWED_SOURCE_COMMIT = "260bc468e5adffea7ce68d8f97fac3e27e4c50b2"
+REVIEWED_SOURCE_COMMIT = "87ac8f0786fa5bc0796a5cba21e638911078d475"
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z", re.ASCII)
 _RELEASE = re.compile(r"v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\Z", re.ASCII)
 _PLATFORMS = frozenset((
