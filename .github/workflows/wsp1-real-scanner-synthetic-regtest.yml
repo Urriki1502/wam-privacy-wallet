@@ -59,6 +59,11 @@ jobs:
           python -m tools.wsp1_full_source_closure --source-root "$GITHUB_WORKSPACE/wsp-source" > /dev/null
           echo "WSP1_PINNED_SOURCE_AND_IMPORT_CLOSURE_VERIFIED"
 
+      - name: Install Linux Qt runtime libraries (match verified Wallet GUI CI)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1 libopengl0 libxkbcommon-x11-0
+
       - name: Install only pinned experimental WSP-1 scanner runtime dependencies
         run: |
           python -m pip install --disable-pip-version-check -e ./wsp-source
