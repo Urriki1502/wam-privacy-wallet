@@ -113,3 +113,9 @@
 ### Main-target review trigger for #150
 
 The synthetic lineage verifier is not an anti-rollback verifier. In particular, a local callback, hash-chain digest or `ready.sha256` marker must never stand in for a platform-qualified external monotonic high-water mark. Review and qualify the anchor protocol in issue #151 independently; this PR cannot enable real-wallet recovery. PR #150 requires fresh exact-HEAD CodeQL and all platform CI after retargeting from the stacked branch to `main`.
+
+## Post-DEV-response Core candidate preparation (PR #152)
+
+- DEV independently attributed GNU_STACK RWE to three RandomX handwritten .S object files missing .note.GNU-stack, and announced patch-at-fetch for librandomx and a release-time readelf gate over Linux tarballs. The future Core build is not yet verified here.
+- A new Linux release candidate can be statically inspected without extraction/execution for every ELF under bin/, with explicit non-executable stack, no RWX LOAD, and an inert share/examples/wam.conf. Entire release signature verification, DEV-generated --help option parity, loader/DSO and process binding remain separate HOLD gates.
+- Keep #86 / #82 / #9 open. Synthetic archive test fixtures are only adversarial input; no mock Core result can substitute genuine signed Linux release evidence. All new non-authorizing receipt flags remain false.
