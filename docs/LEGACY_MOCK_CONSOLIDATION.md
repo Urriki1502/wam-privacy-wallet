@@ -90,3 +90,10 @@
 - Qt receives only `WspScanSessionSummary` after consent and mandatory wipe of previous receipt. Wrong passphrase/decryption failure, checkpoint corruption, database identity mismatch or rendering error deny success and clear previous GUI evidence. Real native CI proves restart and reorg case with identical upstream code, not test doubles.
 - Offline adversarial fixtures cover all denial paths and count as tests, not proof of real-source integration.
 - **Not** an enabled user GUI restore flow: synchronous headless test only. No production WSP source loader, anti-rollback trust anchor, durable restore transaction, FD-bound database handoff, unlocked account vault, signer/broadcast, Core binary or money.
+
+## Security correction: staging cleanup / post-publication durability (#146, PR #147)
+
+- In both create-only Linux encrypted archives, the publisher must report success **only after staged link removal and final directory `fsync`**. Any failure in close, link, unlink or final directory fsync returns a fixed failure code. The canonical archive is never silently overwritten or deleted following an ambiguous publication.
+- Injected stage-unlink errors prove nlink=2 causes the hardened reader to refuse the canonical file even if an atomic publish already happened. Injected final-directory-fsync errors prove the writer cannot claim durable success, even though a readable file may remain. The entire operation remains non-transactional across untrusted filesystem failures.
+- Both suites retain all original tests plus new error-injection, cross-platform refusal and ordering checks. The real pinned WSP native integration continues to import/restore ciphertext; **no cryptography, key custody, Core execution, signing or mainnet changes**.
+- The single immutable checkpoint is still vulnerable to rollback of its whole directory and has no trusted version/rotation policy; treat that as an independent design gate, not a solved issue.

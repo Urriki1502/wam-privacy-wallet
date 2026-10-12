@@ -60,65 +60,77 @@ def _valid_payload(payload: object) -> bool:
 
 
 def provision_encrypted_scan_backup(directory: Path, encrypted_scan: bytes) -> None:
-    """Create one authenticated-by-upstream-only scan envelope, never replace.
+    """Atomically publish one encrypted scan-only without replacement.
 
-    The caller must have obtained encrypted_scan from a previously verified,
-    source-pinned WSP-1 export_scan. This function does not authenticate its
-    contents. Source/crypto authentication occurs on WSP-1 import_scan.
+    The status is successful ONLY after the temporary inode has been unlinked
+    and the final directory fsync completed. A failed cleanup/durability step
+    always returns a stable refusal, even if the canonical hard link now
+    exists. Never unlink the canonical file after an ambiguous publication:
+    another process might be using it and create-only semantics must hold.
     """
     if not _valid_payload(encrypted_scan):
         raise EncryptedScanBackupError("SCAN_BACKUP_INPUT_DENIED")
     dfd = _directory(directory)
     temp = ".scan-only-stage-" + secrets.token_hex(16)
-    tfd = None
+    fd = None
+    staged = False
+    failed = False
     try:
-        try:
-            tfd = os.open(
-                temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL
-                | os.O_NOFOLLOW | os.O_CLOEXEC,
-                0o600, dir_fd=dfd,
-            )
-            os.fchmod(tfd, 0o600)
-            if (stat.S_IMODE(os.fstat(tfd).st_mode) != 0o600
-                    or os.fstat(tfd).st_nlink != 1):
-                raise EncryptedScanBackupError("SCAN_BACKUP_FILE_DENIED")
-            pos = 0
-            while pos < len(encrypted_scan):
-                count = os.write(tfd, encrypted_scan[pos:])
-                if count <= 0:
-                    raise OSError("short write")
-                pos += count
-            os.fsync(tfd)
-        finally:
-            if tfd is not None:
-                os.close(tfd)
-                tfd = None
-
-        # link() is create-if-absent: parallel publishers cannot overwrite.
-        # A reader can never observe an incomplete canonical filename.
-        os.link(
-            temp, _ENVELOPE, src_dir_fd=dfd, dst_dir_fd=dfd,
-            follow_symlinks=False,
+        fd = os.open(
+            temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL
+            | os.O_NOFOLLOW | os.O_CLOEXEC,
+            0o600, dir_fd=dfd,
         )
-        os.fsync(dfd)
-    except EncryptedScanBackupError:
-        raise
+        staged = True
+        os.fchmod(fd, 0o600)
+        meta = os.fstat(fd)
+        if (not stat.S_ISREG(meta.st_mode)
+                or stat.S_IMODE(meta.st_mode) != 0o600
+                or meta.st_uid != os.geteuid()
+                or meta.st_nlink != 1):
+            raise OSError("invalid staged inode")
+        offset = 0
+        while offset < len(encrypted_scan):
+            count = os.write(fd, encrypted_scan[offset:])
+            if count <= 0:
+                raise OSError("short write")
+            offset += count
+        os.fsync(fd)
+        os.close(fd)
+        fd = None
+        # The canonical name is created ONLY when absent. No replacing it.
+        # A canonical file is never exposed before the encrypted bytes sync.
+        os.link(
+            temp, _ENVELOPE,
+            src_dir_fd=dfd, dst_dir_fd=dfd, follow_symlinks=False,
+        )
     except Exception:
-        raise EncryptedScanBackupError("SCAN_BACKUP_STORE_DENIED") from None
+        failed = True
     finally:
-        if tfd is not None:
+        if fd is not None:
             try:
-                os.close(tfd)
+                os.close(fd)
             except OSError:
-                pass
+                failed = True
+        if staged:
+            try:
+                os.unlink(temp, dir_fd=dfd)
+            except OSError:
+                # A published archive still linked to its stage has nlink=2,
+                # which the reader rejects. Never silently declare success.
+                failed = True
         try:
-            os.unlink(temp, dir_fd=dfd)
+            # Synchronize the final directory state *after* stage removal.
+            # A failure means durability is unknown, not successful.
             os.fsync(dfd)
         except OSError:
-            # A failed cleanup is not permission to run a wallet. The
-            # canonical file, if already linked, remains create-only.
-            pass
-        os.close(dfd)
+            failed = True
+        try:
+            os.close(dfd)
+        except OSError:
+            failed = True
+    if failed:
+        raise EncryptedScanBackupError("SCAN_BACKUP_STORE_DENIED") from None
 
 
 def load_encrypted_scan_backup(directory: Path) -> bytes:

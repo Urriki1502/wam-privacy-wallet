@@ -220,5 +220,67 @@ class ScanBackupVaultTests(unittest.TestCase):
         self.assertEqual(len(list(self.path.iterdir())), 1)
 
 
+    @linux_native
+    def test_cleanup_unlink_failure_after_publish_denies_success(self):
+        original = vault.os.unlink
+        def bad_unlink(name, *args, **kwargs):
+            if isinstance(name, str) and name.startswith(".scan-only-stage-"):
+                raise OSError("SENSITIVE_STAGING_UNLINK_FAILURE")
+            return original(name, *args, **kwargs)
+        with patch.object(vault.os, "unlink", side_effect=bad_unlink):
+            with self.assertRaisesRegex(vault.EncryptedScanBackupError, "^SCAN_BACKUP_STORE_DENIED$") as caught:
+                self.store()
+        self.assertNotIn("SENSITIVE", str(caught.exception))
+        self.assertEqual((self.path / "scan-only.wsp.enc").stat().st_nlink, 2)
+        with self.assertRaisesRegex(vault.EncryptedScanBackupError, "^SCAN_BACKUP_FILE_DENIED$"):
+            vault.load_encrypted_scan_backup(self.path)
+
+    @linux_native
+    def test_directory_fsync_failure_after_unlink_denies_success(self):
+        original = vault.os.fsync
+        def bad_sync(fd):
+            if stat.S_ISDIR(os.fstat(fd).st_mode):
+                raise OSError("SENSITIVE_DURABILITY_FAILURE")
+            return original(fd)
+        with patch.object(vault.os, "fsync", side_effect=bad_sync):
+            with self.assertRaisesRegex(vault.EncryptedScanBackupError, "^SCAN_BACKUP_STORE_DENIED$") as caught:
+                self.store()
+        self.assertNotIn("SENSITIVE", str(caught.exception))
+        self.assertEqual([p.name for p in self.path.iterdir()],
+                         ["scan-only.wsp.enc"])
+
+    @linux_native
+    def test_preexisting_canonical_survives_failed_staging_cleanup(self):
+        self.store()
+        previous = vault.load_encrypted_scan_backup(self.path)
+        original = vault.os.unlink
+        def bad_unlink(name, *args, **kwargs):
+            if isinstance(name, str) and name.startswith(".scan-only-stage-"):
+                raise OSError("STAGING_CLEANUP_FAILED")
+            return original(name, *args, **kwargs)
+        with patch.object(vault.os, "unlink", side_effect=bad_unlink):
+            with self.assertRaisesRegex(vault.EncryptedScanBackupError, "^SCAN_BACKUP_STORE_DENIED$"):
+                self.store(b"Z" * 64)
+        self.assertEqual(vault.load_encrypted_scan_backup(self.path), previous)
+
+    @linux_native
+    def test_directory_fsync_runs_after_staging_unlink(self):
+        events = []
+        real_unlink = vault.os.unlink
+        real_fsync = vault.os.fsync
+        def trace_unlink(name, *args, **kwargs):
+            if isinstance(name, str) and name.startswith(".scan-only-stage-"):
+                events.append("unlink")
+            return real_unlink(name, *args, **kwargs)
+        def trace_fsync(fd):
+            if stat.S_ISDIR(os.fstat(fd).st_mode):
+                events.append("sync")
+            return real_fsync(fd)
+        with patch.object(vault.os, "unlink", side_effect=trace_unlink):
+            with patch.object(vault.os, "fsync", side_effect=trace_fsync):
+                self.store()
+        self.assertEqual(events, ["unlink", "sync"])
+
+
 if __name__ == "__main__":
     unittest.main()
