@@ -163,28 +163,37 @@ def inspect_next_linux_release(archive: Path, expected_sha256: str) -> CoreCandi
                 total += member.size
                 if total > _MAX_TOTAL:
                     raise CoreCandidateAuditError("CORE_CANDIDATE_BOUNDS_DENIED")
-                wanted = len(parts) == 3 and (
-                    (parts[1] == "bin")
-                    or (parts[1] == "share" and parts[2] == "examples")
-                )
                 is_example = name == root + "/share/examples/wam.conf"
-                # Real config is 4 path components; do not silently ignore.
-                wanted = (len(parts)==3 and parts[1]=="bin") or is_example
-                if not wanted:
-                    continue
+                in_bin = len(parts) >= 3 and parts[1] == "bin"
                 f = tf.extractfile(member)
                 if f is None:
                     raise CoreCandidateAuditError("CORE_CANDIDATE_TYPE_DENIED")
                 with f:
-                    content = f.read(member.size + 1)
-                if len(content) != member.size:
-                    raise CoreCandidateAuditError("CORE_CANDIDATE_BOUNDS_DENIED")
-                if is_example:
-                    _check_example(content)
-                    example_hash = hashlib.sha256(content).hexdigest()
-                else:
-                    _check_elf(content)
-                    bin_hashes[parts[2]] = hashlib.sha256(content).hexdigest()
+                    prefix = f.read(min(member.size, 7))
+                    is_elf = prefix.startswith(b"\x7fELF")
+                    if is_example or in_bin or is_elf:
+                        content = prefix + f.read(member.size-len(prefix)+1)
+                        if len(content) != member.size:
+                            raise CoreCandidateAuditError("CORE_CANDIDATE_BOUNDS_DENIED")
+                        if is_example:
+                            _check_example(content)
+                            example_hash = hashlib.sha256(content).hexdigest()
+                        else:
+                            # Every ELF anywhere in the tarball is checked,
+                            # including nested bin and non-executable DSOs.
+                            # Non-ELF files under bin fail closed.
+                            _check_elf(content)
+                            label = ("/".join(parts[2:]) if in_bin
+                                     else "/".join(parts[1:]))
+                            bin_hashes[label] = hashlib.sha256(content).hexdigest()
+                    else:
+                        # Still consume and bound all non-ELF documentation.
+                        remaining = member.size-len(prefix)
+                        while remaining:
+                            part = f.read(min(65536, remaining))
+                            if not part:
+                                raise CoreCandidateAuditError("CORE_CANDIDATE_BOUNDS_DENIED")
+                            remaining -= len(part)
         if "wamd" not in bin_hashes:
             raise CoreCandidateAuditError("CORE_CANDIDATE_DAEMON_MISSING")
         if example_hash is None:
