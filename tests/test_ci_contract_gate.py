@@ -32,7 +32,7 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
         return patch.dict(MINIMUM_CASES, {self.pattern: 1})
 
     def test_manifest_preserves_original_eight_and_self_test(self):
-        self.assertEqual(len(MANDATORY_SUITES), 75)
+        self.assertEqual(len(MANDATORY_SUITES), 77)
         self.assertEqual(len(set(MANDATORY_SUITES)), len(MANDATORY_SUITES))
         self.assertIn("test_ci_contract_gate.py", MANDATORY_SUITES)
         self.assertIn("test_regtest_gateway.py", MANDATORY_SUITES)
@@ -174,6 +174,8 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
             "test_app_synthetic_policy_demo.py": 8,
             "test_network_plan_review.py": 15,
             "test_payjoin_proposal_review.py": 17,
+            "test_psbt_v2_review.py": 16,
+            "test_psbt_v2_worker_boundary.py": 10,
             "test_app_receive_public_vector.py": 12,
             "test_app_presentation_lifecycle.py": 10,
             "test_scanner_response_shape.py": 14,
@@ -201,7 +203,7 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
             "test_official_regtest_readiness.py": 5,
             "test_architecture_v1_traceability.py": 6,
             "test_wsp1_pinned_surface.py": 6,
-            "test_wsp1_full_source_closure.py": 10,
+            "test_wsp1_full_source_closure.py": 12,
             "test_wsp1_scanner_only_rpc.py": 21,
             "test_app_scanner_session_workflow.py": 14,
             "test_app_wsp_scan_coordinator.py": 15,
