@@ -12,6 +12,13 @@ from tools.gui_ci_contract_gate import check_and_run
 
 
 _NAMES = (
+    "test_psbt_panel_defaults_empty_without_actions",
+    "test_psbt_scalar_dto_displays_untrusted_without_retaining_raw",
+    "test_psbt_denied_consent_clears_prior_evidence_before_child",
+    "test_psbt_forged_authority_clears_whole_gui",
+    "test_psbt_next_replacement_and_direct_clear_remove_receipt",
+    "test_psbt_render_failure_invalidates_and_redacts",
+
     "test_input_policy_review_actual_models_and_readonly_gui",
     "test_input_policy_denied_consent_clears_previous_report",
     "test_input_policy_bad_network_or_proposal_cannot_keep_pass",

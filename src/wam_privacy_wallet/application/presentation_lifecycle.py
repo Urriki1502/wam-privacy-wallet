@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from .psbt_v2_review import PsbtV2Review, _PIN
 from .node_status import NodeOverview
 from .recovery_transition import OfflineRecoveryTransition
 from .offline_resume_review import OfflineResumeReview
@@ -52,6 +53,7 @@ class OfflinePresentationState:
         "REPLAY_NOT_DOUBLE_COUNTED", "ROLLBACK_RESCAN_REVIEW",
         "MIGRATION_RESCAN_REVIEW",
     ] = "ABSENT"
+    psbt: Literal["ABSENT", "UNSIGNED_PARSED_UNTRUSTED"] = "ABSENT"
     scanner_session: Literal[
         "ABSENT", "LOCAL_RPC_OBSERVED_UNTRUSTED",
     ] = "ABSENT"
@@ -94,6 +96,20 @@ def _valid_scanner(value: object) -> bool:
         and value.signer_enabled is False
         and value.broadcast_allowed is False
         and value.mainnet_allowed is False
+    )
+
+
+def _valid_psbt(value: object) -> bool:
+    """Only bounded untrusted counts; never promote a receipt to authority."""
+    return (
+        type(value) is PsbtV2Review
+        and type(value.input_count) is int and 1 <= value.input_count <= 128
+        and type(value.output_count) is int and 1 <= value.output_count <= 256
+        and type(value.source_commit) is str and value.source_commit == _PIN
+        and type(value.evidence) is str
+        and value.evidence == "PINNED_UNSIGNED_PSBT_V2_PARSED_UNTRUSTED"
+        and value.ownership_verified is False and value.chain_verified is False
+        and value.sign_allowed is False and value.broadcast_allowed is False
     )
 
 
@@ -353,11 +369,13 @@ class OfflinePresentationController:
         rescan: object = None,
         reorg: object = None,
         scanner_observation: object = None,
+        psbt_review: object = None,
     ) -> OfflinePresentationState:
         if type(expected_revision) is not int or expected_revision != self._state.revision:
             self._reject()
         if (
-            (node is not None and not _valid_node(node))
+            (psbt_review is not None and not _valid_psbt(psbt_review))
+            or (node is not None and not _valid_node(node))
             or (scanner_observation is not None
                 and not _valid_scanner(scanner_observation))
             or (privacy is not None and not _valid_privacy(privacy))
@@ -387,6 +405,7 @@ class OfflinePresentationController:
             resume.action if resume is not None else "ABSENT",
             rescan.disposition if rescan is not None else "ABSENT",
             reorg.verdict if reorg is not None else "ABSENT",
+            psbt="UNSIGNED_PARSED_UNTRUSTED" if psbt_review is not None else "ABSENT",
             scanner_session=("LOCAL_RPC_OBSERVED_UNTRUSTED"
                              if scanner_observation is not None else "ABSENT"),
         )

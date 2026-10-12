@@ -2,6 +2,7 @@
 
 import os
 import unittest
+from unittest.mock import patch
 import json
 from pathlib import Path
 
@@ -45,6 +46,61 @@ class GuiShellSmokeTests(unittest.TestCase):
         self.window.deleteLater()
         QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
         QCoreApplication.processEvents()
+
+    def test_psbt_panel_defaults_empty_without_actions(self):
+        self.assertEqual(self.window.psbt_review_status.text(), "NO UNSIGNED PSBT REVIEW")
+        self.assertEqual(self.window.offline_presentation_state.psbt, "ABSENT")
+        self.assertEqual(self.window.findChildren(QPushButton), [])
+
+    def test_psbt_scalar_dto_displays_untrusted_without_retaining_raw(self):
+        # Display/schema test only. Actual parser-to-Qt proof lives in native CI.
+        from wam_privacy_wallet.application.psbt_v2_review import PsbtV2Review
+        self.window.present_unsigned_psbt_review(PsbtV2Review(2, 3))
+        self.assertIn("inputs 2", self.window.psbt_review_status.text())
+        self.assertIn("UNTRUSTED", self.window.psbt_review_status.text())
+        self.assertIn("ac55f134", self.window.psbt_review_notice.text())
+        self.assertIn("SIGNING / SENDING BLOCKED", self.window.psbt_review_notice.text())
+        self.assertEqual(self.window.session_status.text(), "NO WALLET LOADED")
+        self.assertFalse(hasattr(self.window.offline_presentation_state, "raw"))
+
+    def test_psbt_denied_consent_clears_prior_evidence_before_child(self):
+        from pathlib import Path
+        from wam_privacy_wallet.application.psbt_v2_review import PsbtV2Review
+        self.window.present_unsigned_psbt_review(PsbtV2Review(1, 1))
+        with patch("subprocess.run") as child:
+            with self.assertRaisesRegex(ValueError, "^APP_GUI_PSBT_REVIEW_DENIED$"):
+                self.window.review_unsigned_psbt_fixture(b"psbt\xff", source_root=Path.cwd(), scope="synthetic-regtest", consent=False)
+            child.assert_not_called()
+        self.assertEqual(self.window.psbt_review_status.text(), "NO UNSIGNED PSBT REVIEW")
+        self.assertEqual(self.window.offline_presentation_state.psbt, "ABSENT")
+
+    def test_psbt_forged_authority_clears_whole_gui(self):
+        from dataclasses import replace
+        from wam_privacy_wallet.application.psbt_v2_review import PsbtV2Review
+        self.window.present_offline_node_snapshot(NodeOverview("regtest", 1, "READ_ONLY_SNAPSHOT", "EXPERIMENTAL_NO_REAL_FUNDS"))
+        with self.assertRaisesRegex(ValueError, "^APP_GUI_PSBT_REVIEW_DENIED$"):
+            self.window.present_unsigned_psbt_review(replace(PsbtV2Review(1, 1), sign_allowed=True))
+        self.assertEqual(self.window.offline_presentation_state.node, "ABSENT")
+        self.assertEqual(self.window.psbt_review_status.text(), "NO UNSIGNED PSBT REVIEW")
+
+    def test_psbt_next_replacement_and_direct_clear_remove_receipt(self):
+        from wam_privacy_wallet.application.psbt_v2_review import PsbtV2Review
+        self.window.present_unsigned_psbt_review(PsbtV2Review(1, 1))
+        self.window.replace_offline_presentation(self.window.offline_presentation_state.revision)
+        self.assertEqual(self.window.psbt_review_status.text(), "NO UNSIGNED PSBT REVIEW")
+        self.window.present_unsigned_psbt_review(PsbtV2Review(1, 1))
+        self.window.clear_unsigned_psbt_review()
+        self.assertEqual(self.window.offline_presentation_state.psbt, "ABSENT")
+
+    def test_psbt_render_failure_invalidates_and_redacts(self):
+        from wam_privacy_wallet.application.psbt_v2_review import PsbtV2Review
+        old = self.window.offline_presentation_state.revision
+        with patch.object(self.window.psbt_review_status, "setText", side_effect=RuntimeError("PRIVATE")):
+            with self.assertRaisesRegex(ValueError, "^APP_OFFLINE_RENDER_DENIED$"):
+                self.window.present_unsigned_psbt_review(PsbtV2Review(1, 1))
+        self.assertGreater(self.window.offline_presentation_state.revision, old)
+        self.assertEqual(self.window.offline_presentation_state.psbt, "ABSENT")
+        self.assertEqual(self.window.offline_presentation_state.authority, "BLOCKED")
 
     def test_real_wsp_scanner_result_renders_only_as_untrusted_receipt(self):
         receipt = WspScanSessionSummary(1, 2, 0, 0)
