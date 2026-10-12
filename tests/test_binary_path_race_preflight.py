@@ -104,12 +104,24 @@ class BinaryPathRacePreflightTests(unittest.TestCase):
             path.write_bytes(b"synthetic-hardlink")
             try:
                 os.link(path, alias)
+                linked = path.stat().st_nlink >= 2
             except (OSError, NotImplementedError):
-                self.skipTest("hardlinks unavailable on this runner")
-            if path.stat().st_nlink < 2:
-                self.skipTest("native stat does not expose hardlink count")
-            with self.assertRaisesRegex(RealRegtestError, "^CORE_BINARY_NOT_REGULAR$"):
-                verify_binary(path, hashlib.sha256(path.read_bytes()).hexdigest())
+                linked = False
+            if linked:
+                with self.assertRaisesRegex(RealRegtestError, "^CORE_BINARY_NOT_REGULAR$"):
+                    verify_binary(path, hashlib.sha256(path.read_bytes()).hexdigest())
+            else:
+                # Some runner filesystems cannot create/measure hardlinks.
+                # Exercise the exact rejection boundary without a CI skip.
+                from types import SimpleNamespace
+                current = path.stat()
+                fake = SimpleNamespace(
+                    st_mode=current.st_mode, st_nlink=2,
+                    st_size=current.st_size, st_file_attributes=0,
+                )
+                with patch.object(type(path), "lstat", return_value=fake):
+                    with self.assertRaisesRegex(RealRegtestError, "^CORE_BINARY_NOT_REGULAR$"):
+                        verify_binary(path, hashlib.sha256(b"synthetic-hardlink").hexdigest())
 
     def test_empty_binary_denied_without_launch(self):
         with tempfile.TemporaryDirectory() as d:
