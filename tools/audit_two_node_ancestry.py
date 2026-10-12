@@ -20,6 +20,9 @@ from wam_privacy_wallet.node.two_node_bounded_ancestry import (
 from wam_privacy_wallet.node.two_node_header_links import (
     TwoNodeHeaderLinkError, TwoNodeHeaderLinkAuditor,
 )
+from wam_privacy_wallet.node.two_node_p2p_readonly import (
+    RegtestP2PAuditError, TwoNodeP2PReadOnlyAudit,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -32,6 +35,9 @@ def main(argv: list[str] | None = None) -> int:
         parser.add_argument(f"--node-{node}-rpc-user", required=True)
     parser.add_argument("--window-size", type=int, default=8)
     parser.add_argument("--include-header-links", action="store_true")
+    parser.add_argument("--include-p2p-topology", action="store_true")
+    parser.add_argument("--node-a-p2p-port", type=int)
+    parser.add_argument("--node-b-p2p-port", type=int)
     arguments = parser.parse_args(argv)
 
     try:
@@ -44,8 +50,22 @@ def main(argv: list[str] | None = None) -> int:
         if not 1 <= arguments.window_size <= 16:
             raise TwoNodeAncestryError("REGTEST_ANCESTRY_WINDOW_DENIED")
         # Existing exact auth type validates username without transmitting.
-        ExplicitRpcAuth(arguments.node_a_rpc_user, "VALIDATION_ONLY")
-        ExplicitRpcAuth(arguments.node_b_rpc_user, "VALIDATION_ONLY")
+        test_auth_a = ExplicitRpcAuth(arguments.node_a_rpc_user, "VALIDATION_ONLY")
+        test_auth_b = ExplicitRpcAuth(arguments.node_b_rpc_user, "VALIDATION_ONLY")
+        if arguments.include_p2p_topology:
+            if arguments.node_a_p2p_port is None or arguments.node_b_p2p_port is None:
+                raise TwoNodeAncestryError("REGTEST_ANCESTRY_P2P_PORTS_REQUIRED")
+            try:
+                # Validate all four unique localhost ports without opening a socket.
+                TwoNodeP2PReadOnlyAudit(
+                    a, test_auth_a, b, test_auth_b,
+                    node_a_p2p_port=arguments.node_a_p2p_port,
+                    node_b_p2p_port=arguments.node_b_p2p_port,
+                )
+            except RegtestP2PAuditError:
+                raise TwoNodeAncestryError("REGTEST_ANCESTRY_P2P_PORTS_DENIED") from None
+        elif arguments.node_a_p2p_port is not None or arguments.node_b_p2p_port is not None:
+            raise TwoNodeAncestryError("REGTEST_ANCESTRY_P2P_OPT_IN_REQUIRED")
         if not sys.stdin.isatty():
             raise TwoNodeAncestryError("REGTEST_ANCESTRY_TTY_REQUIRED")
         password_a = getpass.getpass("Node A disposable regtest RPC password: ")
@@ -124,6 +144,47 @@ def main(argv: list[str] | None = None) -> int:
                 "status": "UNTRUSTED_TWO_NODE_HEADER_AND_ANCESTRY_REVIEW_ONLY",
                 "rpc_reported_parent_links_match": True,
                 "cryptographic_headers_verified": False,
+                "same_epoch_proven": False,
+            }
+        if arguments.include_p2p_topology:
+            try:
+                topology = TwoNodeP2PReadOnlyAudit(
+                    a, auth_a, b, auth_b,
+                    node_a_p2p_port=arguments.node_a_p2p_port,
+                    node_b_p2p_port=arguments.node_b_p2p_port,
+                ).audit()
+            except RegtestP2PAuditError:
+                raise TwoNodeAncestryError("REGTEST_ANCESTRY_P2P_RPC_DENIED") from None
+            negative = (
+                "genuine_wam_process_verified", "independent_processes_verified",
+                "external_network_exclusion_proven", "real_two_node_regtest_qualified",
+                "scanner_enabled", "wallet_ready", "signing_allowed",
+                "broadcast_allowed", "mainnet_allowed",
+            )
+            expected = {
+                "status", "peer_count_a", "peer_count_b",
+                "localhost_only_observed", "expected_direction_observed",
+                "reported_chain_agrees", *negative,
+            }
+            if (type(topology) is not dict
+                    or set(topology) != expected
+                    or topology.get("status") != "UNTRUSTED_LOCAL_REGTEST_P2P_TOPOLOGY_ONLY"
+                    or type(topology["peer_count_a"]) is not int
+                    or type(topology["peer_count_b"]) is not int
+                    or topology["peer_count_a"] != 1
+                    or topology["peer_count_b"] != 1
+                    or any(topology.get(key) is not True for key in (
+                        "localhost_only_observed", "expected_direction_observed",
+                        "reported_chain_agrees",
+                    ))
+                    or any(topology.get(key) is not False for key in negative)):
+                raise TwoNodeAncestryError("REGTEST_ANCESTRY_P2P_RECEIPT_DENIED")
+            # P2P and ancestry/header audits are sequential, NOT one atomic
+            # epoch or an authenticated WAM Core process-pair attestation.
+            result = {
+                **result,
+                "status": "UNTRUSTED_TWO_NODE_COMBINED_RPC_OBSERVATION_ONLY",
+                "rpc_reported_p2p_topology_match": True,
                 "same_epoch_proven": False,
             }
     except TwoNodeAncestryError as exc:
