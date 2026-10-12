@@ -67,8 +67,9 @@ class ScanPreviewWorkflowTests(unittest.TestCase):
                     rpc=self.rpc, user_consented=True, clear_preview=self.clear,
                     present_preview=self.present)
         opts.update(changes)
+        password = opts.pop("password", b"only-test-passphrase")
         return app.run_disposable_scan_preview(
-            b"E" * 52, b"only-test-passphrase", **opts,
+            b"E" * 52, password, **opts,
         )
 
     def test_full_app_scan_to_presentation_order_and_scalar_receipt(self):
