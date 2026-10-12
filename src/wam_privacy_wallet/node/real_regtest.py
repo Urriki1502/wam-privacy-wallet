@@ -40,21 +40,44 @@ class RealRegtestEvidence:
 
 
 def verify_binary(path: str | os.PathLike[str], sha256: str) -> Path:
-    """Verify a regular executable file against an operator-supplied SHA256."""
+    """Non-executing preflight: hash one no-follow descriptor and detect pathname races.
+
+    This check deliberately DOES NOT authorize launching the returned pathname.
+    The mandatory #36 launch interlock remains in force until immutable
+    verified-image-to-process binding is independently reviewed.
+    """
     if type(sha256) is not str or _SHA.fullmatch(sha256) is None:
         raise RealRegtestError("CORE_SHA256_INVALID")
     try:
         src = Path(path)
-        info = src.lstat()
-        if not stat.S_ISREG(info.st_mode) or src.is_symlink():
+        before = src.lstat()
+        if not stat.S_ISREG(before.st_mode) or stat.S_ISLNK(before.st_mode):
             raise RealRegtestError("CORE_BINARY_NOT_REGULAR")
-        digest = hashlib.sha256()
-        with src.open("rb") as stream:
+        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        with os.fdopen(os.open(src, flags), "rb") as stream:
+            opened = os.fstat(stream.fileno())
+            if (not stat.S_ISREG(opened.st_mode)
+                    or (before.st_dev, before.st_ino) != (opened.st_dev, opened.st_ino)):
+                raise RealRegtestError("CORE_BINARY_CHANGED")
+            digest = hashlib.sha256()
             for chunk in iter(lambda: stream.read(1024 * 1024), b""):
                 digest.update(chunk)
+            held = os.fstat(stream.fileno())
+            after = src.lstat()
+            def identity(info: os.stat_result) -> tuple[int, int, int, int, int]:
+                return (info.st_dev, info.st_ino, info.st_size,
+                        info.st_mtime_ns, info.st_ctime_ns)
+            if (not stat.S_ISREG(after.st_mode)
+                    or identity(opened) != identity(held)
+                    or identity(held) != identity(after)):
+                raise RealRegtestError("CORE_BINARY_CHANGED")
         if digest.hexdigest() != sha256:
             raise RealRegtestError("CORE_SHA256_MISMATCH")
         return src.resolve(strict=True)
+    except RealRegtestError:
+        raise
     except (OSError, TypeError, ValueError):
         raise RealRegtestError("CORE_BINARY_UNAVAILABLE") from None
 
