@@ -58,6 +58,28 @@ jobs:
                   raise SystemExit("WSP_STATIC_ROLE_DENIED_"+role.upper())
               print("WSP_STATIC_ROLE_VERIFIED_"+role.upper())
           PY
+          # Fixed public method names only; no source text or credentials.
+          PYTHONPATH=src python - "$SRC_ROOT" <<'PY'
+          import ast, pathlib, sys
+          from wam_privacy_wallet.node.read_rpc import _READ_METHODS
+          from tools.wsp1_pinned_surface import _EXPECTED_SCAN_CALLS
+          root=pathlib.Path(sys.argv[1])
+          tree=ast.parse((root/"src/wam_sp/scanner.py").read_text())
+          calls={
+              n.args[0].value for n in ast.walk(tree)
+              if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+              and n.func.attr=="call" and n.args
+              and isinstance(n.args[0],ast.Constant)
+              and type(n.args[0].value) is str
+          }
+          attest=sum(1 for n in ast.walk(tree) if isinstance(n, ast.Call)
+                     and isinstance(n.func, ast.Attribute)
+                     and n.func.attr=="attest")
+          print("WSP_SCANNER_PUBLIC_METHODS="+",".join(sorted(calls)))
+          print("WSP_EXPECTED_PUBLIC_METHODS="+",".join(sorted(_EXPECTED_SCAN_CALLS)))
+          print("WSP_MISSING_WALLET_READ_METHODS="+",".join(sorted(calls-_READ_METHODS)))
+          print("WSP_ATTEST_CALL_COUNT="+str(attest))
+          PY
           PYTHONPATH=src python -m tools.wsp1_pinned_surface \
             --source-root "$SRC_ROOT" > "$SRC_ROOT/report.json"
           python - "$SRC_ROOT/report.json" <<'PY'
