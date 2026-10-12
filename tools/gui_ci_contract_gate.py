@@ -53,6 +53,9 @@ GUI_TEST_IDS = frozenset({
 })
 # Security-critical original non-GUI identities; additive to original suite floors.
 CRITICAL_NON_GUI_IDS = frozenset({
+    "test_encrypted_scan_backup.ScanBackupVaultTests.test_create_and_load_identical_opaque_encrypted_backup",
+    "test_encrypted_scan_backup.ScanBackupVaultTests.test_symlinked_parent_directory_is_refused",
+    "test_encrypted_scan_backup.ScanBackupVaultTests.test_concurrent_writers_one_wins_no_overwrite",
     "test_scan_preview_workflow.ScanPreviewWorkflowTests.test_full_app_scan_to_presentation_order_and_scalar_receipt",
     "test_scan_preview_workflow.ScanPreviewWorkflowTests.test_render_failure_clears_previous_evidence",
     "test_scan_preview_workflow.ScanPreviewWorkflowTests.test_denied_consent_clears_without_import",
