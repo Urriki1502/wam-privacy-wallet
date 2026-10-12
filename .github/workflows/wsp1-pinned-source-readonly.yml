@@ -44,6 +44,20 @@ jobs:
               --output "$SRC_ROOT/src/wam_sp/$name.py" \
               "https://raw.githubusercontent.com/Urriki1502/wam-silent-payments/$COMMIT/src/wam_sp/$name.py"
           done
+          # Role-specific fixed diagnostics aid reproducible upstream byte
+          # review. No source text, secrets, paths or untrusted data printed.
+          PYTHONPATH=src python - "$SRC_ROOT" <<'PY'
+          import pathlib, sys
+          from tools.wsp1_pinned_surface import _PINNED, _inspect_one, WspSourceReviewError
+          root = pathlib.Path(sys.argv[1])
+          for path, pin in _PINNED.items():
+              role = path.rsplit("/",1)[-1].replace("offline_signer","signer").replace(".py","")
+              try:
+                  _inspect_one((root/path).read_bytes(),blob_sha=pin,role=role)
+              except (OSError, WspSourceReviewError):
+                  raise SystemExit("WSP_STATIC_ROLE_DENIED_"+role.upper())
+              print("WSP_STATIC_ROLE_VERIFIED_"+role.upper())
+          PY
           PYTHONPATH=src python -m tools.wsp1_pinned_surface \
             --source-root "$SRC_ROOT" > "$SRC_ROOT/report.json"
           python - "$SRC_ROOT/report.json" <<'PY'
