@@ -155,6 +155,7 @@ def _run(source_root: Path) -> None:
     # This is the actual pinned scanner and its real OS lock/SQLite store.
     from wam_sp.core import Input, pub, send
     from wam_sp.keystore import ScanAccount, export_scan, import_scan
+    from wam_sp.errors import StorageError
     from wam_sp.scanner import Scanner
     from wam_sp.watcher import GENESIS
     if GENESIS != WAM_REGTEST_GENESIS:
@@ -631,6 +632,85 @@ def _run(source_root: Path) -> None:
                         raise RuntimeError("WSP1_RETAINED_REPLAY_DUPLICATED")
                 print("WSP1_REAL_PERSISTENT_SQLITE_RESTART_IDEMPOTENT_PASS")
 
+                # Upstream source-pinned Store exports an authenticated,
+                # network+account-bound AES-GCM checkpoint for all tables.
+                # This is genuine Store crypto, not a custom serialized mock.
+                snapshot_source = Scanner(db_path, (account,))
+                try:
+                    encrypted_checkpoint = snapshot_source.store.export_checkpoint(
+                        test_password
+                    )
+                finally:
+                    snapshot_source.close()
+                if (type(encrypted_checkpoint) is not bytes
+                        or len(encrypted_checkpoint) < 52):
+                    raise RuntimeError("WSP1_CHECKPOINT_EXPORT_FORMAT_DENIED")
+
+                restored_db = retained_dir / "checkpoint-restore-test.sqlite"
+                restored_scanner = Scanner(restored_db, (account,))
+                try:
+                    restored_scanner.store.restore_checkpoint(
+                        encrypted_checkpoint, test_password
+                    )
+                    if restored_scanner.store.tip() != (2, PAYTIP):
+                        raise RuntimeError("WSP1_CHECKPOINT_RESTORED_TIP_BAD")
+                    reviewed = run_consented_wsp_scan(
+                        restored_scanner, Wsp1ScannerOnlyRpc(endpoint, auth),
+                        user_consented=True, max_blocks=1,
+                    )
+                    if (reviewed.blocks_processed != 0
+                            or len(restored_scanner.coins()) != 1):
+                        raise RuntimeError("WSP1_CHECKPOINT_RESCAN_REPLAY_BAD")
+                finally:
+                    restored_scanner.close()
+                print("WSP1_REAL_ENCRYPTED_SQLITE_CHECKPOINT_RESTORE_PASS")
+
+                corrupt = bytearray(encrypted_checkpoint)
+                corrupt[-1] ^= 0x01
+                bad_scanner = Scanner(
+                    retained_dir / "checkpoint-auth-test.sqlite", (account,)
+                )
+                before_bad_checkpoint = len(server.observed_methods)
+                try:
+                    try:
+                        bad_scanner.store.restore_checkpoint(
+                            bytes(corrupt), test_password
+                        )
+                    except StorageError:
+                        pass
+                    else:
+                        raise RuntimeError("WSP1_CHECKPOINT_AUTH_BYPASS")
+                    if bad_scanner.store.tip()[0] != 0:
+                        raise RuntimeError("WSP1_CHECKPOINT_AUTH_FAILED_DIRTY_DB")
+                finally:
+                    bad_scanner.close()
+                if len(server.observed_methods) != before_bad_checkpoint:
+                    raise RuntimeError("WSP1_CHECKPOINT_BAD_AUTH_CALLED_RPC")
+                print("WSP1_REAL_CHECKPOINT_TAMPER_DENIED_PASS")
+
+                wrong_checkpoint_identity = ScanAccount(2, 3, pub(5), birthday=1)
+                foreign_checkpoint = Scanner(
+                    retained_dir / "checkpoint-foreign-test.sqlite",
+                    (wrong_checkpoint_identity,),
+                )
+                before_foreign_checkpoint = len(server.observed_methods)
+                try:
+                    try:
+                        foreign_checkpoint.store.restore_checkpoint(
+                            encrypted_checkpoint, test_password
+                        )
+                    except StorageError:
+                        pass
+                    else:
+                        raise RuntimeError("WSP1_CHECKPOINT_FOREIGN_ACCEPTED")
+                    if foreign_checkpoint.store.tip()[0] != 0:
+                        raise RuntimeError("WSP1_CHECKPOINT_FOREIGN_DIRTY_DB")
+                finally:
+                    foreign_checkpoint.close()
+                if len(server.observed_methods) != before_foreign_checkpoint:
+                    raise RuntimeError("WSP1_CHECKPOINT_FOREIGN_CALLED_RPC")
+                print("WSP1_REAL_CHECKPOINT_FOREIGN_IDENTITY_DENIED_PASS")
+
                 foreign_scan_only = ScanAccount(2, 3, pub(5), birthday=1)
                 no_wire_before = len(server.observed_methods)
                 try:
@@ -702,6 +782,29 @@ def _run(source_root: Path) -> None:
                     ).fetchone()[0] != 0:
                         raise RuntimeError("WSP1_RETAINED_REORG_COIN_STALE")
                 print("WSP1_REAL_PERSISTENT_SQLITE_REORG_UNDO_PASS")
+
+                # Restore *pre-fork* encrypted checkpoint into yet another
+                # WSP SQLite instance and process fork through real scanner.
+                fork_scanner = Scanner(
+                    retained_dir / "checkpoint-fork-test.sqlite", (account,)
+                )
+                try:
+                    fork_scanner.store.restore_checkpoint(
+                        encrypted_checkpoint, test_password
+                    )
+                    after_fork = run_consented_wsp_scan(
+                        fork_scanner, Wsp1ScannerOnlyRpc(endpoint, auth),
+                        user_consented=True, max_blocks=1,
+                    )
+                    if (after_fork.rollback_blocks != 1
+                            or after_fork.blocks_processed != 1
+                            or fork_scanner.coins()
+                            or fork_scanner.store.tip() != (2, PAYTIP_FORK)):
+                        raise RuntimeError("WSP1_CHECKPOINT_FORK_RECOVERY_FAILED")
+                finally:
+                    fork_scanner.close()
+                print("WSP1_REAL_CHECKPOINT_RESTORE_REORG_UNDO_PASS")
+
                 payment_window.close()
                 payment_window.deleteLater()
                 QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
