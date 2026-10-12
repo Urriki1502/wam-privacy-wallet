@@ -18,6 +18,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from tools.wsp1_pinned_surface import PINNED_COMMIT, verify_pinned_wsp1_sources
+from tools.wsp1_full_source_closure import verify_wsp1_full_source_closure
 from wam_privacy_wallet.integrations.wsp1_scanner_only_rpc import (
     Wsp1ScannerOnlyRpc, WspScannerRpcError,
 )
@@ -120,6 +121,14 @@ def _run(source_root: Path) -> None:
             or result["wallet_read_rpc_missing"] !=
                ["getblock", "getrawmempool", "getrawtransaction"]):
         raise RuntimeError("WSP1_SOURCE_POLICY_DENIED")
+    closure = verify_wsp1_full_source_closure(source_root)
+    if (closure["pinned_commit"] != PINNED_COMMIT
+            or closure["status"] != "WSP1_FULL_SOURCE_CLOSURE_VERIFIED_NO_AUTHORITY"
+            or closure["scanner_enabled"] is not False
+            or closure["python_modules_verified"] < 8):
+        raise RuntimeError("WSP1_IMPORT_CLOSURE_UNQUALIFIED")
+    print("WSP1_FULL_IMPORT_SOURCE_CLOSURE_PASS")
+
     spec = importlib.util.find_spec("wam_sp")
     if (spec is None or not spec.submodule_search_locations
             or not Path(next(iter(spec.submodule_search_locations))).resolve()
