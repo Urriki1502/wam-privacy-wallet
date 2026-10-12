@@ -1,0 +1,66 @@
+# Native pinned upstream WSP-1 Scanner.sync + local SYNTHETIC RPC integration.
+# Not a real WAM Core node; no mainnet, signing, broadcast or real keys.
+name: WSP-1 Native Scanner Synthetic Regtest (NO Core EXEC)
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/wsp1-real-scanner-synthetic-regtest.yml'
+      - 'tools/ci_wsp1_scanner_loopback.py'
+      - 'tools/wsp1_pinned_surface.py'
+      - 'src/wam_privacy_wallet/integrations/wsp1_scanner_only_rpc.py'
+      - 'src/wam_privacy_wallet/integrations/regtest_scanner_wire.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-synthetic-scanner:
+    name: Actual pinned WSP-1 Scanner.sync with local synthetic RPC (NO Core)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout WAM Privacy Wallet (no credentials)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Checkout independently pinned WSP-1 source (read-only)
+        uses: actions/checkout@v4
+        with:
+          repository: Urriki1502/wam-silent-payments
+          ref: ac55f13423620252bdbf848c7e8a280c3b84721e
+          path: wsp-source
+          persist-credentials: false
+
+      - name: Set up Python 3.12 x64
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+
+      - name: Verify exact source commit and four pinned Git blobs BEFORE import
+        shell: bash
+        env:
+          PYTHONPATH: src
+        run: |
+          set -euo pipefail
+          test "$(git -C wsp-source rev-parse HEAD)" = "ac55f13423620252bdbf848c7e8a280c3b84721e"
+          python -m tools.wsp1_pinned_surface --source-root "$GITHUB_WORKSPACE/wsp-source" > /dev/null
+          echo "WSP1_PINNED_SOURCE_READ_ONLY_VERIFIED"
+
+      - name: Install only pinned experimental WSP-1 scanner runtime dependencies
+        run: |
+          python -m pip install --disable-pip-version-check -e ./wsp-source
+          python -m pip check
+
+      - name: Compile/test actual WSP-1 Scanner.sync against disposable loopback peer
+        shell: bash
+        env:
+          PYTHONPATH: src
+          PYTHONUNBUFFERED: '1'
+        run: |
+          set -euo pipefail
+          python -m py_compile tools/ci_wsp1_scanner_loopback.py
+          python -m tools.ci_wsp1_scanner_loopback --source-root "$GITHUB_WORKSPACE/wsp-source"
