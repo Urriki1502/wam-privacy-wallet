@@ -106,6 +106,11 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_regtest_cookie_descriptor.RegtestCookieDescriptorTests.test_exact_terminal_crlf_is_accepted_but_internal_crlf_denied",
     "test_regtest_cookie_descriptor.RegtestCookieDescriptorTests.test_swap_between_lstat_and_fd_open_is_rejected",
     "test_read_rpc.LocalReadOnlyRpcTests.test_header_invalid_hash_or_verbosity_fails_without_network",
+    "test_two_node_ancestry_cli.BoundedAncestryCliTests.test_optional_header_review_reuses_one_tty_prompt_pair",
+    "test_two_node_ancestry_cli.BoundedAncestryCliTests.test_header_forged_authority_and_missing_flags_denied",
+    "test_two_node_ancestry_cli.BoundedAncestryCliTests.test_header_height_window_epoch_mismatch_is_denied",
+    "test_two_node_ancestry_cli.BoundedAncestryCliTests.test_secret_bearing_extra_ancestry_fields_are_refused",
+    "test_two_node_ancestry_cli.BoundedAncestryCliTests.test_header_extra_fields_or_fake_pass_count_denied",
     "test_two_node_header_links.TwoNodeHeaderLinkWireTests.test_independent_real_tcp_header_rpc_double_pass",
     "test_two_node_header_links.TwoNodeHeaderLinkWireTests.test_misreported_header_parent_rejected_even_if_both_nodes_agree",
     "test_two_node_header_links.TwoNodeHeaderLinkWireTests.test_output_redacted_non_authorizing_and_no_executable",
@@ -148,7 +153,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 782
+FULL_MIN_CASES = 789
 
 
 def _cases(suite: unittest.TestSuite):
