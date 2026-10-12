@@ -122,8 +122,12 @@ class SignedLinuxCoreMemfdTests(unittest.TestCase):
         with a, b, c, d, patch.object(bridge, "_F_SEAL_EXEC", 0x40000000), \
              patch.object(bridge.tarfile, "open",
                           side_effect=AssertionError("MUST_NOT_STREAM")):
+            # The outer artifact-staging context intentionally redacts
+            # exceptions raised inside its yield to a generic denial.
+            # Require a DENIAL before any tar member is streamed, not a
+            # specific internal noexec status code crossing that boundary.
             with self.assertRaisesRegex(
-                bridge.SignedNodeSealError, "^CORE_SIGNED_SEAL_NOEXEC_DENIED$",
+                bridge.SignedNodeSealError, "^CORE_SIGNED_SEAL_DENIED$",
             ):
                 with bridge.sealed_signed_linux_wamd(**self.inputs):
                     self.fail("unsealed executable inode cannot be reviewed")
