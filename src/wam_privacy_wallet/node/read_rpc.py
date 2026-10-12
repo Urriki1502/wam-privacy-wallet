@@ -10,11 +10,13 @@ from __future__ import annotations
 import base64
 import http.client
 import json
+import re
 from dataclasses import dataclass
 
 from .endpoint import LocalRegtestEndpoint
 
-_READ_METHODS = frozenset({"getblockhash", "getblockcount", "getbestblockhash", "getblockchaininfo"})
+_READ_METHODS = frozenset({"getblockhash", "getblockcount", "getbestblockhash", "getblockchaininfo", "getblockheader"})
+_HEADER_HASH_RE = re.compile(r"[0-9a-f]{64}\Z", re.ASCII)
 _MAX_RESPONSE_BYTES = 1_048_576
 _MAX_BLOCK_HEIGHT = 100_000_000
 
@@ -73,6 +75,13 @@ class LocalReadOnlyRpc:
         if method == "getblockhash":
             if (len(params) != 1 or type(params[0]) is not int
                     or not 0 <= params[0] <= _MAX_BLOCK_HEIGHT):
+                raise LocalRpcError("WAM_RPC_INVALID_PARAMS")
+        elif method == "getblockheader":
+            # Exact verbose header read on one specified block hash only.
+            # Never accept a raw hex full-block request or implicit params.
+            if (len(params) != 2 or type(params[0]) is not str
+                    or _HEADER_HASH_RE.fullmatch(params[0]) is None
+                    or params[1] is not True):
                 raise LocalRpcError("WAM_RPC_INVALID_PARAMS")
         elif params:
             raise LocalRpcError("WAM_RPC_INVALID_PARAMS")
