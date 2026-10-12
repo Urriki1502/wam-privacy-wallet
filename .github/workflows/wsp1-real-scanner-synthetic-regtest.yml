@@ -10,6 +10,8 @@ on:
       - 'src/wam_privacy_wallet/application/wsp_scan_coordinator.py'
       - 'tests/test_app_wsp_scan_coordinator.py'
       - 'tools/wsp1_pinned_surface.py'
+      - 'tools/wsp1_full_source_closure.py'
+      - 'tests/test_wsp1_full_source_closure.py'
       - 'src/wam_privacy_wallet/integrations/wsp1_scanner_only_rpc.py'
       - 'src/wam_privacy_wallet/integrations/regtest_scanner_wire.py'
   workflow_dispatch:
@@ -50,7 +52,8 @@ jobs:
           set -euo pipefail
           test "$(git -C wsp-source rev-parse HEAD)" = "ac55f13423620252bdbf848c7e8a280c3b84721e"
           python -m tools.wsp1_pinned_surface --source-root "$GITHUB_WORKSPACE/wsp-source" > /dev/null
-          echo "WSP1_PINNED_SOURCE_READ_ONLY_VERIFIED"
+          python -m tools.wsp1_full_source_closure --source-root "$GITHUB_WORKSPACE/wsp-source" > /dev/null
+          echo "WSP1_PINNED_SOURCE_AND_IMPORT_CLOSURE_VERIFIED"
 
       - name: Install only pinned experimental WSP-1 scanner runtime dependencies
         run: |
