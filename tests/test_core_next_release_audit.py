@@ -167,7 +167,9 @@ class NextCoreReleaseCandidateTests(unittest.TestCase):
 
     def test_symlink_archive_denied(self):
         self.build()
-        link = self.root/"symlink"
+        sibling = self.root/"link-dir"
+        sibling.mkdir()
+        link = sibling / _NAME
         link.symlink_to(self.archive)
         with self.assertRaisesRegex(candidate.CoreCandidateAuditError,
                                     "^CORE_CANDIDATE_PATH_DENIED$"):
