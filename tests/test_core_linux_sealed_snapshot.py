@@ -150,6 +150,34 @@ class LinuxKernelSealedRegtestTests(unittest.TestCase):
                 if not reused_directly:
                     os.close(closed_number)
 
+    def test_live_review_rejects_swapped_equivalent_sealed_fd(self):
+        if not self._supported():
+            self._unsupported()
+            return
+        with self._open() as original:
+            held_fd = os.dup(original._descriptor)
+            try:
+                with self._open() as attacker:
+                    first_id = os.fstat(original._descriptor)
+                    second_id = os.fstat(attacker._descriptor)
+                    self.assertNotEqual(
+                        (first_id.st_dev, first_id.st_ino),
+                        (second_id.st_dev, second_id.st_ino),
+                    )
+                    # Replace the live descriptor with a DIFFERENT sealed
+                    # kernel object carrying identical bytes and seals.
+                    os.dup2(attacker._descriptor, original._descriptor)
+                    with self.assertRaisesRegex(
+                        seal.LinuxCoreSealError, "^CORE_SEAL_CHANGED$",
+                    ):
+                        original.audit()
+            finally:
+                # Restore original file description before original context
+                # exit so its independent cleanup audit remains valid.
+                os.dup2(held_fd, original._descriptor)
+                os.close(held_fd)
+            self.assertTrue(original.audit())
+
     def test_wrong_digest_is_rejected_before_seal_claim(self):
         if not self._supported():
             self._unsupported()
