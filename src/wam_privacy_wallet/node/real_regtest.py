@@ -48,17 +48,33 @@ def verify_binary(path: str | os.PathLike[str], sha256: str) -> Path:
     """
     if type(sha256) is not str or _SHA.fullmatch(sha256) is None:
         raise RealRegtestError("CORE_SHA256_INVALID")
+    # Do not invoke attacker-supplied __fspath__ hooks and do not let a
+    # relative pathname silently change identity with the current directory.
+    if type(path) not in (str, type(Path())):
+        raise RealRegtestError("CORE_BINARY_PATH_DENIED")
+    src = Path(path)
+    if not src.is_absolute():
+        raise RealRegtestError("CORE_BINARY_PATH_DENIED")
+
+    def safe_file(info: os.stat_result) -> bool:
+        return (
+            stat.S_ISREG(info.st_mode)
+            and info.st_nlink == 1
+            and 1 <= info.st_size <= 512 * 1024 * 1024
+            and not (getattr(info, "st_file_attributes", 0)
+                     & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
+        )
+
     try:
-        src = Path(path)
         before = src.lstat()
-        if not stat.S_ISREG(before.st_mode) or stat.S_ISLNK(before.st_mode):
+        if not safe_file(before):
             raise RealRegtestError("CORE_BINARY_NOT_REGULAR")
         flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
         if hasattr(os, "O_NOFOLLOW"):
             flags |= os.O_NOFOLLOW
         with os.fdopen(os.open(src, flags), "rb") as stream:
             opened = os.fstat(stream.fileno())
-            if (not stat.S_ISREG(opened.st_mode)
+            if (not safe_file(opened)
                     or (before.st_dev, before.st_ino) != (opened.st_dev, opened.st_ino)):
                 raise RealRegtestError("CORE_BINARY_CHANGED")
             digest = hashlib.sha256()
@@ -73,7 +89,7 @@ def verify_binary(path: str | os.PathLike[str], sha256: str) -> Path:
                 stable = (info.st_dev, info.st_ino, info.st_size,
                           info.st_mtime_ns)
                 return stable if os.name == "nt" else stable + (info.st_ctime_ns,)
-            if (not stat.S_ISREG(after.st_mode)
+            if (not safe_file(held) or not safe_file(after)
                     or identity(opened) != identity(held)
                     or identity(held) != identity(after)):
                 raise RealRegtestError("CORE_BINARY_CHANGED")
@@ -84,7 +100,7 @@ def verify_binary(path: str | os.PathLike[str], sha256: str) -> Path:
         # descriptor was closed. Reject a visible swap during resolution;
         # this is NOT immutable process-image binding or launch approval.
         last = src.lstat()
-        if (not stat.S_ISREG(last.st_mode)
+        if (not safe_file(last)
                 or identity(held) != identity(last)):
             raise RealRegtestError("CORE_BINARY_CHANGED")
         return resolved
