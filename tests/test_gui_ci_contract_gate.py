@@ -12,6 +12,12 @@ from tools.gui_ci_contract_gate import check_and_run
 
 
 _NAMES = (
+    "test_input_policy_review_actual_models_and_readonly_gui",
+    "test_input_policy_denied_consent_clears_previous_report",
+    "test_input_policy_bad_network_or_proposal_cannot_keep_pass",
+    "test_input_policy_replaces_receive_scanner_and_prior_evidence",
+    "test_input_policy_renderer_failure_invalidates_and_redacts",
+
     "test_real_wsp_scanner_result_renders_only_as_untrusted_receipt",
     "test_real_wsp_receipt_cleared_by_next_offline_update",
     "test_forged_real_wsp_receipt_denied_and_clears_existing",
