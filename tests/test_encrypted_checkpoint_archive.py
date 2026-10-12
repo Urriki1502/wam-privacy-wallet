@@ -193,5 +193,67 @@ class CheckpointArchiveTests(unittest.TestCase):
         self.assertFalse(bad.exists())
 
 
+    @require_linux_or_deny
+    def test_cleanup_unlink_failure_after_publish_denies_success(self):
+        original = m.os.unlink
+        def bad_unlink(name, *args, **kwargs):
+            if isinstance(name, str) and name.startswith(".wsp-checkpoint-stage-"):
+                raise OSError("SENSITIVE_STAGING_UNLINK_FAILURE")
+            return original(name, *args, **kwargs)
+        with patch.object(m.os, "unlink", side_effect=bad_unlink):
+            with self.assertRaisesRegex(m.EncryptedCheckpointArchiveError, "^CHECKPOINT_STORE_DENIED$") as caught:
+                self.save()
+        self.assertNotIn("SENSITIVE", str(caught.exception))
+        self.assertEqual((self.folder / "wsp-checkpoint-v1.enc").stat().st_nlink, 2)
+        with self.assertRaisesRegex(m.EncryptedCheckpointArchiveError, "^CHECKPOINT_FILE_DENIED$"):
+            m.load_encrypted_checkpoint(self.folder)
+
+    @require_linux_or_deny
+    def test_directory_fsync_failure_after_unlink_denies_success(self):
+        original = m.os.fsync
+        def bad_sync(fd):
+            if stat.S_ISDIR(os.fstat(fd).st_mode):
+                raise OSError("SENSITIVE_DURABILITY_FAILURE")
+            return original(fd)
+        with patch.object(m.os, "fsync", side_effect=bad_sync):
+            with self.assertRaisesRegex(m.EncryptedCheckpointArchiveError, "^CHECKPOINT_STORE_DENIED$") as caught:
+                self.save()
+        self.assertNotIn("SENSITIVE", str(caught.exception))
+        self.assertEqual([p.name for p in self.folder.iterdir()],
+                         ["wsp-checkpoint-v1.enc"])
+
+    @require_linux_or_deny
+    def test_preexisting_canonical_survives_failed_staging_cleanup(self):
+        self.save()
+        previous = m.load_encrypted_checkpoint(self.folder)
+        original = m.os.unlink
+        def bad_unlink(name, *args, **kwargs):
+            if isinstance(name, str) and name.startswith(".wsp-checkpoint-stage-"):
+                raise OSError("STAGING_CLEANUP_FAILED")
+            return original(name, *args, **kwargs)
+        with patch.object(m.os, "unlink", side_effect=bad_unlink):
+            with self.assertRaisesRegex(m.EncryptedCheckpointArchiveError, "^CHECKPOINT_STORE_DENIED$"):
+                self.save(b"WAMSP02\x00" + b"Z" * 56)
+        self.assertEqual(m.load_encrypted_checkpoint(self.folder), previous)
+
+    @require_linux_or_deny
+    def test_directory_fsync_runs_after_staging_unlink(self):
+        events = []
+        real_unlink = m.os.unlink
+        real_fsync = m.os.fsync
+        def trace_unlink(name, *args, **kwargs):
+            if isinstance(name, str) and name.startswith(".wsp-checkpoint-stage-"):
+                events.append("unlink")
+            return real_unlink(name, *args, **kwargs)
+        def trace_fsync(fd):
+            if stat.S_ISDIR(os.fstat(fd).st_mode):
+                events.append("sync")
+            return real_fsync(fd)
+        with patch.object(m.os, "unlink", side_effect=trace_unlink):
+            with patch.object(m.os, "fsync", side_effect=trace_fsync):
+                self.save()
+        self.assertEqual(events, ["unlink", "sync"])
+
+
 if __name__ == "__main__":
     unittest.main()

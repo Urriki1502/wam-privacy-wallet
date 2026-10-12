@@ -205,9 +205,9 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
             "test_app_wsp_scan_coordinator.py": 15,
             "test_scan_only_account_session.py": 14,
             "test_scan_preview_workflow.py": 15,
-            "test_encrypted_scan_backup.py": 18,
+            "test_encrypted_scan_backup.py": 23,
             "test_retained_scan_session.py": 18,
-            "test_encrypted_checkpoint_archive.py": 17,
+            "test_encrypted_checkpoint_archive.py": 21,
             "test_checkpoint_recovery_workflow.py": 18,
         }
         self.assertEqual(MINIMUM_CASES, expected)
