@@ -36,9 +36,9 @@ class SecurityAssuranceReviewTests(unittest.TestCase):
     def test_fixed_child_command_and_public_request_protocol_only(self):
         import json, subprocess, sys
         from dataclasses import asdict
-        reply=json.dumps(asdict(app.SecurityAssuranceReview("0"*64))).encode()
+        reply=json.dumps(asdict(app.SecurityAssuranceReview(app._PUBLIC_PROVENANCE_DIGEST))).encode()
         with patch.object(app.subprocess,"run",return_value=subprocess.CompletedProcess([],0,reply)) as child:
-            self.assertEqual(self.review().provenance_digest,"0"*64)
+            self.assertEqual(self.review().provenance_digest,app._PUBLIC_PROVENANCE_DIGEST)
             args,kwargs=child.call_args
             self.assertEqual(args[0],[sys.executable,"-I","-B","-m","wam_privacy_wallet.application._security_assurance_worker"])
             self.assertEqual(kwargs["input"],b"PUBLIC_ASSURANCE_FIXTURE_V1\n")
@@ -46,7 +46,7 @@ class SecurityAssuranceReviewTests(unittest.TestCase):
     def test_forged_child_publisher_runtime_release_sign_or_send_flags_denied(self):
         import json, subprocess
         from dataclasses import asdict
-        reply=asdict(app.SecurityAssuranceReview("0"*64))
+        reply=asdict(app.SecurityAssuranceReview(app._PUBLIC_PROVENANCE_DIGEST))
         for field in ("publisher_authenticated","runtime_authenticated","release_allowed","sign_allowed","broadcast_allowed"):
             with patch.object(app.subprocess,"run",return_value=subprocess.CompletedProcess([],0,json.dumps(reply|{field:True}).encode())):
                 with self.assertRaises(app.SecurityAssuranceReviewError):self.review()
@@ -54,8 +54,8 @@ class SecurityAssuranceReviewTests(unittest.TestCase):
     def test_forged_child_digest_shape_counts_or_pin_denied(self):
         import json, subprocess
         from dataclasses import asdict
-        reply=asdict(app.SecurityAssuranceReview("0"*64))
-        for field,value in (("provenance_digest","PRIVATE"),("subject_count",True),("dependency_count",4),("source_commit","forged"),("evidence","AUTHENTICATED")):
+        reply=asdict(app.SecurityAssuranceReview(app._PUBLIC_PROVENANCE_DIGEST))
+        for field,value in (("provenance_digest","1"*64),("provenance_digest","PRIVATE"),("subject_count",True),("dependency_count",4),("source_commit","forged"),("evidence","AUTHENTICATED")):
             with patch.object(app.subprocess,"run",return_value=subprocess.CompletedProcess([],0,json.dumps(reply|{field:value}).encode())):
                 with self.assertRaises(app.SecurityAssuranceReviewError):self.review()
         for raw in (b"PRIVATE",b"x"*2049,b"[]"):

@@ -9,6 +9,9 @@ on:
       - 'tools/package_public_hpke_fixture.py'
       - 'tools/ci_pinned_hpke_fixture.py'
       - 'tests/test_selective_disclosure_review.py'
+      - 'src/wam_privacy_wallet/gui/main_window.py'
+      - 'src/wam_privacy_wallet/application/presentation_lifecycle.py'
+      - 'tests/test_gui_shell.py'
   workflow_dispatch:
 
 permissions:
@@ -45,6 +48,7 @@ jobs:
             bits: 64
     env:
       PYTHONDONTWRITEBYTECODE: '1'
+      QT_QPA_PLATFORM: offscreen
     steps:
       - name: Preserve raw source Git blob bytes
         run: git config --global core.autocrlf false
@@ -69,6 +73,12 @@ jobs:
           architecture: ${{ matrix.arch }}
       - name: Install dependency-free wallet
         run: python -m pip install --disable-pip-version-check -e .
+      - name: Install Linux Qt runtime for actual source-to-GUI proof
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libegl1 libopengl0 libxkbcommon-x11-0
+      - name: Install Qt for qualified x64 GUI matrix only
+        if: matrix.arch == 'x64'
+        run: python -m pip install -e ".[gui]"
       - name: Verify actual native Python width
         shell: python
         env:
@@ -90,5 +100,9 @@ jobs:
         run: cargo +1.99.0 build --release --locked --manifest-path native/hpke_readonly/Cargo.toml --target ${{ matrix.target }}
       - name: Package own build as unauthenticated experimental worker
         run: python -B tools/package_public_hpke_fixture.py ${{ matrix.target }}
-      - name: Actual native application receipt and adversarial tests (no mocks)
+      - name: Actual native x86 application receipt and adversarial tests (no Qt)
+        if: matrix.arch == 'x86'
         run: python -B -m tools.ci_pinned_hpke_fixture --source-root "${{ github.workspace }}/privacy-source"
+      - name: Actual native x64 application and Qt receipt tests (no mocks)
+        if: matrix.arch == 'x64'
+        run: python -B -m tools.ci_pinned_hpke_fixture --gui --source-root "${{ github.workspace }}/privacy-source"

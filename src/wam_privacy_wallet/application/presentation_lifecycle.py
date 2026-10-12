@@ -10,6 +10,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from .coin_selection_review import CoinSelectionReview
+from .selective_disclosure_review import SelectiveDisclosureReview
+from .security_assurance_review import SecurityAssuranceReview, _PUBLIC_PROVENANCE_DIGEST
 from .psbt_v2_review import PsbtV2Review, _PIN
 from .node_status import NodeOverview
 from .recovery_transition import OfflineRecoveryTransition
@@ -53,6 +56,9 @@ class OfflinePresentationState:
         "REPLAY_NOT_DOUBLE_COUNTED", "ROLLBACK_RESCAN_REVIEW",
         "MIGRATION_RESCAN_REVIEW",
     ] = "ABSENT"
+    coin_policy: Literal["ABSENT", "NORMALIZED_POLICY_UNTRUSTED"] = "ABSENT"
+    disclosure: Literal["ABSENT", "PUBLIC_HPKE_UNTRUSTED"] = "ABSENT"
+    assurance: Literal["ABSENT", "UNSIGNED_PUBLIC_PROVENANCE"] = "ABSENT"
     psbt: Literal["ABSENT", "UNSIGNED_PARSED_UNTRUSTED"] = "ABSENT"
     scanner_session: Literal[
         "ABSENT", "LOCAL_RPC_OBSERVED_UNTRUSTED",
@@ -96,6 +102,50 @@ def _valid_scanner(value: object) -> bool:
         and value.signer_enabled is False
         and value.broadcast_allowed is False
         and value.mainnet_allowed is False
+    )
+
+
+def _valid_coin_policy(value: object) -> bool:
+    return (
+        type(value) is CoinSelectionReview
+        and type(value.selected_inputs) is int and 1 <= value.selected_inputs <= 128
+        and type(value.cluster_count) is int and 1 <= value.cluster_count <= value.selected_inputs
+        and type(value.change_created) is bool and type(value.warning_codes) is tuple
+        and len(value.warning_codes) <= 2
+        and all(type(w) is str and w in ("CLUSTER_MERGE", "CHANGE_CREATED") for w in value.warning_codes)
+        and len(set(value.warning_codes)) == len(value.warning_codes)
+        and ("CLUSTER_MERGE" in value.warning_codes) == (value.cluster_count > 1)
+        and ("CHANGE_CREATED" in value.warning_codes) == value.change_created
+        and type(value.provenance) is str and value.provenance == "PINNED_SOURCE_BYTES_NOT_RUNTIME_ATTESTATION"
+        and type(value.status) is str and value.status == "REGTEST_POLICY_REVIEW_UNTRUSTED"
+        and value.consent_granted is True and value.core_authenticated is False
+        and value.wallet_operational is False and value.wallet_balance_qualified is False
+        and value.signing_allowed is False and value.broadcast_allowed is False and value.mainnet_allowed is False
+    )
+
+
+def _valid_disclosure(value: object) -> bool:
+    return (
+        type(value) is SelectiveDisclosureReview
+        and type(value.role) is str and value.role in ("incoming", "audit")
+        and type(value.negative_checks) is int and value.negative_checks == 14
+        and type(value.source_commit) is str and value.source_commit == "db3d2dcaa540f1129d540101813b761167d33174"
+        and type(value.evidence) is str and value.evidence == "PUBLIC_HPKE_FIXTURE_EXECUTED_UNTRUSTED"
+        and value.external_review_complete is False and value.runtime_authenticated is False
+        and value.spend_authorized is False and value.sign_allowed is False and value.broadcast_allowed is False
+    )
+
+
+def _valid_assurance(value: object) -> bool:
+    return (
+        type(value) is SecurityAssuranceReview
+        and type(value.provenance_digest) is str and value.provenance_digest == _PUBLIC_PROVENANCE_DIGEST
+        and type(value.subject_count) is int and value.subject_count == 1
+        and type(value.dependency_count) is int and value.dependency_count == 3
+        and type(value.source_commit) is str and value.source_commit == "c9b1ce872c2b0b65276883d4e210b6a2f7c96467"
+        and type(value.evidence) is str and value.evidence == "PINNED_UNSIGNED_PUBLIC_PROVENANCE_UNTRUSTED"
+        and value.publisher_authenticated is False and value.runtime_authenticated is False
+        and value.release_allowed is False and value.sign_allowed is False and value.broadcast_allowed is False
     )
 
 
@@ -369,12 +419,16 @@ class OfflinePresentationController:
         rescan: object = None,
         reorg: object = None,
         scanner_observation: object = None,
-        psbt_review: object = None,
+        psbt_review: object = None, coin_policy_review: object = None,
+        disclosure_review: object = None, assurance_review: object = None,
     ) -> OfflinePresentationState:
         if type(expected_revision) is not int or expected_revision != self._state.revision:
             self._reject()
         if (
-            (psbt_review is not None and not _valid_psbt(psbt_review))
+            (coin_policy_review is not None and not _valid_coin_policy(coin_policy_review))
+            or (disclosure_review is not None and not _valid_disclosure(disclosure_review))
+            or (assurance_review is not None and not _valid_assurance(assurance_review))
+            or (psbt_review is not None and not _valid_psbt(psbt_review))
             or (node is not None and not _valid_node(node))
             or (scanner_observation is not None
                 and not _valid_scanner(scanner_observation))
@@ -405,6 +459,9 @@ class OfflinePresentationController:
             resume.action if resume is not None else "ABSENT",
             rescan.disposition if rescan is not None else "ABSENT",
             reorg.verdict if reorg is not None else "ABSENT",
+            coin_policy="NORMALIZED_POLICY_UNTRUSTED" if coin_policy_review is not None else "ABSENT",
+            disclosure="PUBLIC_HPKE_UNTRUSTED" if disclosure_review is not None else "ABSENT",
+            assurance="UNSIGNED_PUBLIC_PROVENANCE" if assurance_review is not None else "ABSENT",
             psbt="UNSIGNED_PARSED_UNTRUSTED" if psbt_review is not None else "ABSENT",
             scanner_session=("LOCAL_RPC_OBSERVED_UNTRUSTED"
                              if scanner_observation is not None else "ABSENT"),

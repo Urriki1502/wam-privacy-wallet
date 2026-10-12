@@ -47,6 +47,109 @@ class GuiShellSmokeTests(unittest.TestCase):
         QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
         QCoreApplication.processEvents()
 
+    def test_new_privacy_panels_start_empty_and_scroll_without_actions(self):
+        from PySide6.QtWidgets import QScrollArea
+        self.assertIsInstance(self.window.page_stack.widget(3),QScrollArea)
+        self.assertEqual((self.window.offline_presentation_state.coin_policy,self.window.offline_presentation_state.disclosure,self.window.offline_presentation_state.assurance),("ABSENT",)*3)
+        self.assertEqual(self.window.findChildren(QPushButton),[])
+
+    def test_actual_normalized_coin_policy_reaches_readonly_gui(self):
+        from wam_privacy_wallet.research_models.wallet_privacy.model import Coin,Intent
+        self.window.review_coin_policy_inputs((Coin("01"*32,0,51000,"PRIVATE_CLUSTER"),),(Intent("PRIVATE_RECIPIENT",50000),),1000,scope="synthetic-regtest",consent=True)
+        self.assertIn("inputs 1",self.window.coin_policy_review_status.text())
+        self.assertIn("UNTRUSTED",self.window.coin_policy_review_status.text())
+        self.assertIn("db3d2dca",self.window.coin_policy_review_notice.text())
+        self.assertNotIn("PRIVATE",self.window.coin_policy_review_status.text())
+        self.assertEqual(self.window.session_status.text(),"NO WALLET LOADED")
+
+    def test_coin_policy_denied_consent_or_scope_clears_before_algorithm(self):
+        from wam_privacy_wallet.application.coin_selection_review import CoinSelectionReview
+        for changes in ({"consent":False},{"scope":"mainnet"}):
+            self.window.present_coin_policy_review(CoinSelectionReview(1,1,False,()))
+            with patch("wam_privacy_wallet.application.coin_selection_review._verify_source") as source:
+                with self.assertRaisesRegex(ValueError,"^APP_GUI_COIN_POLICY_DENIED$"):
+                    self.window.review_coin_policy_inputs((),(),1000,**(dict(scope="synthetic-regtest",consent=True)|changes))
+                source.assert_not_called()
+            self.assertEqual(self.window.offline_presentation_state.coin_policy,"ABSENT")
+
+    def test_forged_coin_signing_or_warning_claim_clears_whole_gui(self):
+        from wam_privacy_wallet.application.coin_selection_review import CoinSelectionReview
+        value=CoinSelectionReview(1,1,False,());object.__setattr__(value,"signing_allowed",True)
+        for receipt in (value,CoinSelectionReview(1,1,False,("CLUSTER_MERGE",))):
+            with self.assertRaisesRegex(ValueError,"^APP_GUI_COIN_POLICY_DENIED$"):self.window.present_coin_policy_review(receipt)
+            self.assertEqual(self.window.offline_presentation_state.coin_policy,"ABSENT")
+
+    def test_public_disclosure_dto_is_only_untrusted_display_evidence(self):
+        # Schema/display only; actual Rust worker-to-Qt cases run in native CI.
+        from wam_privacy_wallet.application.selective_disclosure_review import SelectiveDisclosureReview
+        self.window.present_public_disclosure_review(SelectiveDisclosureReview("audit",14))
+        self.assertIn("AUDIT",self.window.disclosure_review_status.text())
+        self.assertIn("EXTERNAL REVIEW PENDING",self.window.disclosure_review_status.text())
+        self.assertIn("NO PRIVATE CONTENT",self.window.disclosure_review_notice.text())
+        self.assertEqual(self.window.findChildren(QPushButton),[])
+
+    def test_disclosure_denied_consent_clears_without_native_worker(self):
+        from wam_privacy_wallet.application.selective_disclosure_review import SelectiveDisclosureReview
+        self.window.present_public_disclosure_review(SelectiveDisclosureReview("incoming",14))
+        with patch("subprocess.run") as child:
+            with self.assertRaisesRegex(ValueError,"^APP_GUI_DISCLOSURE_DENIED$"):
+                self.window.review_public_disclosure_fixture(role="incoming",scope="synthetic-regtest",consent=False)
+            child.assert_not_called()
+        self.assertEqual(self.window.offline_presentation_state.disclosure,"ABSENT")
+
+    def test_disclosure_forged_external_review_or_spend_authority_is_denied(self):
+        from dataclasses import replace
+        from wam_privacy_wallet.application.selective_disclosure_review import SelectiveDisclosureReview
+        for field in ("external_review_complete","runtime_authenticated","spend_authorized","sign_allowed","broadcast_allowed"):
+            with self.assertRaisesRegex(ValueError,"^APP_GUI_DISCLOSURE_DENIED$"):
+                self.window.present_public_disclosure_review(replace(SelectiveDisclosureReview("incoming",14),**{field:True}))
+            self.assertEqual(self.window.offline_presentation_state.disclosure,"ABSENT")
+
+    def test_assurance_dto_display_is_unsigned_without_authentication_claim(self):
+        # A supplied DTO is not proof of helper execution or publisher identity.
+        from wam_privacy_wallet.application.security_assurance_review import SecurityAssuranceReview,_PUBLIC_PROVENANCE_DIGEST
+        self.window.present_public_assurance_review(SecurityAssuranceReview(_PUBLIC_PROVENANCE_DIGEST))
+        self.assertIn("UNSIGNED / UNTRUSTED",self.window.assurance_review_status.text())
+        self.assertIn("c9b1ce87",self.window.assurance_review_notice.text())
+        self.assertIn("NO PUBLISHER / RUNTIME / RELEASE",self.window.assurance_review_notice.text())
+
+    def test_assurance_denied_consent_clears_without_child_or_source_read(self):
+        from wam_privacy_wallet.application.security_assurance_review import SecurityAssuranceReview,_PUBLIC_PROVENANCE_DIGEST
+        self.window.present_public_assurance_review(SecurityAssuranceReview(_PUBLIC_PROVENANCE_DIGEST))
+        with patch("subprocess.run") as child:
+            with self.assertRaisesRegex(ValueError,"^APP_GUI_ASSURANCE_DENIED$"):
+                self.window.review_public_assurance_fixture(scope="synthetic-regtest",consent=False)
+            child.assert_not_called()
+        self.assertEqual(self.window.offline_presentation_state.assurance,"ABSENT")
+
+    def test_assurance_forged_digest_or_release_claim_clears_all_evidence(self):
+        from dataclasses import replace
+        from wam_privacy_wallet.application.security_assurance_review import SecurityAssuranceReview,_PUBLIC_PROVENANCE_DIGEST
+        for value in (SecurityAssuranceReview("1"*64),replace(SecurityAssuranceReview(_PUBLIC_PROVENANCE_DIGEST),release_allowed=True)):
+            with self.assertRaisesRegex(ValueError,"^APP_GUI_ASSURANCE_DENIED$"):self.window.present_public_assurance_review(value)
+            self.assertEqual(self.window.offline_presentation_state.assurance,"ABSENT")
+
+    def test_combined_privacy_receipts_replace_and_clear_with_single_writer(self):
+        from wam_privacy_wallet.application.coin_selection_review import CoinSelectionReview
+        from wam_privacy_wallet.application.selective_disclosure_review import SelectiveDisclosureReview
+        from wam_privacy_wallet.application.security_assurance_review import SecurityAssuranceReview,_PUBLIC_PROVENANCE_DIGEST
+        self.window.replace_offline_presentation(0,coin_policy_review=CoinSelectionReview(1,1,False,()),disclosure_review=SelectiveDisclosureReview("incoming",14),assurance_review=SecurityAssuranceReview(_PUBLIC_PROVENANCE_DIGEST))
+        self.assertEqual(self.window.offline_presentation_state.authority,"BLOCKED")
+        self.window.replace_offline_presentation(self.window.offline_presentation_state.revision)
+        self.assertEqual((self.window.offline_presentation_state.coin_policy,self.window.offline_presentation_state.disclosure,self.window.offline_presentation_state.assurance),("ABSENT",)*3)
+        self.assertEqual(self.window.assurance_review_status.text(),"NO UNSIGNED PROVENANCE REVIEW")
+
+    def test_new_privacy_renderer_failures_invalidate_revision_and_redact(self):
+        from wam_privacy_wallet.application.coin_selection_review import CoinSelectionReview
+        from wam_privacy_wallet.application.selective_disclosure_review import SelectiveDisclosureReview
+        from wam_privacy_wallet.application.security_assurance_review import SecurityAssuranceReview,_PUBLIC_PROVENANCE_DIGEST
+        for widget,method,receipt in ((self.window.coin_policy_review_status,self.window.present_coin_policy_review,CoinSelectionReview(1,1,False,())),(self.window.disclosure_review_status,self.window.present_public_disclosure_review,SelectiveDisclosureReview("incoming",14)),(self.window.assurance_review_status,self.window.present_public_assurance_review,SecurityAssuranceReview(_PUBLIC_PROVENANCE_DIGEST))):
+            old=self.window.offline_presentation_state.revision
+            with patch.object(widget,"setText",side_effect=RuntimeError("PRIVATE")):
+                with self.assertRaisesRegex(ValueError,"^APP_OFFLINE_RENDER_DENIED$"):method(receipt)
+            self.assertGreater(self.window.offline_presentation_state.revision,old)
+            self.assertEqual((self.window.offline_presentation_state.coin_policy,self.window.offline_presentation_state.disclosure,self.window.offline_presentation_state.assurance),("ABSENT",)*3)
+
     def test_psbt_panel_defaults_empty_without_actions(self):
         self.assertEqual(self.window.psbt_review_status.text(), "NO UNSIGNED PSBT REVIEW")
         self.assertEqual(self.window.offline_presentation_state.psbt, "ABSENT")

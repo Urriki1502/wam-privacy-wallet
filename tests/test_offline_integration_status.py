@@ -52,6 +52,24 @@ def storage(version=3, checkpoint=1, reported=1, tip=B):
 
 
 class OfflineIntegrationStatusTests(unittest.TestCase):
+    def test_all_new_presentation_indicators_count_as_untrusted_evidence(self):
+        for field,value in (("psbt","UNSIGNED_PARSED_UNTRUSTED"),("coin_policy","NORMALIZED_POLICY_UNTRUSTED"),("disclosure","PUBLIC_HPKE_UNTRUSTED"),("assurance","UNSIGNED_PUBLIC_PROVENANCE"),("scanner_session","LOCAL_RPC_OBSERVED_UNTRUSTED")):
+            state=replace(presentation().state,revision=1,transition="REPLACED",**{field:value})
+            receipt=inspect_offline_integration(state)
+            self.assertEqual(receipt.presentation,"SYNTHETIC_ONLY")
+            self.assertFalse(receipt.release_allowed or receipt.signer_enabled or receipt.send_enabled)
+
+    def test_new_indicators_cannot_survive_cleared_or_initial_state(self):
+        for state in (presentation().state,presentation().reset()):
+            for field,value in (("psbt","UNSIGNED_PARSED_UNTRUSTED"),("coin_policy","NORMALIZED_POLICY_UNTRUSTED"),("disclosure","PUBLIC_HPKE_UNTRUSTED"),("assurance","UNSIGNED_PUBLIC_PROVENANCE"),("scanner_session","LOCAL_RPC_OBSERVED_UNTRUSTED")):
+                with self.assertRaises(OfflineIntegrationStatusError):inspect_offline_integration(replace(state,**{field:value}))
+
+    def test_new_indicator_foreign_or_nonprimitive_vocabulary_is_denied(self):
+        class Hook(str): pass
+        for field in ("psbt","coin_policy","disclosure","assurance","scanner_session"):
+            for value in ("RELEASE_READY",Hook("ABSENT"),True):
+                with self.assertRaises(OfflineIntegrationStatusError):inspect_offline_integration(replace(presentation().state,revision=1,transition="REPLACED",**{field:value}))
+
     def test_empty_state_remains_no_authority(self):
         result = inspect_offline_integration(presentation().state)
         self.assertEqual(

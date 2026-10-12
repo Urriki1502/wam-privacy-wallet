@@ -50,6 +50,48 @@ class OfflinePresentationLifecycleTests(unittest.TestCase):
                 self.controller.replace(self.controller.state.revision, psbt_review=PsbtV2Review(a, b))
         self.assertEqual(self.controller.state.psbt, "ABSENT")
 
+    def test_coin_disclosure_assurance_are_untrusted_scalar_states(self):
+        from wam_privacy_wallet.application.coin_selection_review import CoinSelectionReview
+        from wam_privacy_wallet.application.selective_disclosure_review import SelectiveDisclosureReview
+        from wam_privacy_wallet.application.security_assurance_review import SecurityAssuranceReview, _PUBLIC_PROVENANCE_DIGEST
+        state=self.controller.replace(0, coin_policy_review=CoinSelectionReview(1,1,False,()), disclosure_review=SelectiveDisclosureReview("incoming",14), assurance_review=SecurityAssuranceReview(_PUBLIC_PROVENANCE_DIGEST))
+        self.assertEqual((state.coin_policy,state.disclosure,state.assurance), ("NORMALIZED_POLICY_UNTRUSTED","PUBLIC_HPKE_UNTRUSTED","UNSIGNED_PUBLIC_PROVENANCE"))
+        self.assertEqual(state.authority,"BLOCKED")
+        self.assertFalse(hasattr(state,"provenance_digest") or hasattr(state,"role"))
+
+    def test_new_receipt_authority_or_inconsistent_counts_reject_whole_view(self):
+        from dataclasses import replace
+        from wam_privacy_wallet.application.coin_selection_review import CoinSelectionReview
+        from wam_privacy_wallet.application.selective_disclosure_review import SelectiveDisclosureReview
+        from wam_privacy_wallet.application.security_assurance_review import SecurityAssuranceReview, _PUBLIC_PROVENANCE_DIGEST
+        coin=CoinSelectionReview(1,1,False,());object.__setattr__(coin,"signing_allowed",True)
+        for kwargs in ({"coin_policy_review":coin}, {"coin_policy_review":CoinSelectionReview(1,2,False,("CLUSTER_MERGE",))}, {"disclosure_review":replace(SelectiveDisclosureReview("incoming",14),external_review_complete=True)}, {"assurance_review":replace(SecurityAssuranceReview(_PUBLIC_PROVENANCE_DIGEST),release_allowed=True)}):
+            c=OfflinePresentationController();c.replace(0,node=node())
+            with self.assertRaises(OfflineLifecycleError):c.replace(1,**kwargs)
+            self.assertEqual((c.state.node,c.state.coin_policy,c.state.disclosure,c.state.assurance), ("ABSENT",)*4)
+
+    def test_new_receipt_nonprimitive_strings_do_not_invoke_comparisons(self):
+        from wam_privacy_wallet.application.coin_selection_review import CoinSelectionReview
+        from wam_privacy_wallet.application.selective_disclosure_review import SelectiveDisclosureReview
+        from wam_privacy_wallet.application.security_assurance_review import SecurityAssuranceReview, _PUBLIC_PROVENANCE_DIGEST
+        calls=[]
+        class Hook(str):
+            def __eq__(self,other): calls.append("comparison");return super().__eq__(other)
+            def __hash__(self): calls.append("hash");return super().__hash__()
+        for kwargs in ({"coin_policy_review":CoinSelectionReview(2,2,False,(Hook("CLUSTER_MERGE"),))}, {"disclosure_review":SelectiveDisclosureReview(Hook("incoming"),14)}, {"assurance_review":SecurityAssuranceReview(Hook(_PUBLIC_PROVENANCE_DIGEST))}):
+            with self.assertRaises(OfflineLifecycleError):self.controller.replace(self.controller.state.revision,**kwargs)
+        self.assertEqual(calls,[])
+
+    def test_new_receipts_are_cleared_on_omission_and_reset(self):
+        from wam_privacy_wallet.application.coin_selection_review import CoinSelectionReview
+        from wam_privacy_wallet.application.selective_disclosure_review import SelectiveDisclosureReview
+        from wam_privacy_wallet.application.security_assurance_review import SecurityAssuranceReview, _PUBLIC_PROVENANCE_DIGEST
+        args=dict(coin_policy_review=CoinSelectionReview(1,1,False,()), disclosure_review=SelectiveDisclosureReview("audit",14), assurance_review=SecurityAssuranceReview(_PUBLIC_PROVENANCE_DIGEST))
+        self.controller.replace(0,**args);state=self.controller.replace(1)
+        self.assertEqual((state.coin_policy,state.disclosure,state.assurance),("ABSENT",)*3)
+        self.controller.replace(2,**args);state=self.controller.reset()
+        self.assertEqual((state.coin_policy,state.disclosure,state.assurance),("ABSENT",)*3)
+
     def test_initial_state_is_unprivileged_and_empty(self):
         s = self.controller.state
         self.assertEqual((s.revision, s.transition), (0, "INITIAL"))

@@ -157,6 +157,30 @@ jobs:
       - name: Check Python syntax
         run: python -m compileall -q src tests
 
+      - name: Preserve raw security source Git blob bytes in GUI matrix
+        run: git config --global core.autocrlf false
+
+      - name: Checkout exact WAM Security source for actual Qt proof
+        uses: actions/checkout@v4
+        with:
+          repository: Urriki1502/wam-security
+          ref: c9b1ce872c2b0b65276883d4e210b6a2f7c96467
+          path: .pinned-security
+          persist-credentials: false
+
+      - name: Verify raw pure-helper source before GUI dependency installation
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python -B -m tools.ci_pinned_security_assurance .pinned-security --verify-only
+
+      - name: Install verified dependency-free security helper for actual GUI proof
+        run: python -m pip install --disable-pip-version-check -e .pinned-security
+
+      - name: Actual source-pinned provenance worker-to-Qt proof
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python -B -m tools.ci_pinned_security_assurance .pinned-security --gui
+
       - name: Run fail-closed GUI and full test discovery
         run: python -m tools.gui_ci_contract_gate
 
