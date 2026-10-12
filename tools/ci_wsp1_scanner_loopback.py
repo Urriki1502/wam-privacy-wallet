@@ -572,12 +572,19 @@ def _run(source_root: Path) -> None:
                 retained_dir = path / "retained-scan-regtest"
                 retained_dir.mkdir(mode=0o700)
                 provision_encrypted_scan_backup(retained_dir, envelope)
-                first_retained = run_retained_scan_only(
+                print("WSP1_RETAINED_PRIVATE_BACKUP_STAGED")
+                try:
+                    first_retained = run_retained_scan_only(
                     retained_dir, test_password,
                     import_scan=import_scan, scanner_factory=Scanner,
                     rpc=Wsp1ScannerOnlyRpc(endpoint, auth),
                     user_consented=True, max_blocks=2,
-                )
+                    )
+                except RetainedScanError as diag:
+                    print("WSP1_RETAINED_FIRST_" + str(diag),
+                          file=sys.stderr)
+                    raise
+                print("WSP1_RETAINED_FIRST_SCANNER_CLOSED")
                 db_path = retained_dir / "scan-only-state.sqlite"
                 if (first_retained.blocks_processed != 2
                         or not db_path.is_file()):
