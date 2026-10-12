@@ -32,3 +32,10 @@ read-only parser boundary. Do not import `offline_signer` into scanner paths,
 upgrade source pins implicitly, or pass arbitrary callback/provider objects.
 CORE-003 excluded and all #9/#82/#86/#153, #148/#151 and WSP review blockers
 remain unchanged. No upstream modification or production-ready claim.
+
+## Main integration base
+
+Network review PR #155 merged at
+`743a450a2ed4e50c4151057611e49fb233ab4bb0`. This slice is now based
+on that main commit; exact-head native/GUI/CodeQL qualification is required
+after retargeting. Earlier stacked-branch checks do not qualify the main PR.
