@@ -11,6 +11,7 @@ dependencies = []
 
 [project.optional-dependencies]
 gui = ["PySide6>=6.8,<7"]
+assurance = ["wam-security @ git+https://github.com/Urriki1502/wam-security@c9b1ce872c2b0b65276883d4e210b6a2f7c96467"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
