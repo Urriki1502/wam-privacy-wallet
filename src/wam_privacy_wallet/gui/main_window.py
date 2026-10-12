@@ -343,6 +343,8 @@ class MainWindow(QMainWindow):
         column.addStretch(1)
         if title == "Privacy":
             scroll = QScrollArea(self)
+            scroll.setFrameShape(QFrame.Shape.NoFrame)
+            scroll.viewport().setStyleSheet("background: #111827;")
             scroll.setWidgetResizable(True)
             scroll.setWidget(panel)
             return scroll
