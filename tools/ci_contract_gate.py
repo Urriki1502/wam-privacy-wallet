@@ -49,6 +49,7 @@ MINIMUM_CASES = {
     "test_app_synthetic_policy_demo.py": 8,
     "test_network_plan_review.py": 15,
     "test_payjoin_proposal_review.py": 17,
+    "test_selective_disclosure_review.py": 12,
     "test_app_coin_selection_review.py": 22,
     "test_psbt_v2_review.py": 16,
     "test_psbt_v2_worker_boundary.py": 10,

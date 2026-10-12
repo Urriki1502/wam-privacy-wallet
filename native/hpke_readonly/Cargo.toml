@@ -1,0 +1,9 @@
+[package]
+name = "wam-wallet-hpke-readonly"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+wam-privacy-halo2-prototype = { git = "https://github.com/Urriki1502/wam-privacy", rev = "db3d2dcaa540f1129d540101813b761167d33174" }
+halo2_proofs = { version = "0.3.5", default-features = false }
