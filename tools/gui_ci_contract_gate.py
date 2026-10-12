@@ -53,6 +53,10 @@ GUI_TEST_IDS = frozenset({
 })
 # Security-critical original non-GUI identities; additive to original suite floors.
 CRITICAL_NON_GUI_IDS = frozenset({
+    "test_app_coin_selection_review.CoinSelectionApplicationTests.test_exact_coin_without_change",
+    "test_app_coin_selection_review.CoinSelectionApplicationTests.test_cluster_merge_forbidden_by_default",
+    "test_app_coin_selection_review.CoinSelectionApplicationTests.test_explicit_merge_policy_and_consent_required",
+    "test_app_coin_selection_review.CoinSelectionApplicationTests.test_tampered_source_copy_denied_before_import",
     "test_core_help_example_parity.CoreHelpExampleParityTests.test_same_options_no_release_authority",
     "test_core_help_example_parity.CoreHelpExampleParityTests.test_added_help_option_without_sample_is_denied",
     "test_core_help_example_parity.CoreHelpExampleParityTests.test_active_network_header_denied",
