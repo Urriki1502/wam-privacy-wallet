@@ -45,6 +45,10 @@ GUI_TEST_IDS = frozenset({
 })
 # Security-critical original non-GUI identities; additive to original suite floors.
 CRITICAL_NON_GUI_IDS = frozenset({
+    "test_architecture_v1_traceability.V1ArchitectureTraceabilityTests.test_diagram_all_14_boxes_and_19_dependencies_are_pinned",
+    "test_architecture_v1_traceability.V1ArchitectureTraceabilityTests.test_no_live_wallet_or_core_execution_authority_even_if_claimed",
+    "test_architecture_v1_traceability.V1ArchitectureTraceabilityTests.test_unmerged_external_modules_never_mislabeled_as_integrated",
+    "test_architecture_v1_traceability.V1ArchitectureTraceabilityTests.test_blockers_exactly_pin_core_wsp_and_elf_review_gates",
     "test_official_regtest_readiness.OfficialRegtestReadinessTests.test_known_signed_exec_stack_is_explicitly_blocked",
     "test_official_regtest_readiness.OfficialRegtestReadinessTests.test_clean_elf_still_cannot_grant_wam_process_launch",
     "test_official_regtest_readiness.OfficialRegtestReadinessTests.test_untrusted_review_claim_is_denied_before_elf_read",
@@ -190,7 +194,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 865
+FULL_MIN_CASES = 871
 
 
 def _cases(suite: unittest.TestSuite):
