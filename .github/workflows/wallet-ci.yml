@@ -65,6 +65,21 @@ jobs:
           PYTHONPATH: src
         run: python -m tools.ci_contract_gate
 
+      # Preserve upstream raw Git blob bytes on Windows as well as Unix.
+      - name: Disable CRLF conversion for exact-source research checkout
+        run: git config --global core.autocrlf false
+
+      - name: Checkout exact pinned privacy research source
+        uses: actions/checkout@v4
+        with:
+          repository: Urriki1502/wam-privacy
+          ref: db3d2dcaa540f1129d540101813b761167d33174
+          path: .pinned-privacy
+          persist-credentials: false
+
+      - name: Native source-pinned network policy regressions (no transport)
+        run: python tools/ci_pinned_network_policy.py .pinned-privacy
+
       # Real detached GnuPG verification with an ephemeral synthetic test key.
       # This never runs WAM Core and never claims the official release is verified.
       - name: Verify GnuPG detached signatures with disposable test key (Linux)

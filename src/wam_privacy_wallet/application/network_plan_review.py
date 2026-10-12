@@ -1,0 +1,68 @@
+"""Consent-gated offline review using the unchanged pinned upstream policy.
+
+Caller annotations are untrusted. This evaluates a synthetic plan, never a
+transport, endpoint identity, Core connection or permission to send.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from .synthetic_policy_demo import _verify_source_bytes
+
+_FIELDS = frozenset(("role", "host", "port", "route", "encrypted_transport",
+                     "authenticated_transport", "fallback"))
+
+
+class NetworkPlanReviewError(ValueError):
+    """Fixed redacted code; no endpoint or underlying exception escapes."""
+
+
+@dataclass(frozen=True, slots=True)
+class NetworkPlanReview:
+    source_commit: str = "db3d2dcaa540f1129d540101813b761167d33174"
+    evidence: str = "PINNED_MODEL_EXECUTED_UNTRUSTED_INPUT"
+    transport_verified: bool = False
+    scan_allowed: bool = False
+    sign_allowed: bool = False
+    broadcast_allowed: bool = False
+
+
+def review_synthetic_network_plan(
+    endpoints: object, *, scope: object, consent: object,
+    async_payjoin: object = False,
+) -> NetworkPlanReview:
+    """Evaluate up to 32 exact-shape synthetic endpoints under strict defaults.
+
+    Consent permits local computation only; no I/O except source integrity
+    reads. No caller-controlled policy relaxation, callback or object method.
+    The output retains neither endpoints nor correlation-prone route telemetry.
+    """
+    try:
+        if (type(scope) is not str or scope != "synthetic-regtest"
+                or consent is not True or type(async_payjoin) is not bool
+                or type(endpoints) is not tuple or not 1 <= len(endpoints) <= 32):
+            raise ValueError
+        for row in endpoints:
+            if type(row) is not dict or set(row) != _FIELDS:
+                raise ValueError
+            for key, limit in (("role", 32), ("host", 255), ("route", 16)):
+                value = row[key]
+                if (type(value) is not str or not 1 <= len(value) <= limit
+                        or any(ord(c) < 33 or ord(c) > 126 for c in value)):
+                    raise ValueError
+            if type(row["port"]) is not int or not 1 <= row["port"] <= 65535:
+                raise ValueError
+            if any(type(row[k]) is not bool for k in (
+                "encrypted_transport", "authenticated_transport", "fallback"
+            )):
+                raise ValueError
+        _verify_source_bytes()
+        from ..research_models.network_privacy.model import Endpoint, NetworkPlan, NetworkPolicy
+        from ..research_models.network_privacy.policy import validate_network_plan
+
+        # Construct fresh exact upstream values. Never dispatch caller methods.
+        plan = NetworkPlan(tuple(Endpoint(**dict(row)) for row in endpoints))
+        validate_network_plan(plan, NetworkPolicy(async_payjoin=async_payjoin))
+    except Exception:
+        raise NetworkPlanReviewError("APP_NETWORK_PLAN_REVIEW_DENIED") from None
+    return NetworkPlanReview()
