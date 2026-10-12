@@ -15,6 +15,7 @@ from wam_privacy_wallet.application import receive_vector as rv
 
 from wam_privacy_wallet.application.node_status import NodeOverview, node_overview
 from wam_privacy_wallet.application.scanner_session_workflow import ScannerReadOnlyObservation
+from wam_privacy_wallet.application.wsp_scan_coordinator import WspScanSessionSummary
 from wam_privacy_wallet.node.attestation import ChainIdentity, WAM_REGTEST_GENESIS
 from wam_privacy_wallet.node.core_profile import VerifiedCoreProfile
 from wam_privacy_wallet.node.endpoint import LocalRegtestEndpoint
@@ -44,6 +45,71 @@ class GuiShellSmokeTests(unittest.TestCase):
         self.window.deleteLater()
         QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
         QCoreApplication.processEvents()
+
+    def test_real_wsp_scanner_result_renders_only_as_untrusted_receipt(self):
+        receipt = WspScanSessionSummary(1, 2, 0, 0)
+        self.window.present_wsp_scan_session_summary(receipt)
+        self.assertIn("WSP-1 SCAN EXECUTED", self.window.wsp_session_status.text())
+        self.assertIn("tx 2", self.window.wsp_session_status.text())
+        self.assertIn("UNTRUSTED CORE", self.window.wsp_session_status.text())
+        self.assertIn("NO VALIDATED CORE", self.window.wsp_session_notice.text())
+        self.assertEqual(self.window.session_status.text(), "NO WALLET LOADED")
+        self.assertEqual(self.window.findChildren(QPushButton), [])
+
+    def test_real_wsp_receipt_cleared_by_next_offline_update(self):
+        self.window.present_wsp_scan_session_summary(
+            WspScanSessionSummary(1, 1, 0, 0)
+        )
+        self.window.replace_offline_presentation(
+            self.window.offline_presentation_state.revision
+        )
+        self.assertEqual(
+            self.window.wsp_session_status.text(),
+            "NO WSP-1 APPLICATION SCAN RECEIPT",
+        )
+        self.assertEqual(self.window.offline_presentation_state.scanner_session,
+                         "ABSENT")
+
+    def test_forged_real_wsp_receipt_denied_and_clears_existing(self):
+        self.window.present_wsp_scan_session_summary(
+            WspScanSessionSummary(1, 1, 0, 0)
+        )
+        forged = WspScanSessionSummary(1, 1, 0, 0)
+        object.__setattr__(forged, "signer_enabled", True)
+        with self.assertRaisesRegex(ValueError, "^APP_GUI_WSP_RECEIPT_DENIED$"):
+            self.window.present_wsp_scan_session_summary(forged)
+        self.assertEqual(
+            self.window.wsp_session_status.text(),
+            "NO WSP-1 APPLICATION SCAN RECEIPT",
+        )
+        self.assertEqual(self.window.session_status.text(), "NO WALLET LOADED")
+
+    def test_real_wsp_receipt_bool_and_oversize_counts_fail_closed(self):
+        for field, value in (
+            ("blocks_processed", True),
+            ("blocks_processed", 17),
+            ("transactions_processed", 160001),
+            ("rollback_blocks", -1),
+            ("mempool_transactions_processed", 10001),
+            ("status", "WALLET_OPERATIONAL"),
+        ):
+            receipt = WspScanSessionSummary(1, 1, 0, 0)
+            object.__setattr__(receipt, field, value)
+            with self.subTest(field=field), self.assertRaisesRegex(
+                ValueError, "^APP_GUI_WSP_RECEIPT_DENIED$"
+            ):
+                self.window.present_wsp_scan_session_summary(receipt)
+
+    def test_real_wsp_receipt_direct_clear_and_reentrant_guard(self):
+        self.window.present_wsp_scan_session_summary(
+            WspScanSessionSummary(1, 0, 0, 0)
+        )
+        self.window.clear_wsp_scan_session_summary()
+        self.assertEqual(
+            self.window.wsp_session_status.text(),
+            "NO WSP-1 APPLICATION SCAN RECEIPT",
+        )
+        self.assertFalse(self.window._managed_transition_active)
 
     def test_local_scanner_rpc_observation_is_untrusted_gui_only(self) -> None:
         preview = ScannerReadOnlyObservation(3, 2, 4, 0)

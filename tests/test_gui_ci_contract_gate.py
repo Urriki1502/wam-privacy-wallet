@@ -12,6 +12,11 @@ from tools.gui_ci_contract_gate import check_and_run
 
 
 _NAMES = (
+    "test_real_wsp_scanner_result_renders_only_as_untrusted_receipt",
+    "test_real_wsp_receipt_cleared_by_next_offline_update",
+    "test_forged_real_wsp_receipt_denied_and_clears_existing",
+    "test_real_wsp_receipt_bool_and_oversize_counts_fail_closed",
+    "test_real_wsp_receipt_direct_clear_and_reentrant_guard",
     "test_local_scanner_rpc_observation_is_untrusted_gui_only",
     "test_forged_scanner_enable_flag_clears_gui_lifecycle",
     "test_lifecycle_replacement_never_carries_scanner_preview_forward",
