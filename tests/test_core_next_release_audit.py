@@ -26,10 +26,10 @@ _EHDR = struct.Struct("<HHIQQQIHHHHHH")
 _PHDR = struct.Struct("<IIQQQQQQ")
 
 
-def _elf(stack_flags=6, *, missing_note=False, load_flags=5, valid=True):
+def _elf(stack_flags=6, *, missing_note=False, load_flags=5, valid=True, entry=0x401000):
     blob = bytearray(512)
     blob[:16] = b"\x7fELF" + bytes((2, 1, 1)) + bytes(9)
-    blob[16:64] = _EHDR.pack(3, 62, 1, 0x401000, 64, 0, 0,
+    blob[16:64] = _EHDR.pack(3, 62, 1, entry, 64, 0, 0,
                              64, 56, 2, 0, 0, 0)
     blob[64:120] = _PHDR.pack(1, load_flags, 0, 0x400000, 0, 512, 512, 4096)
     blob[120:176] = _PHDR.pack(0 if missing_note else 0x6474E551,
@@ -103,6 +103,28 @@ class NextCoreReleaseCandidateTests(unittest.TestCase):
             changed[i] = (name, _elf(stack_flags=7), kind)
             with self.subTest(binary=name):
                 self.denied("CORE_CANDIDATE_EXECSTACK_DENIED", changed)
+
+
+    def test_nested_bin_elf_is_covered(self):
+        records = self.default + [
+            (_ROOT + "/bin/tools/wam-backup", _elf(), tarfile.REGTYPE)
+        ]
+        observation = self.inspect(records)
+        self.assertIn("tools/wam-backup", observation.binary_names)
+
+    def test_shared_object_outside_bin_with_zero_entry_is_inspected(self):
+        records = self.default + [
+            (_ROOT + "/lib/libwam.so", _elf(entry=0), tarfile.REGTYPE)
+        ]
+        observation = self.inspect(records)
+        self.assertIn("lib/libwam.so", observation.binary_names)
+
+    def test_executable_stack_shared_object_outside_bin_denied(self):
+        records = self.default + [
+            (_ROOT + "/lib/libwam.so", _elf(stack_flags=7,entry=0),
+             tarfile.REGTYPE)
+        ]
+        self.denied("CORE_CANDIDATE_EXECSTACK_DENIED", records)
 
     def test_missing_gnu_stack_note_rejected(self):
         changed = list(self.default)
