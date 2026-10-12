@@ -74,7 +74,7 @@ MINIMUM_CASES = {
     "test_official_regtest_readiness.py": 5,
     "test_architecture_v1_traceability.py": 6,
     "test_wsp1_pinned_surface.py": 6,
-    "test_wsp1_scanner_only_rpc.py": 17,
+    "test_wsp1_scanner_only_rpc.py": 21,
     "test_app_scanner_session_workflow.py": 14,
 }
 MANDATORY_SUITES = tuple(MINIMUM_CASES)
