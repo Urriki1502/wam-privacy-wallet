@@ -117,6 +117,8 @@ def audit_v1_traceability(data: object) -> dict[str, object]:
         num = b.get("issue", b.get("pr"))
         if type(b["id"]) is not str or type(num) is not int:
             _deny()
+        if (b["id"] in {"CORE-ELF-HOLD", "WSP-QUALIFICATION"}) != ("pr" in b):
+            _deny()
         item = (b["id"], num)
         if item not in _BLOCKERS or item in seen_blockers:
             _deny()
