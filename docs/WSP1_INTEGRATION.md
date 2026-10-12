@@ -1,5 +1,7 @@
 # WSP-1 integration boundary
 
+**V1 approved architecture:** [Traceability plan](ARCHITECTURE_V1_PLAN.md) and [WSP-1 pinned source reuse / scanner RPC gap](WSP1_SOURCE_REUSE_GATE.md). A verified Git source blob is **review evidence, not an imported dependency or an operational scanner**.
+
 **Status: planned / review-gated**. The pinned WSP-1 interface candidate is tracked in [PR #3](https://github.com/Urriki1502/wam-privacy-wallet/pull/3) and must not be described as merged, complete or secure until independently qualified.
 
 ## Intended components
