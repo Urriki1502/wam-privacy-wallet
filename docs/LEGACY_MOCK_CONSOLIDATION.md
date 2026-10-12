@@ -35,3 +35,10 @@
 - **Mock assessment:** `tests/test_wsp1_full_source_closure.py` uses a synthetic Git tree and is **test-only**. Keep it for tampering/negative cases. Native source qualification uses a real Git checkout and real pinned WSP scanner/SQLite. No production mock fallback is introduced.
 - **Removal decision:** no legacy test or module meets evidence-backed deletion conditions in this slice; leave runtime `scanner_session_workflow.py` as explicitly labeled untrusted RPC observation until GUI scanner state can be bound to a qualified external engine without exposing scan secrets.
 - **Remaining:** this gate is a CI/source provenance prerequisite, NOT an operational loader, hardware trust or transitive native dependency attestation. Actual user scan accounts / encryption / GUI activation and WAM Core approval are still separate gates.
+
+## Checkpoint: encrypted scan-only disposable intake (PR #137 candidate)
+
+- Reuse **actual pinned WSP-1** `export_scan` / `import_scan` and `Scanner` from a previously qualified native source checkout. The application imports **no** external source by default and does not construct a `Keyring` or spend keys.
+- One explicit-consent, bounded, **disposable** encrypted scan-backup session runs scanner + SQLite inside an isolated temporary directory; close and cleanup are required, failure is redacted. Native CI exercises upstream AES-GCM scan-only envelope and actual upstream SQLite/scanner with synthetic localhost RPC.
+- KEEP dependency-free adversarial tests as negative fixtures. No old runtime module has yet qualified for deletion.
+- This is **not durable account custody**: plaintext scan secrets exist temporarily in upstream Python objects and memory zeroization is not assured. No persistent encrypted vault, operational GUI, source loader, real Core runtime, signer, broadcast or mainnet authorization is provided.
