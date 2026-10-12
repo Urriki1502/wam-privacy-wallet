@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MINIMUM_CASES = {
     "test_scaffold.py": 5,
     "test_core_profile.py": 9,
-    "test_core_source_pin.py": 10,
+    "test_core_source_pin.py": 14,
     "test_node_contract.py": 7,
     "test_read_rpc.py": 11,
     "test_real_regtest_harness.py": 13,

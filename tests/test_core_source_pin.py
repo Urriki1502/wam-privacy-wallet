@@ -25,17 +25,25 @@ def fixtures():
         for network, spec in PORTS.items() for kind, value in spec.items()
     ).encode("ascii")
     chains = (
+        "class CMainParams : public CChainParams {\n"
+        "  consensus.enforce_BIP94 = false;\n"
+        "};\n"
+        "class CTestNetParams : public CChainParams {\n"
+        "  consensus.enforce_BIP94 = false;\n"
+        "};\n"
         "class CRegTestParams : public CChainParams {\n"
+        "  consensus.enforce_BIP94 = true;\n"
         f'  assert(consensus.hashGenesisBlock == uint256S("0x{WAM_REGTEST_GENESIS}"));\n'
         "};\n"
     ).encode("ascii")
     patch = b'''replacement='return std::make_unique<CBaseChainParams>("regtest", 29554);'\n'''
     files = dict(zip(PATHS, (params, chains, patch)))
     manifest = {
-        "schema": 1, "repository": "wamcoin-core-dev/wam-coin",
+        "schema": 2, "repository": "wamcoin-core-dev/wam-coin",
         "inspected_commit": "a" * 40, "wsp1_reference_core_commit": "b" * 40,
         "source_blobs": {key: git_blob_sha1(value) for key, value in files.items()},
         "network_ports": PORTS, "regtest_genesis": WAM_REGTEST_GENESIS,
+        "consensus_bip94": {"mainnet": False, "testnet": False, "regtest": True},
     }
     return manifest, files
 
@@ -96,7 +104,8 @@ class CorePinTests(unittest.TestCase):
         config = load_core_manifest(path)
         self.assertEqual(config["regtest_genesis"], WAM_REGTEST_GENESIS)
         self.assertEqual(config["network_ports"]["regtest"], {"p2p": 29555, "rpc": 29554})
-        self.assertEqual(config["inspected_commit"], "260bc468e5adffea7ce68d8f97fac3e27e4c50b2")
+        self.assertEqual(config["inspected_commit"], "87ac8f0786fa5bc0796a5cba21e638911078d475")
+        self.assertEqual(config["consensus_bip94"], {"mainnet": False, "testnet": False, "regtest": True})
         self.assertEqual(config["wsp1_reference_core_commit"], "8a3f4fe4f1d804c378f795d4cc281ec5125f75f3")
 
     def test_manifest_rejects_fake_network_and_boolean_port(self):
@@ -111,6 +120,54 @@ class CorePinTests(unittest.TestCase):
                 doc.write_text(json.dumps({**manifest, **mutation}), encoding="utf-8")
                 with self.assertRaisesRegex(CoreSourceContractError, code):
                     load_core_manifest(doc)
+
+    def test_bip94_wrong_regtest_even_with_rewritten_blob_pin_is_denied(self):
+        manifest, files = fixtures()
+        changed_bytes = files[PATHS[1]].replace(
+            b"consensus.enforce_BIP94 = true;",
+            b"consensus.enforce_BIP94 = false;",
+        )
+        changed = {**files, PATHS[1]: changed_bytes}
+        manifest["source_blobs"][PATHS[1]] = git_blob_sha1(changed_bytes)
+        with self.assertRaisesRegex(CoreSourceContractError, "^CORE_SOURCE_BIP94_DRIFT$"):
+            verify_core_source(manifest, changed)
+
+    def test_bip94_missing_or_duplicate_assignment_is_denied(self):
+        for replacement in (b"", b"consensus.enforce_BIP94 = true;\n  consensus.enforce_BIP94 = true;"):
+            with self.subTest(replacement=replacement):
+                manifest, files = fixtures()
+                changed_bytes = files[PATHS[1]].replace(
+                    b"consensus.enforce_BIP94 = true;", replacement,
+                )
+                manifest["source_blobs"][PATHS[1]] = git_blob_sha1(changed_bytes)
+                with self.assertRaisesRegex(CoreSourceContractError, "^CORE_SOURCE_BIP94_DRIFT$"):
+                    verify_core_source(manifest, {**files, PATHS[1]: changed_bytes})
+
+    def test_bip94_manifest_forgery_denied(self):
+        manifest, files = fixtures()
+        for invalid in (
+            {"mainnet": False, "testnet": False, "regtest": False},
+            {"mainnet": 0, "testnet": 0, "regtest": True},
+            {"mainnet": False, "testnet": False},
+        ):
+            with self.subTest(invalid=invalid), tempfile.TemporaryDirectory() as d:
+                file = Path(d) / "manifest.json"
+                file.write_text(json.dumps({**manifest, "consensus_bip94": invalid}))
+                with self.assertRaisesRegex(
+                    CoreSourceContractError, "^CORE_MANIFEST_BIP94_INVALID$",
+                ):
+                    load_core_manifest(file)
+
+    def test_bip94_misplaced_assignment_before_network_class_denied(self):
+        manifest, files = fixtures()
+        changed_bytes = (
+            b"consensus.enforce_BIP94 = true;\n" + files[PATHS[1]]
+        )
+        manifest["source_blobs"][PATHS[1]] = git_blob_sha1(changed_bytes)
+        with self.assertRaisesRegex(
+            CoreSourceContractError, "^CORE_SOURCE_BIP94_DRIFT$",
+        ):
+            verify_core_source(manifest, {**files, PATHS[1]: changed_bytes})
 
     def test_duplicate_ports_denied_even_if_blob_matches(self):
         manifest, files = fixtures()
