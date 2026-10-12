@@ -45,6 +45,11 @@ GUI_TEST_IDS = frozenset({
 })
 # Security-critical original non-GUI identities; additive to original suite floors.
 CRITICAL_NON_GUI_IDS = frozenset({
+    "test_two_node_ancestry_cli.BoundedAncestryCliTests.test_optional_header_review_reuses_one_tty_prompt_pair",
+    "test_two_node_ancestry_cli.BoundedAncestryCliTests.test_header_forged_authority_and_missing_flags_denied",
+    "test_two_node_ancestry_cli.BoundedAncestryCliTests.test_header_height_window_epoch_mismatch_is_denied",
+    "test_two_node_ancestry_cli.BoundedAncestryCliTests.test_secret_bearing_extra_ancestry_fields_are_refused",
+    "test_two_node_ancestry_cli.BoundedAncestryCliTests.test_header_extra_fields_or_fake_pass_count_denied",
     "test_two_node_readiness.TwoNodeReadinessTests.test_all_claimed_evidence_still_cannot_grant_authority",
     "test_two_node_readiness.TwoNodeReadinessTests.test_readiness_never_launches_core",
     "test_binary_path_race_preflight.BinaryPathRacePreflightTests.test_path_replacement_during_open_is_rejected",
@@ -155,7 +160,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 812
+FULL_MIN_CASES = 819
 
 
 def _cases(suite: unittest.TestSuite):
