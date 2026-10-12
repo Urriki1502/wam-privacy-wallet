@@ -90,7 +90,7 @@ def _inspect_one(raw: bytes, *, blob_sha: str, role: str) -> tuple[ast.Module, s
 
 def verify_pinned_wsp1_sources(root: Path) -> dict[str, object]:
     """Examine only four known files; report scanner bridge gap, never approve it."""
-    if type(root) is not Path or not root.is_absolute() or root.is_symlink():
+    if type(root) is not type(Path()) or not root.is_absolute() or root.is_symlink():
         _deny()
     trees: dict[str, ast.Module] = {}
     for path, pinned_sha in _PINNED.items():
