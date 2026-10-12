@@ -32,7 +32,7 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
         return patch.dict(MINIMUM_CASES, {self.pattern: 1})
 
     def test_manifest_preserves_original_eight_and_self_test(self):
-        self.assertEqual(len(MANDATORY_SUITES), 51)
+        self.assertEqual(len(MANDATORY_SUITES), 52)
         self.assertEqual(len(set(MANDATORY_SUITES)), len(MANDATORY_SUITES))
         self.assertIn("test_ci_contract_gate.py", MANDATORY_SUITES)
         self.assertIn("test_regtest_gateway.py", MANDATORY_SUITES)
@@ -140,6 +140,7 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
 
     def test_minimum_case_floors_pinned_for_all_mandatory_suites(self):
         expected = {
+            "test_binary_path_race_preflight.py": 5,
             "test_scaffold.py": 5,
             "test_core_profile.py": 9,
             "test_core_source_pin.py": 14,
