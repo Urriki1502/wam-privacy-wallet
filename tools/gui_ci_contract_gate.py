@@ -105,6 +105,10 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_offline_integration_status.OfflineIntegrationStatusTests.test_mismatched_reorg_segment_or_recovery_fails_atomic_replacement",
     "test_regtest_cookie_descriptor.RegtestCookieDescriptorTests.test_exact_terminal_crlf_is_accepted_but_internal_crlf_denied",
     "test_regtest_cookie_descriptor.RegtestCookieDescriptorTests.test_swap_between_lstat_and_fd_open_is_rejected",
+    "test_two_node_bounded_ancestry.TwoNodeBoundedAncestryWireTests.test_actual_two_distinct_tcp_hosts_audit_three_heights_twice",
+    "test_two_node_bounded_ancestry.TwoNodeBoundedAncestryWireTests.test_same_reported_tip_but_different_interior_height_denied",
+    "test_two_node_bounded_ancestry.TwoNodeBoundedAncestryWireTests.test_silent_interior_mutation_between_two_passes_is_denied",
+    "test_two_node_bounded_ancestry.TwoNodeBoundedAncestryWireTests.test_never_calls_wam_core_subprocess_on_real_localhost_http",
     "test_two_node_live_transition.TwoNodeLiveTransitionWireTests.test_higher_tip_with_rewritten_old_height_is_reorg",
     "test_two_node_live_transition.TwoNodeLiveTransitionWireTests.test_two_real_independent_localhost_sockets_report_unchanged",
     "test_two_node_live_transition.TwoNodeLiveTransitionWireTests.test_no_core_subprocess_on_successful_live_http_observation",
@@ -135,7 +139,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 737
+FULL_MIN_CASES = 752
 
 
 def _cases(suite: unittest.TestSuite):
