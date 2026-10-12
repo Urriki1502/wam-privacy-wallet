@@ -91,10 +91,64 @@ class LinuxKernelSealedRegtestTests(unittest.TestCase):
             return
         with self._open() as review:
             self.assertTrue(review.audit())
+        self.assertEqual(review._descriptor, -1)
         with self.assertRaisesRegex(
-            seal.LinuxCoreSealError, "^CORE_SEAL_CHANGED$",
+            seal.LinuxCoreSealError, "^CORE_SEAL_CLOSED$",
         ):
             review.audit()
+
+    def test_seal_receipt_denies_forged_zero_seal_mask(self):
+        if not self._supported():
+            self._unsupported()
+            return
+        with self._open() as review:
+            with self.assertRaisesRegex(
+                seal.LinuxCoreSealError, "^CORE_SEAL_REVIEW_DENIED$",
+            ):
+                seal.KernelSealedReview(
+                    review._descriptor, self.digest, len(self.bytes), 0,
+                )
+            self.assertTrue(review.audit())
+
+    def test_unsealed_kernel_fd_cannot_claim_verified_seals(self):
+        if not self._supported():
+            self._unsupported()
+            return
+        fd = os.memfd_create("synthetic-not-sealed", os.MFD_CLOEXEC | os.MFD_ALLOW_SEALING)
+        try:
+            os.write(fd, self.bytes)
+            required = (seal.fcntl.F_SEAL_WRITE | seal.fcntl.F_SEAL_GROW
+                        | seal.fcntl.F_SEAL_SHRINK | seal.fcntl.F_SEAL_SEAL)
+            with self.assertRaisesRegex(
+                seal.LinuxCoreSealError, "^CORE_SEAL_CHANGED$",
+            ):
+                seal.KernelSealedReview(fd, self.digest, len(self.bytes), required)
+        finally:
+            os.close(fd)
+
+    def test_closed_review_cannot_attach_to_reused_valid_sealed_fd(self):
+        if not self._supported():
+            self._unsupported()
+            return
+        with self._open() as original:
+            closed_number = original._descriptor
+            self.assertTrue(original.audit())
+        self.assertEqual(original._descriptor, -1)
+        # New kernel memfd has the SAME seals, size, and content. A stale
+        # numeric fd must never make the old receipt valid again.
+        with self._open() as replacement:
+            reused_directly = replacement._descriptor == closed_number
+            if not reused_directly:
+                os.dup2(replacement._descriptor, closed_number)
+            try:
+                self.assertTrue(replacement.audit())
+                with self.assertRaisesRegex(
+                    seal.LinuxCoreSealError, "^CORE_SEAL_CLOSED$",
+                ):
+                    original.audit()
+            finally:
+                if not reused_directly:
+                    os.close(closed_number)
 
     def test_wrong_digest_is_rejected_before_seal_claim(self):
         if not self._supported():
