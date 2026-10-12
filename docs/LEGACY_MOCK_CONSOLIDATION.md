@@ -76,3 +76,10 @@
 - Actual SQLite stores one BIP352 synthetic receive, then an encrypted checkpoint is restored into a different WSP Scanner instance; scanner reattests the same local synthetic RPC and does not re-apply confirmed receive. Flipped authentication tag and foreign account are refused before RPC, without partially restoring SQLite.
 - Recovering the pre-fork encrypted checkpoint after a synthetic chain reorg must roll back one block and erase the coin using the same actual WSP Store/Scanner, not a fabricated backend.
 - This is ONLY native test qualification. Checkpoint bytes remain ephemeral; no user-facing backup export, disk-save/delete/rotation feature, provenance signing or real WAM Core runtime is authorized. Upstream SQLite remains unencrypted at rest. No real user wallet keys/funds, signing, broadcast or mainnet.
+
+## Checkpoint: encrypted checkpoint archive on disk (PR #144 candidate)
+
+- **No new cryptography**: source-verified pinned WSP-1 `Store.export_checkpoint` produces an authenticated AES-GCM encrypted state blob. A Linux-only create-once, mode-0600 atomic/no-clobber archive stores opaque ciphertext and reads it from disk; the real WSP-1 `Store.restore_checkpoint` authenticates and restores a new genuine SQLite scanner.
+- Native CI proves disk write/read with actual WSP-1 encrypted checkpoint; no overwrite, correct previous receipt after restart, cross-account refusal and fork rollback are still enforced by WSP Store.
+- Fail closed on missing/unsafe/foreign files, symlinks, hardlinks, FIFO, permissive directory and concurrent publishers. Existing negative mock fixtures are retained for filesystem denial testing; a real scanner/SQLite run separately validates integration.
+- Fixed-name one-shot archive only; **no rotation, trusted latest-version selection, rollback defense, operating-system keychain, real WAM Core, GUI restore button or real-funds use**. SQLite remains plaintext privacy metadata. Same-UID attacker resistance and crash-consistency across all filesystems are NOT proven.
