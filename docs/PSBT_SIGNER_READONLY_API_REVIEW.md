@@ -61,3 +61,16 @@ unimplemented in this branch. Operational signer approval remains separate.
 WSP upstream #9 and wallet #3/#16 remain review-gated. CORE-003 excluded;
 #9/#82/#86/#153 and trusted anti-rollback #148/#151 retain their state.
 No Core modification, mainnet, production readiness or security-audit claim.
+
+## Implemented unsigned boundary on current main
+
+Main `76a1dab675905ef0b2b5bc5e3a9b25c61d6a3055` includes PR #161/#162 and the
+combined read-only GUI in #165. The application calls the original source-pinned
+unsigned decoder in a fixed isolated worker; native decoder-to-Qt evidence and
+adversarial field/source checks are recorded in the merged docs/workflows.
+Windows x86 PSBT stays unqualified. Receipt origins are not runtime attestation.
+
+This research branch is rebased onto that main. It contains documentation only;
+no signer constructor, signing request, approval grant, private spend-key input,
+finalization or transaction broadcast has been added or executed. Opening the
+branch does not revoke SIGNER-APPROVAL or any Core/upstream/rollback gate.
