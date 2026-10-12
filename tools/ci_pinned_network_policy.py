@@ -1,4 +1,4 @@
-"""Run exact-source upstream network regressions; never invoke Core or transport."""
+"""Run exact-source upstream privacy regressions; never invoke Core or transport."""
 from hashlib import sha1
 from pathlib import Path
 import sys
@@ -13,22 +13,37 @@ FILES = {
 }
 
 
+PAYJOIN_FILES = {
+    "prototypes/payjoin_safety/model.py": "8e3e8be096a66fc960f75a56f1ac34daa9306017",
+    "prototypes/payjoin_safety/validator.py": "598596a8bde118204b3baf69bb53a884c6dad21a",
+    "prototypes/payjoin_safety/__init__.py": "59f1f5380eb071f6a010d6e57ec9e7937fe7291c",
+    "tests/test_phase4_payjoin_safety.py": "e338a278e626c547ff84e34fd3f2ea7cee99c3bf",
+}
+
+
 def main():
     root = Path(sys.argv[1]).resolve()
-    for path, expected in FILES.items():
+    payjoin = len(sys.argv) == 3 and sys.argv[2] == "--payjoin"
+    if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and not payjoin):
+        raise SystemExit("PINNED_PRIVACY_ARGUMENT_DENIED")
+    files = PAYJOIN_FILES if payjoin else FILES
+    pattern = "test_phase4_payjoin_safety.py" if payjoin else "test_phase5_network_privacy.py"
+    minimum = 16 if payjoin else 10
+    label = "PAYJOIN" if payjoin else "NETWORK"
+    for path, expected in files.items():
         data = (root / path).read_bytes()
         actual = sha1(b"blob " + str(len(data)).encode("ascii") + b"\0" + data).hexdigest()
         if actual != expected:
-            raise SystemExit("PINNED_NETWORK_SOURCE_DENIED")
+            raise SystemExit(f"PINNED_{label}_SOURCE_DENIED")
     # This dedicated process imports only the authenticated pure-model closure.
-    suite = unittest.TestLoader().discover(str(root / "tests"), pattern="test_phase5_network_privacy.py")
-    if suite.countTestCases() != 10:
-        raise SystemExit("PINNED_NETWORK_DISCOVERY_DENIED")
+    suite = unittest.TestLoader().discover(str(root / "tests"), pattern=pattern)
+    if suite.countTestCases() != minimum:
+        raise SystemExit(f"PINNED_{label}_DISCOVERY_DENIED")
     result = unittest.TextTestRunner(verbosity=2).run(suite)
     if (not result.wasSuccessful() or result.skipped or result.expectedFailures
             or result.unexpectedSuccesses):
-        raise SystemExit("PINNED_NETWORK_TESTS_DENIED")
-    print(f"PINNED_NETWORK_NATIVE_OK {PIN} 10/10; no transport authority")
+        raise SystemExit(f"PINNED_{label}_TESTS_DENIED")
+    print(f"PINNED_{label}_NATIVE_OK {PIN} {minimum}/{minimum}; no operational authority")
 
 
 if __name__ == "__main__":

@@ -48,6 +48,7 @@ MINIMUM_CASES = {
     "test_app_policy_evidence.py": 12,
     "test_app_synthetic_policy_demo.py": 8,
     "test_network_plan_review.py": 14,
+    "test_payjoin_proposal_review.py": 16,
     "test_app_receive_public_vector.py": 12,
     "test_app_presentation_lifecycle.py": 10,
     "test_scanner_response_shape.py": 14,
