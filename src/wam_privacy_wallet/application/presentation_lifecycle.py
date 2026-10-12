@@ -18,6 +18,7 @@ from .offline_reorg_reconciliation import OfflineReorgReconciliation
 from .policy_evidence import SyntheticPolicyReport
 from .privacy_readiness import PrivacyResearchSnapshot
 from .receive_vector import ReceiveVectorPreview, _FIXED_FINGERPRINT
+from .scanner_session_workflow import ScannerReadOnlyObservation
 
 
 class OfflineLifecycleError(ValueError):
@@ -51,6 +52,9 @@ class OfflinePresentationState:
         "REPLAY_NOT_DOUBLE_COUNTED", "ROLLBACK_RESCAN_REVIEW",
         "MIGRATION_RESCAN_REVIEW",
     ] = "ABSENT"
+    scanner_session: Literal[
+        "ABSENT", "LOCAL_RPC_OBSERVED_UNTRUSTED",
+    ] = "ABSENT"
 
 
 def _empty(revision: int, transition: str) -> OfflinePresentationState:
@@ -67,6 +71,29 @@ def _valid_node(value: object) -> bool:
         and type(value.height) is int and 0 <= value.height <= 100_000_000
         and type(value.status) is str and value.status == "READ_ONLY_SNAPSHOT"
         and type(value.notice) is str and value.notice == "EXPERIMENTAL_NO_REAL_FUNDS"
+    )
+
+
+def _valid_scanner(value: object) -> bool:
+    """Only untrusted bounded scalar observations may reach GUI state."""
+    return (
+        type(value) is ScannerReadOnlyObservation
+        and type(value.reported_tip_height) is int
+        and 0 <= value.reported_tip_height <= 100_000_000
+        and type(value.blocks_observed) is int
+        and 0 <= value.blocks_observed <= 16
+        and type(value.transactions_observed) is int
+        and 0 <= value.transactions_observed <= 20_000
+        and type(value.mempool_ids_observed) is int
+        and 0 <= value.mempool_ids_observed <= 20_000
+        and value.status == "LOCAL_RPC_OBSERVED_UNTRUSTED"
+        and value.scanner_enabled is False
+        and value.wallet_ready is False
+        and value.chain_verified is False
+        and value.core_execution_allowed is False
+        and value.signer_enabled is False
+        and value.broadcast_allowed is False
+        and value.mainnet_allowed is False
     )
 
 
@@ -325,11 +352,14 @@ class OfflinePresentationController:
         resume: object = None,
         rescan: object = None,
         reorg: object = None,
+        scanner_observation: object = None,
     ) -> OfflinePresentationState:
         if type(expected_revision) is not int or expected_revision != self._state.revision:
             self._reject()
         if (
             (node is not None and not _valid_node(node))
+            or (scanner_observation is not None
+                and not _valid_scanner(scanner_observation))
             or (privacy is not None and not _valid_privacy(privacy))
             or (policy is not None and not _valid_policy(policy))
             or (receive is not None and not _valid_receive(receive))
@@ -357,5 +387,7 @@ class OfflinePresentationController:
             resume.action if resume is not None else "ABSENT",
             rescan.disposition if rescan is not None else "ABSENT",
             reorg.verdict if reorg is not None else "ABSENT",
+            scanner_session=("LOCAL_RPC_OBSERVED_UNTRUSTED"
+                             if scanner_observation is not None else "ABSENT"),
         )
         return self._state
