@@ -18,6 +18,23 @@ from wam_privacy_wallet.application import encrypted_scan_backup as vault
 
 
 _LINUX = sys.platform == "linux"
+_DEFAULT = object()
+
+
+def linux_native(fn):
+    """On other platforms prove fail-closed without unittest.skip."""
+    from functools import wraps
+
+    @wraps(fn)
+    def wrapper(self):
+        if not _LINUX:
+            with self.assertRaisesRegex(vault.EncryptedScanBackupError,
+                                        "^SCAN_BACKUP_PLATFORM_OR_PATH_DENIED$"):
+                vault.load_encrypted_scan_backup(self.path)
+            return
+        return fn(self)
+
+    return wrapper
 
 
 class ScanBackupVaultTests(unittest.TestCase):
@@ -27,9 +44,9 @@ class ScanBackupVaultTests(unittest.TestCase):
         self.path = Path(self.root.name)
         self.payload = b"E" * 64
 
-    def store(self, content=None):
+    def store(self, content=_DEFAULT):
         vault.provision_encrypted_scan_backup(
-            self.path, self.payload if content is None else content,
+            self.path, self.payload if content is _DEFAULT else content,
         )
 
     def test_rejects_bad_input_before_directory_io(self):
@@ -61,7 +78,7 @@ class ScanBackupVaultTests(unittest.TestCase):
         self.assertFalse(hasattr(vault, "sign"))
         self.assertFalse(hasattr(vault, "sendrawtransaction"))
 
-    @unittest.skipUnless(_LINUX, "native Linux filesystem contract")
+    @linux_native
     def test_create_and_load_identical_opaque_encrypted_backup(self):
         self.store()
         self.assertEqual(vault.load_encrypted_scan_backup(self.path), self.payload)
@@ -70,7 +87,7 @@ class ScanBackupVaultTests(unittest.TestCase):
         self.assertEqual(f.stat().st_nlink, 1)
         self.assertEqual([p.name for p in self.path.iterdir()], [f.name])
 
-    @unittest.skipUnless(_LINUX, "native Linux filesystem contract")
+    @linux_native
     def test_overwrite_is_never_allowed_and_original_ciphertext_survives(self):
         self.store()
         with self.assertRaisesRegex(vault.EncryptedScanBackupError,
@@ -78,12 +95,12 @@ class ScanBackupVaultTests(unittest.TestCase):
             self.store(b"Z" * 64)
         self.assertEqual(vault.load_encrypted_scan_backup(self.path), self.payload)
 
-    @unittest.skipUnless(_LINUX, "native Linux filesystem contract")
+    @linux_native
     def test_missing_canonical_name_fails_closed(self):
         with self.assertRaises(vault.EncryptedScanBackupError):
             vault.load_encrypted_scan_backup(self.path)
 
-    @unittest.skipUnless(_LINUX, "native Linux filesystem contract")
+    @linux_native
     def test_world_readable_parent_is_refused_before_any_file_write(self):
         self.path.chmod(0o755)
         with self.assertRaisesRegex(vault.EncryptedScanBackupError,
@@ -91,7 +108,7 @@ class ScanBackupVaultTests(unittest.TestCase):
             self.store()
         self.assertFalse((self.path / "scan-only.wsp.enc").exists())
 
-    @unittest.skipUnless(_LINUX, "native Linux filesystem contract")
+    @linux_native
     def test_symlinked_parent_directory_is_refused(self):
         link = self.path.with_name(self.path.name + "-link")
         link.symlink_to(self.path, target_is_directory=True)
@@ -100,7 +117,7 @@ class ScanBackupVaultTests(unittest.TestCase):
             vault.provision_encrypted_scan_backup(link, self.payload)
         self.assertFalse((self.path / "scan-only.wsp.enc").exists())
 
-    @unittest.skipUnless(_LINUX, "native Linux filesystem contract")
+    @linux_native
     def test_canonical_symlink_is_not_followed_for_read_or_write(self):
         victim = self.path / "victim"
         victim.write_bytes(b"DO NOT CHANGE")
@@ -112,7 +129,7 @@ class ScanBackupVaultTests(unittest.TestCase):
                 fn()
         self.assertEqual(victim.read_bytes(), b"DO NOT CHANGE")
 
-    @unittest.skipUnless(_LINUX, "native Linux filesystem contract")
+    @linux_native
     def test_hardlinked_ciphertext_denied(self):
         outside = self.path / "original"
         outside.write_bytes(self.payload)
@@ -122,21 +139,21 @@ class ScanBackupVaultTests(unittest.TestCase):
                                     "^SCAN_BACKUP_FILE_DENIED$"):
             vault.load_encrypted_scan_backup(self.path)
 
-    @unittest.skipUnless(_LINUX, "native Linux filesystem contract")
+    @linux_native
     def test_permissive_ciphertext_mode_denied(self):
         self.store()
         (self.path / "scan-only.wsp.enc").chmod(0o644)
         with self.assertRaises(vault.EncryptedScanBackupError):
             vault.load_encrypted_scan_backup(self.path)
 
-    @unittest.skipUnless(_LINUX, "native Linux filesystem contract")
+    @linux_native
     def test_short_or_truncated_ciphertext_denied(self):
         self.store()
         (self.path / "scan-only.wsp.enc").write_bytes(b"x"*30)
         with self.assertRaises(vault.EncryptedScanBackupError):
             vault.load_encrypted_scan_backup(self.path)
 
-    @unittest.skipUnless(_LINUX, "native Linux filesystem contract")
+    @linux_native
     def test_excessive_file_size_denied_without_read(self):
         self.store()
         with (self.path / "scan-only.wsp.enc").open("r+b") as f:
@@ -144,13 +161,13 @@ class ScanBackupVaultTests(unittest.TestCase):
         with self.assertRaises(vault.EncryptedScanBackupError):
             vault.load_encrypted_scan_backup(self.path)
 
-    @unittest.skipUnless(_LINUX, "native Linux filesystem contract")
+    @linux_native
     def test_fifo_never_blocks_and_is_rejected(self):
         os.mkfifo(self.path / "scan-only.wsp.enc", 0o600)
         with self.assertRaises(vault.EncryptedScanBackupError):
             vault.load_encrypted_scan_backup(self.path)
 
-    @unittest.skipUnless(_LINUX, "native Linux filesystem contract")
+    @linux_native
     def test_concurrent_writers_one_wins_no_overwrite(self):
         outcome = []
         barrier = threading.Barrier(2)
@@ -172,7 +189,7 @@ class ScanBackupVaultTests(unittest.TestCase):
         self.assertIn(vault.load_encrypted_scan_backup(self.path),
                       (b"A"*64, b"B"*64))
 
-    @unittest.skipUnless(_LINUX, "native Linux filesystem contract")
+    @linux_native
     def test_partial_write_failure_cannot_publish_canonical_file(self):
         original = vault.os.write
         calls = [0]
@@ -188,14 +205,14 @@ class ScanBackupVaultTests(unittest.TestCase):
         self.assertFalse((self.path / "scan-only.wsp.enc").exists())
         self.assertEqual(list(self.path.iterdir()), [])
 
-    @unittest.skipUnless(_LINUX, "native Linux filesystem contract")
+    @linux_native
     def test_no_existing_directory_is_autocreated(self):
         missing = self.path / "missing"
         with self.assertRaises(vault.EncryptedScanBackupError):
             vault.provision_encrypted_scan_backup(missing, self.payload)
         self.assertFalse(missing.exists())
 
-    @unittest.skipUnless(_LINUX, "native Linux filesystem contract")
+    @linux_native
     def test_empty_data_and_redundant_staging_are_never_accepted(self):
         self.store()
         with self.assertRaises(vault.EncryptedScanBackupError):
