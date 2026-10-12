@@ -141,7 +141,7 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
     def test_minimum_case_floors_pinned_for_all_mandatory_suites(self):
         expected = {
             "test_two_node_readiness.py": 5,
-            "test_binary_path_race_preflight.py": 7,
+            "test_binary_path_race_preflight.py": 12,
             "test_scaffold.py": 5,
             "test_core_profile.py": 9,
             "test_core_source_pin.py": 14,

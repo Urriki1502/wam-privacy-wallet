@@ -85,6 +85,68 @@ class BinaryPathRacePreflightTests(unittest.TestCase):
                 with self.assertRaisesRegex(RealRegtestError, "CORE_BINARY_UNAVAILABLE"):
                     verify_binary(path, digest)
 
+    def test_custom_fspath_cannot_execute_hooks(self):
+        class Hostile:
+            def __fspath__(self):
+                raise AssertionError("UNTRUSTED_PATH_HOOK_CALLED")
+        with self.assertRaisesRegex(RealRegtestError, "^CORE_BINARY_PATH_DENIED$"):
+            verify_binary(Hostile(), "0" * 64)
+
+    def test_relative_path_denied_before_filesystem_access(self):
+        with patch("wam_privacy_wallet.node.real_regtest.os.open",
+                   side_effect=AssertionError("MUST_NOT_OPEN")):
+            with self.assertRaisesRegex(RealRegtestError, "^CORE_BINARY_PATH_DENIED$"):
+                verify_binary("relative-wamd", "0" * 64)
+
+    def test_hardlinked_binary_denied_even_with_correct_digest(self):
+        with tempfile.TemporaryDirectory() as d:
+            path, alias = Path(d) / "wamd", Path(d) / "alias"
+            path.write_bytes(b"synthetic-hardlink")
+            try:
+                os.link(path, alias)
+                linked = path.stat().st_nlink >= 2
+            except (OSError, NotImplementedError):
+                linked = False
+            if linked:
+                with self.assertRaisesRegex(RealRegtestError, "^CORE_BINARY_NOT_REGULAR$"):
+                    verify_binary(path, hashlib.sha256(path.read_bytes()).hexdigest())
+            else:
+                # Some runner filesystems cannot create/measure hardlinks.
+                # Exercise the exact rejection boundary without a CI skip.
+                from types import SimpleNamespace
+                current = path.stat()
+                fake = SimpleNamespace(
+                    st_mode=current.st_mode, st_nlink=2,
+                    st_size=current.st_size, st_file_attributes=0,
+                )
+                with patch.object(type(path), "lstat", return_value=fake):
+                    with self.assertRaisesRegex(RealRegtestError, "^CORE_BINARY_NOT_REGULAR$"):
+                        verify_binary(path, hashlib.sha256(b"synthetic-hardlink").hexdigest())
+
+    def test_empty_binary_denied_without_launch(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "empty-wamd"
+            path.write_bytes(b"")
+            with patch("wam_privacy_wallet.node.real_regtest.subprocess.Popen",
+                       side_effect=AssertionError("MUST_NOT_LAUNCH")):
+                with self.assertRaisesRegex(RealRegtestError, "^CORE_BINARY_NOT_REGULAR$"):
+                    verify_binary(path, hashlib.sha256(b"").hexdigest())
+
+    def test_oversize_metadata_rejected_without_open(self):
+        import stat
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "synthetic-wamd"
+            fake = SimpleNamespace(st_mode=stat.S_IFREG | 0o600, st_nlink=1,
+                                   st_size=512 * 1024 * 1024 + 1,
+                                   st_file_attributes=0)
+            with patch.object(type(path), "lstat", return_value=fake), patch(
+                "wam_privacy_wallet.node.real_regtest.os.open",
+                side_effect=AssertionError("MUST_NOT_OPEN")
+            ):
+                with self.assertRaisesRegex(RealRegtestError, "^CORE_BINARY_NOT_REGULAR$"):
+                    verify_binary(path, "0" * 64)
+
     def test_launcher_remains_interlocked_even_with_correct_digest(self):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "wamd"

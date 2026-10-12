@@ -20,6 +20,7 @@ from wam_privacy_wallet.node.endpoint import LocalRegtestEndpoint
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PySide6.QtCore import QCoreApplication, QEvent  # noqa: E402
 from PySide6.QtWidgets import QApplication, QPushButton  # noqa: E402
 
 from wam_privacy_wallet.gui import MainWindow  # noqa: E402
@@ -34,7 +35,14 @@ class GuiShellSmokeTests(unittest.TestCase):
         self.window = MainWindow()
 
     def tearDown(self) -> None:
+        # Full-discovery keeps GUI and socket tests in one process. On macOS,
+        # leaving Qt widgets to Python GC after GUI tests can delete shared
+        # QObjects during a later non-GUI test (native exit 139). Dispose on
+        # the creating GUI thread via DeferredDelete, not direct C++ deletion.
         self.window.close()
+        self.window.deleteLater()
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        QCoreApplication.processEvents()
 
     def test_pages_and_navigation_are_consistent(self) -> None:
         self.assertEqual(
