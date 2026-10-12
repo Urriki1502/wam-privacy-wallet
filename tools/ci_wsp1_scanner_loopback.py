@@ -688,6 +688,27 @@ def _run(source_root: Path) -> None:
                     raise RuntimeError("WSP1_CHECKPOINT_BAD_AUTH_CALLED_RPC")
                 print("WSP1_REAL_CHECKPOINT_TAMPER_DENIED_PASS")
 
+                wrong_password_scanner = Scanner(
+                    retained_dir / "checkpoint-wrong-password.sqlite", (account,)
+                )
+                wrong_password_before = len(server.observed_methods)
+                try:
+                    try:
+                        wrong_password_scanner.store.restore_checkpoint(
+                            encrypted_checkpoint, b"incorrect-checkpoint-password"
+                        )
+                    except StorageError:
+                        pass
+                    else:
+                        raise RuntimeError("WSP1_CHECKPOINT_WRONG_PASSWORD_ACCEPTED")
+                    if wrong_password_scanner.store.tip()[0] != 0:
+                        raise RuntimeError("WSP1_CHECKPOINT_WRONG_PASSWORD_DIRTY_DB")
+                finally:
+                    wrong_password_scanner.close()
+                if len(server.observed_methods) != wrong_password_before:
+                    raise RuntimeError("WSP1_CHECKPOINT_WRONG_PASSWORD_CALLED_RPC")
+                print("WSP1_REAL_CHECKPOINT_WRONG_PASSWORD_DENIED_PASS")
+
                 wrong_checkpoint_identity = ScanAccount(2, 3, pub(5), birthday=1)
                 foreign_checkpoint = Scanner(
                     retained_dir / "checkpoint-foreign-test.sqlite",
