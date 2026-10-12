@@ -53,6 +53,9 @@ GUI_TEST_IDS = frozenset({
 })
 # Security-critical original non-GUI identities; additive to original suite floors.
 CRITICAL_NON_GUI_IDS = frozenset({
+    "test_checkpoint_recovery_workflow.RecoveryWorkflowNegativeTests.test_expected_real_workflow_stage_order",
+    "test_checkpoint_recovery_workflow.RecoveryWorkflowNegativeTests.test_checkpoint_aead_refusal_always_closes_scanner",
+    "test_checkpoint_recovery_workflow.RecoveryWorkflowNegativeTests.test_gui_present_failure_clears_before_return",
     "test_encrypted_checkpoint_archive.CheckpointArchiveTests.test_create_read_exact_ciphertext_and_modes",
     "test_encrypted_checkpoint_archive.CheckpointArchiveTests.test_canonical_file_symlink_denied_without_write",
     "test_encrypted_checkpoint_archive.CheckpointArchiveTests.test_parallel_publishers_only_one_succeeds",

@@ -83,3 +83,10 @@
 - Native CI proves disk write/read with actual WSP-1 encrypted checkpoint; no overwrite, correct previous receipt after restart, cross-account refusal and fork rollback are still enforced by WSP Store.
 - Fail closed on missing/unsafe/foreign files, symlinks, hardlinks, FIFO, permissive directory and concurrent publishers. Existing negative mock fixtures are retained for filesystem denial testing; a real scanner/SQLite run separately validates integration.
 - Fixed-name one-shot archive only; **no rotation, trusted latest-version selection, rollback defense, operating-system keychain, real WAM Core, GUI restore button or real-funds use**. SQLite remains plaintext privacy metadata. Same-UID attacker resistance and crash-consistency across all filesystems are NOT proven.
+
+## Checkpoint: application encrypted checkpoint recovery → Qt (PR #145 candidate)
+
+- The Application composes existing already encrypted upstream WSP-1 scan-only account backup (#141) and encrypted SQLite checkpoint file (#144); **actual pinned WSP** `import_scan`, `Scanner`, `Store.restore_checkpoint` and `Scanner.sync` authenticate/replay the state in a private disposable SQLite on synthetic read-only regtest-shaped localhost RPC.
+- Qt receives only `WspScanSessionSummary` after consent and mandatory wipe of previous receipt. Wrong passphrase/decryption failure, checkpoint corruption, database identity mismatch or rendering error deny success and clear previous GUI evidence. Real native CI proves restart and reorg case with identical upstream code, not test doubles.
+- Offline adversarial fixtures cover all denial paths and count as tests, not proof of real-source integration.
+- **Not** an enabled user GUI restore flow: synchronous headless test only. No production WSP source loader, anti-rollback trust anchor, durable restore transaction, FD-bound database handoff, unlocked account vault, signer/broadcast, Core binary or money.

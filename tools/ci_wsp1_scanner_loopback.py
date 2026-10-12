@@ -37,6 +37,9 @@ from wam_privacy_wallet.application.encrypted_checkpoint_archive import (
     EncryptedCheckpointArchiveError, store_encrypted_checkpoint,
     load_encrypted_checkpoint,
 )
+from wam_privacy_wallet.application.checkpoint_recovery_workflow import (
+    CheckpointRecoveryError, recover_checkpoint_scan_preview,
+)
 from wam_privacy_wallet.application.retained_scan_session import (
     RetainedScanError, run_retained_scan_only,
 )
@@ -665,6 +668,46 @@ def _run(source_root: Path) -> None:
                     raise RuntimeError("WSP1_DURABLE_CHECKPOINT_OVERWRITTEN")
                 print("WSP1_REAL_ENCRYPTED_CHECKPOINT_DISK_ROUNDTRIP_PASS")
 
+                # Actual application orchestration: two distinct saved WSP-1
+                # AES-GCM blobs -> genuine fresh Scanner/SQLite checkpoint
+                # restore -> read-only scan -> no-authority offscreen Qt.
+                recovered_preview = recover_checkpoint_scan_preview(
+                    retained_dir, test_password,
+                    import_scan=import_scan, scanner_factory=Scanner,
+                    rpc=Wsp1ScannerOnlyRpc(endpoint, auth),
+                    user_consented=True, max_blocks=1,
+                    clear_preview=payment_window.clear_offline_presentation,
+                    present_preview=payment_window.present_wsp_scan_session_summary,
+                )
+                if (recovered_preview.blocks_processed != 0
+                        or recovered_preview.wallet_operational is not False
+                        or recovered_preview.signer_enabled is not False
+                        or "blocks 0" not in
+                        payment_window.wsp_session_status.text()
+                        or payment_window.session_status.text() != "NO WALLET LOADED"):
+                    raise RuntimeError("WSP1_REAL_CHECKPOINT_APP_GUI_DENIED")
+                print("WSP1_REAL_DISK_CHECKPOINT_APP_TO_QT_PASS")
+                no_auth_wire = len(server.observed_methods)
+                try:
+                    recover_checkpoint_scan_preview(
+                        retained_dir, b"wrong-checkpoint-password",
+                        import_scan=import_scan, scanner_factory=Scanner,
+                        rpc=Wsp1ScannerOnlyRpc(endpoint, auth),
+                        user_consented=True,
+                        clear_preview=payment_window.clear_offline_presentation,
+                        present_preview=payment_window.present_wsp_scan_session_summary,
+                    )
+                except CheckpointRecoveryError as err:
+                    if str(err) != "APP_RECOVERY_RESTORE_DENIED":
+                        raise
+                else:
+                    raise RuntimeError("WSP1_CHECKPOINT_APP_INVALID_PASSWORD_ACCEPTED")
+                if (len(server.observed_methods) != no_auth_wire
+                        or payment_window.wsp_session_status.text()
+                        != "NO WSP-1 APPLICATION SCAN RECEIPT"):
+                    raise RuntimeError("WSP1_CHECKPOINT_APP_STALE_QT_RECEIPT")
+                print("WSP1_REAL_CHECKPOINT_APP_WRONG_PASSWORD_UI_CLEAR_PASS")
+
                 restored_db = retained_dir / "checkpoint-restore-test.sqlite"
                 restored_scanner = Scanner(restored_db, (account,))
                 try:
@@ -844,6 +887,22 @@ def _run(source_root: Path) -> None:
                 finally:
                     fork_scanner.close()
                 print("WSP1_REAL_CHECKPOINT_RESTORE_REORG_UNDO_PASS")
+                fork_preview = recover_checkpoint_scan_preview(
+                    retained_dir, test_password,
+                    import_scan=import_scan, scanner_factory=Scanner,
+                    rpc=Wsp1ScannerOnlyRpc(endpoint, auth),
+                    user_consented=True, max_blocks=1,
+                    clear_preview=payment_window.clear_offline_presentation,
+                    present_preview=payment_window.present_wsp_scan_session_summary,
+                )
+                if (fork_preview.rollback_blocks != 1
+                        or fork_preview.blocks_processed != 1
+                        or fork_preview.mainnet_allowed is not False
+                        or "reorg 1" not in
+                        payment_window.wsp_session_status.text()
+                        or payment_window.session_status.text() != "NO WALLET LOADED"):
+                    raise RuntimeError("WSP1_REAL_CHECKPOINT_APP_QT_REORG_BAD")
+                print("WSP1_REAL_DISK_CHECKPOINT_RECOVER_REORG_GUI_PASS")
 
                 payment_window.close()
                 payment_window.deleteLater()
