@@ -105,7 +105,7 @@ class SyntheticKernelDescriptorBindingTests(unittest.TestCase):
         src.write_text(
             '#include <unistd.h>\n'
             'int main(void) {\n'
-            f'  const char m[] = "{token}\\\\n";\n'
+            f'  const char m[] = "{token}\\n";\n'
             '  return write(1, m, sizeof(m)-1) == sizeof(m)-1 ? 0 : 42;\n'
             '}\n',
             encoding="ascii",
@@ -145,7 +145,7 @@ class SyntheticKernelDescriptorBindingTests(unittest.TestCase):
             return
         result = self._witness("sealed-fd")
         self.assertEqual(result.returncode, 0, result.stderr[-600:])
-        self.assertEqual(result.stdout, "SYNTHETIC_FD_BINDING_OK\\n")
+        self.assertEqual(result.stdout, "SYNTHETIC_FD_BINDING_OK\n")
         self.assertNotIn("ATTACKER", result.stdout)
 
     def test_noexec_sealed_fd_kernel_denies_even_synthetic_fixture(self):
