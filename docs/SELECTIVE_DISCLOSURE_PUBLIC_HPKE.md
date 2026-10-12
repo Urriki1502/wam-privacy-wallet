@@ -40,8 +40,9 @@ unit tests are protocol/negative evidence only and do not prove real HPKE.
 The original wallet/GUI/CodeQL gates are kept and floors increase additively.
 
 Local macOS arm64 validation: 3 adapter tests, 8 actual native/application tests,
-12 protocol/negative tests and full wallet discovery pass; upstream 8-test and
-other architecture results must be reported separately as they finish.
+12 protocol/negative tests, the original 8 upstream note-encryption tests and
+1235 full wallet discovery cases pass. Other architecture results must be
+reported separately as they finish.
 
 wam-privacy Phase15C/15D independent reviews, Phase15E remediation closure and
 Phase15F maintainer handoff remain pending. The receipt forcibly records

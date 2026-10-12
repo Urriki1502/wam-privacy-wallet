@@ -69,16 +69,15 @@ jobs:
           architecture: ${{ matrix.arch }}
       - name: Install dependency-free wallet
         run: python -m pip install --disable-pip-version-check -e .
-      - name: Verify actual native Python width and exact upstream blobs before build
+      - name: Verify actual native Python width
         shell: python
         env:
           EXPECTED_BITS: ${{ matrix.bits }}
         run: |
           import os, struct
-          from pathlib import Path
-          from tools.ci_pinned_hpke_fixture import verify
           assert struct.calcsize('P') * 8 == int(os.environ['EXPECTED_BITS'])
-          verify(Path('privacy-source').resolve())
+      - name: Verify exact upstream blobs before build
+        run: python -B -m tools.ci_pinned_hpke_fixture --verify-only --source-root "${{ github.workspace }}/privacy-source"
       - name: Install fixed official Rust toolchain and target
         run: |
           rustup toolchain install 1.99.0 --profile minimal
