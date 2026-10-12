@@ -91,3 +91,20 @@ Input UTXO ownership, amount, fee, consensus and final chain validity are
 **not** proven; upstream blob identity is not publisher authentication.
 There is no PSBT, WSP signer, Core launch, RPC, wallet balance, transaction
 broadcast or mainnet authorization. CORE-003/shielded consensus is excluded.
+
+## Coin selection application and native regression qualification
+
+The existing pure upstream policy is unchanged at `db3d2dcaa540f1129d540101813b761167d33174`.
+Application review uses exact model types, explicit consent and separately
+confirmed cluster merge. String subclasses are rejected before algorithm
+comparisons, and the application limits exact search to the upstream default
+budget (18 candidates / width 4). Results retain only counts, change presence
+and bounded warning codes; normalized fixture coins are not ownership evidence.
+
+CI executes the original source-pinned 10 Phase2 policy cases and three property
+cases (including 500 seeded scenarios) in a fresh native process on Linux,
+macOS, Windows x64 and Windows x86. Raw Git blob hashes are verified before
+imports; no source line-ending normalization or algorithm fork is used. These
+13 native cases complement 22 application adversarial cases and all existing
+mandatory suites. Neither suite grants wallet balance, Core, signer, broadcast
+or mainnet authority.

@@ -96,7 +96,17 @@ def review_regtest_coin_selection(
                 or any(type(i) is not Intent for i in intents)
                 or (policy is not None and type(policy) is not Policy)):
             raise CoinSelectionReviewError("APP_COIN_SELECTION_MODEL_DENIED")
+        # Exact model classes still permit string subclasses in their fields.
+        # Deny those before the upstream algorithm can compare/hash them.
+        if (any(type(c.txid) is not str or type(c.cluster) is not str for c in coins)
+                or type(intents[0].recipient) is not str):
+            raise CoinSelectionReviewError("APP_COIN_SELECTION_MODEL_DENIED")
         chosen = Policy() if policy is None else policy
+        if (type(chosen.exact_search_limit) is not int
+                or not 1 <= chosen.exact_search_limit <= 18
+                or type(chosen.exact_search_width) is not int
+                or not 1 <= chosen.exact_search_width <= 4):
+            raise CoinSelectionReviewError("APP_COIN_SELECTION_POLICY_DENIED")
         if (type(chosen.allow_cluster_merge) is not bool
                 or chosen.allow_cluster_merge is not allow_cluster_merge):
             raise CoinSelectionReviewError("APP_COIN_SELECTION_CLUSTER_CONSENT_DENIED")

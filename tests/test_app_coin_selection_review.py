@@ -145,6 +145,30 @@ class CoinSelectionApplicationTests(unittest.TestCase):
                      "broadcast_allowed", "mainnet_allowed"):
             self.assertIs(getattr(result, flag), False)
 
+    def test_nonprimitive_strings_denied_before_policy_callbacks(self):
+        calls = []
+        class Hook(str):
+            def __eq__(self, other):
+                calls.append("eq"); return super().__eq__(other)
+            def __hash__(self):
+                calls.append("hash"); return super().__hash__()
+            def __iter__(self):
+                calls.append("iter"); return super().__iter__()
+        for changes in (
+            {"coins": (Coin(Hook(f"{1:064x}"), 0, 51000, "a"),)},
+            {"coins": (Coin(f"{1:064x}", 0, 51000, Hook("a")),)},
+            {"intents": (Intent(Hook("recipient"), 50000),)},
+        ):
+            with self.assertRaisesRegex(app.CoinSelectionReviewError, "^APP_COIN_SELECTION_MODEL_DENIED$"):
+                self.review(**changes)
+        self.assertEqual(calls, [])
+
+    def test_application_search_budget_cannot_be_expanded(self):
+        for policy in (Policy(exact_search_limit=19), Policy(exact_search_width=5),
+                       Policy(exact_search_limit=True), Policy(exact_search_width=True)):
+            with self.assertRaisesRegex(app.CoinSelectionReviewError, "^APP_COIN_SELECTION_POLICY_DENIED$"):
+                self.review(policy=policy)
+
     def test_no_signer_rpc_or_broadcast_api(self):
         for name in ("sign", "broadcast", "Keyring", "WamCore",
                      "sendrawtransaction"):

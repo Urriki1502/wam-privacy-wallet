@@ -21,22 +21,35 @@ PAYJOIN_FILES = {
 }
 
 
+COIN_FILES = {
+    "prototypes/wallet_privacy/model.py": "c53df0c40f183bd51fbfaffe64d6a5aa899c8a43",
+    "prototypes/wallet_privacy/policy.py": "4c37f9c78d1c0f2818bf6530871cd0a87f4741dd",
+    "prototypes/wallet_privacy/__init__.py": "d1a5272b8e389add8ca5e13767ccfe0ec319b1ee",
+    "tests/test_phase2_wallet_privacy.py": "ee573b99f0cc595bef54ba947276022424396ba4",
+    "tests/test_phase2_wallet_properties.py": "6fc26a9be317a639cada1980c4052c4811e1f2a5",
+}
+
+
 def main():
     root = Path(sys.argv[1]).resolve()
-    payjoin = len(sys.argv) == 3 and sys.argv[2] == "--payjoin"
-    if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and not payjoin):
+    option = sys.argv[2] if len(sys.argv) == 3 else "--network"
+    if len(sys.argv) not in (2, 3) or option not in ("--network", "--payjoin", "--coin-selection"):
         raise SystemExit("PINNED_PRIVACY_ARGUMENT_DENIED")
-    files = PAYJOIN_FILES if payjoin else FILES
-    pattern = "test_phase4_payjoin_safety.py" if payjoin else "test_phase5_network_privacy.py"
-    minimum = 16 if payjoin else 10
-    label = "PAYJOIN" if payjoin else "NETWORK"
+    files, patterns, minimum, label = {
+        "--network": (FILES, ("test_phase5_network_privacy.py",), 10, "NETWORK"),
+        "--payjoin": (PAYJOIN_FILES, ("test_phase4_payjoin_safety.py",), 16, "PAYJOIN"),
+        "--coin-selection": (COIN_FILES, ("test_phase2_wallet_privacy.py", "test_phase2_wallet_properties.py"), 13, "COIN_SELECTION"),
+    }[option]
     for path, expected in files.items():
         data = (root / path).read_bytes()
         actual = sha1(b"blob " + str(len(data)).encode("ascii") + b"\0" + data).hexdigest()
         if actual != expected:
             raise SystemExit(f"PINNED_{label}_SOURCE_DENIED")
-    # This dedicated process imports only the authenticated pure-model closure.
-    suite = unittest.TestLoader().discover(str(root / "tests"), pattern=pattern)
+    # This dedicated process imports only the source-pinned pure-model closure.
+    # Content hashes do not authenticate its publisher or runtime.
+    suite = unittest.TestSuite()
+    for pattern in patterns:
+        suite.addTests(unittest.TestLoader().discover(str(root / "tests"), pattern=pattern))
     if suite.countTestCases() != minimum:
         raise SystemExit(f"PINNED_{label}_DISCOVERY_DENIED")
     result = unittest.TextTestRunner(verbosity=2).run(suite)
