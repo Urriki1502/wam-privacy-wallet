@@ -33,6 +33,10 @@ from wam_privacy_wallet.application.encrypted_scan_backup import (
     EncryptedScanBackupError, provision_encrypted_scan_backup,
     load_encrypted_scan_backup,
 )
+from wam_privacy_wallet.application.encrypted_checkpoint_archive import (
+    EncryptedCheckpointArchiveError, store_encrypted_checkpoint,
+    load_encrypted_checkpoint,
+)
 from wam_privacy_wallet.application.retained_scan_session import (
     RetainedScanError, run_retained_scan_only,
 )
@@ -646,11 +650,26 @@ def _run(source_root: Path) -> None:
                         or len(encrypted_checkpoint) < 52):
                     raise RuntimeError("WSP1_CHECKPOINT_EXPORT_FORMAT_DENIED")
 
+                # Actual WSP-1 AES-GCM encrypted Store checkpoint persists
+                # through new file descriptors and a simulated process restart.
+                store_encrypted_checkpoint(retained_dir, encrypted_checkpoint)
+                on_disk_checkpoint = load_encrypted_checkpoint(retained_dir)
+                if on_disk_checkpoint != encrypted_checkpoint:
+                    raise RuntimeError("WSP1_DURABLE_CHECKPOINT_COPY_DENIED")
+                try:
+                    store_encrypted_checkpoint(retained_dir, encrypted_checkpoint)
+                except EncryptedCheckpointArchiveError as err:
+                    if str(err) != "CHECKPOINT_STORE_DENIED":
+                        raise
+                else:
+                    raise RuntimeError("WSP1_DURABLE_CHECKPOINT_OVERWRITTEN")
+                print("WSP1_REAL_ENCRYPTED_CHECKPOINT_DISK_ROUNDTRIP_PASS")
+
                 restored_db = retained_dir / "checkpoint-restore-test.sqlite"
                 restored_scanner = Scanner(restored_db, (account,))
                 try:
                     restored_scanner.store.restore_checkpoint(
-                        encrypted_checkpoint, test_password
+                        on_disk_checkpoint, test_password
                     )
                     if restored_scanner.store.tip() != (2, PAYTIP):
                         raise RuntimeError("WSP1_CHECKPOINT_RESTORED_TIP_BAD")
@@ -695,7 +714,7 @@ def _run(source_root: Path) -> None:
                 try:
                     try:
                         wrong_password_scanner.store.restore_checkpoint(
-                            encrypted_checkpoint, b"incorrect-checkpoint-password"
+                            on_disk_checkpoint, b"incorrect-checkpoint-password"
                         )
                     except StorageError:
                         pass
@@ -718,7 +737,7 @@ def _run(source_root: Path) -> None:
                 try:
                     try:
                         foreign_checkpoint.store.restore_checkpoint(
-                            encrypted_checkpoint, test_password
+                            on_disk_checkpoint, test_password
                         )
                     except StorageError:
                         pass
@@ -811,7 +830,7 @@ def _run(source_root: Path) -> None:
                 )
                 try:
                     fork_scanner.store.restore_checkpoint(
-                        encrypted_checkpoint, test_password
+                        load_encrypted_checkpoint(retained_dir), test_password
                     )
                     after_fork = run_consented_wsp_scan(
                         fork_scanner, Wsp1ScannerOnlyRpc(endpoint, auth),
