@@ -486,14 +486,15 @@ def _run(source_root: Path) -> None:
                 # record one coin in SQLite, and never duplicate on re-scan.
                 server.height = 2
                 server.tip = PAYTIP
-                payment_stats = scanner.sync(Wsp1ScannerOnlyRpc(
-                    endpoint, auth,
-                ), max_blocks=1)
+                payment_stats = run_consented_wsp_scan(
+                    scanner, Wsp1ScannerOnlyRpc(endpoint, auth),
+                    user_consented=True, max_blocks=1,
+                )
                 coins = scanner.coins()
-                if (payment_stats.blocks != 1
-                        or payment_stats.transactions != 2
-                        or payment_stats.candidates != 1
-                        or payment_stats.ecdh < 1
+                if (payment_stats.blocks_processed != 1
+                        or payment_stats.transactions_processed != 2
+                        or scanner.metrics.candidates != 1
+                        or scanner.metrics.ecdh < 1
                         or len(coins) != 1
                         or coins[0]["txid"] != PAYTX
                         or coins[0]["atoms"] != 200_000
@@ -503,27 +504,57 @@ def _run(source_root: Path) -> None:
                     raise RuntimeError("WSP1_SYNTHETIC_SILENT_PAYMENT_NOT_DETECTED")
                 print("WSP1_ACTUAL_SCANNER_SYNTHETIC_BIP352_RECEIVE_PASS")
 
-                again = scanner.sync(Wsp1ScannerOnlyRpc(
-                    endpoint, auth,
-                ), max_blocks=1)
-                if (again.blocks != 0 or len(scanner.coins()) != 1
+                # Render actual BIP352 match statistics through the real App
+                # DTO into the real Qt GUI. No address/txid/balance display.
+                payment_window = MainWindow()
+                payment_window.present_wsp_scan_session_summary(payment_stats)
+                if ("tx 2" not in payment_window.wsp_session_status.text()
+                        or "UNTRUSTED CORE" not in
+                        payment_window.wsp_session_status.text()
+                        or payment_window.session_status.text()
+                        != "NO WALLET LOADED"):
+                    raise RuntimeError("WSP1_BIP352_RECEIVE_QT_DISPLAY_DENIED")
+                print("WSP1_REAL_BIP352_RECEIVE_TO_GUI_PASS")
+
+                again = run_consented_wsp_scan(
+                    scanner, Wsp1ScannerOnlyRpc(endpoint, auth),
+                    user_consented=True, max_blocks=1,
+                )
+                if (again.blocks_processed != 0 or len(scanner.coins()) != 1
                         or scanner.store.tip() != (2, PAYTIP)):
                     raise RuntimeError("WSP1_SYNTHETIC_PAYMENT_DUPLICATED")
                 print("WSP1_ACTUAL_SCANNER_SYNTHETIC_PAYMENT_REPLAY_PASS")
+                payment_window.present_wsp_scan_session_summary(again)
+                if "blocks 0" not in payment_window.wsp_session_status.text():
+                    raise RuntimeError("WSP1_REPLAY_QT_RECEIPT_STALE")
 
                 # Chain fork at the same height drops the payment. Upstream
                 # Scanner.sync must genuinely UNDO the prior wallet coin and
                 # commit only the new, payment-free synthetic block.
                 server.tip = PAYTIP_FORK
                 server.discard_payment = True
-                undone = scanner.sync(Wsp1ScannerOnlyRpc(
-                    endpoint, auth,
-                ), max_blocks=1)
-                if (undone.rollback != 1 or undone.blocks != 1
+                undone = run_consented_wsp_scan(
+                    scanner, Wsp1ScannerOnlyRpc(endpoint, auth),
+                    user_consented=True, max_blocks=1,
+                )
+                if (undone.rollback_blocks != 1 or undone.blocks_processed != 1
                         or scanner.store.tip() != (2, PAYTIP_FORK)
                         or scanner.coins()):
                     raise RuntimeError("WSP1_SYNTHETIC_PAYMENT_REORG_NOT_UNDONE")
                 print("WSP1_ACTUAL_SCANNER_SYNTHETIC_PAYMENT_REORG_UNDO_PASS")
+                payment_window.present_wsp_scan_session_summary(undone)
+                if ("reorg 1" not in payment_window.wsp_session_status.text()
+                        or "NO VALIDATED CORE" not in
+                        payment_window.wsp_session_notice.text()
+                        or payment_window.session_status.text()
+                        != "NO WALLET LOADED"
+                        or payment_window.findChildren(QPushButton)):
+                    raise RuntimeError("WSP1_REAL_REORG_QT_UI_CLAIM_DENIED")
+                print("WSP1_REAL_BIP352_REORG_TO_GUI_PASS")
+                payment_window.close()
+                payment_window.deleteLater()
+                QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+                QCoreApplication.processEvents()
 
                 before = len(server.observed_methods)
                 for forbidden in ("sendrawtransaction", "getwalletinfo", "stop"):
