@@ -6,6 +6,21 @@ This increment complements merged #92's bounded `getblockhash(height)` double-pa
 
 New native tests use **real TCP to two different localhost HTTP servers** configured with adversarial JSON-RPC responses. They check both peers' headers, changed interior blocks, a forged parent agreed by both endpoints, malformed header identity or shape, wrong genesis/mainnet/pruned profiles, authentication, no wallet execution, redaction, and strict window bounds. Three more tests pin the new RPC method allowlist boundary. Required floors: **50 mandatory suites / 782 full-discovery tests**, preserving prior #93 49/764. No invented genuine-node run.
 
+## Optional combined operator review (follow-on PR #95)
+
+The existing TTY-only regtest ancestry CLI from merged #93 now supports an explicit opt-in flag:
+
+```sh
+PYTHONPATH=src python -m tools.audit_two_node_ancestry \
+  --node-a-host 127.0.0.1 --node-a-port <A_RPC> --node-a-rpc-user <A_USER> \
+  --node-b-host 127.0.0.1 --node-b-port <B_RPC> --node-b-rpc-user <B_USER> \
+  --window-size 8 --include-header-links
+```
+
+Unattended/non-interactive execution is intentionally unsupported and fails before any credential prompt or RPC request. Each disposable node RPC password is requested **once** from the terminal, shared only inside this one process between the separately constructed ancestry and header read-only auditors. The CLI rejects all forged TRUE operational flags from either report, checks only that their scalar height/start/count match, and emits `rpc_reported_parent_links_match=true` along with **`same_epoch_proven=false`**, `cryptographic_headers_verified=false` and every wallet/scanner/execution permission false. Two sequential RPC audits **cannot prove atomic coherence** or actual consensus/process identity even when scalar heights agree. Any RPC or epoch failure is redacted and produces **no JSON result**. The default CLI without the flag is unchanged and performs **no header RPC**.
+
+Seven additive CLI regression methods pin positive opt-in, default-off, forged authority, scalar mismatch, rejected unexpected/secret-bearing receipt keys, strict two-pass counts and redacted failures. The full native CI floor becomes **50 mandatory suites / 789 full-discovery cases** for this follow-on.
+
 ## Trust boundaries remain explicit
 
 This validates only **the parent-link statements reported by RPC endpoints**. It does NOT independently hash or cryptographically validate serialized headers, verify PoW or WAM consensus/BIP94, authenticate the kernel process image, prove the nodes are independent Core processes, prove P2P network isolation or enable scanner/wallet/spending/mainnet. The output records `rpc_reported_parent_links_match=true`, but **`cryptographic_headers_verified=false`**, `block_parent_links_verified=false`, `genuine_core_processes_verified=false`, `real_two_node_regtest_qualified=false`, and all financial/network authority flags false.
