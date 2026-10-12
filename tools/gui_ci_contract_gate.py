@@ -8,6 +8,9 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 GUI_PATTERN = "test_gui_shell.py"
 GUI_TEST_IDS = frozenset({
+    "test_gui_shell.GuiShellSmokeTests.test_local_scanner_rpc_observation_is_untrusted_gui_only",
+    "test_gui_shell.GuiShellSmokeTests.test_forged_scanner_enable_flag_clears_gui_lifecycle",
+    "test_gui_shell.GuiShellSmokeTests.test_lifecycle_replacement_never_carries_scanner_preview_forward",
     "test_gui_shell.GuiShellSmokeTests.test_pages_and_navigation_are_consistent",
     "test_gui_shell.GuiShellSmokeTests.test_offline_safety_notice_and_no_funds_state",
     "test_gui_shell.GuiShellSmokeTests.test_no_payment_actions_are_exposed",
@@ -45,6 +48,11 @@ GUI_TEST_IDS = frozenset({
 })
 # Security-critical original non-GUI identities; additive to original suite floors.
 CRITICAL_NON_GUI_IDS = frozenset({
+    "test_app_scanner_session_workflow.AppScannerSessionTests.test_no_consent_means_no_rpc_constructor_or_observation",
+    "test_app_scanner_session_workflow.AppScannerSessionTests.test_bounded_two_block_observation_has_only_scalar_output",
+    "test_app_scanner_session_workflow.AppScannerSessionTests.test_cancellation_before_first_block_denied_without_block_rpc",
+    "test_app_scanner_session_workflow.AppScannerSessionTests.test_rpc_failures_redact_credentials_and_response_content",
+    "test_app_scanner_session_workflow.AppScannerSessionTests.test_controller_rejects_forged_snapshot_and_poisoned_revision",
     "test_wsp1_scanner_only_rpc.WspScannerOnlyRpcTests.test_every_scan_call_requires_fresh_explicit_attest",
     "test_wsp1_scanner_only_rpc.WspScannerOnlyRpcTests.test_disallow_all_write_methods_and_foreign_rpc_before_network",
     "test_wsp1_scanner_only_rpc.WspScannerOnlyRpcTests.test_tip_changes_during_block_read_poison_session",
@@ -204,7 +212,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 895
+FULL_MIN_CASES = 912
 
 
 def _cases(suite: unittest.TestSuite):
