@@ -80,6 +80,7 @@ def inspect_sealed_linux_elf(fd: int) -> SealedElfObservation:
             raise SealedElfError("CORE_ELF_PROGRAM_DENIED")
         load = interp = dynamic = 0
         exec_stack = False
+        stack_headers = 0
         for i in range(phnum):
             (kind, flags, offset, _vaddr, _paddr, filesz,
              memsz, _align) = _PROGRAM.unpack_from(
@@ -105,6 +106,9 @@ def inspect_sealed_linux_elf(fd: int) -> SealedElfObservation:
                         or any(c < 33 or c > 126 for c in content[:-1])):
                     raise SealedElfError("CORE_ELF_INTERP_DENIED")
             elif kind == _PT_GNU_STACK:
+                stack_headers += 1
+                if stack_headers > 1:
+                    raise SealedElfError("CORE_ELF_STACK_DUPLICATE_DENIED")
                 exec_stack = bool(flags & 0x1)
         if load == 0:
             raise SealedElfError("CORE_ELF_NO_LOAD_DENIED")
