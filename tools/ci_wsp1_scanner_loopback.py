@@ -28,6 +28,8 @@ from wam_privacy_wallet.node.read_rpc import ExplicitRpcAuth
 TIP = "a" * 64
 FORK = "b" * 64
 COINBASE = "c" * 64
+MEMTX = "e" * 64
+PREV = "f" * 64
 
 
 class LocalSyntheticCoreShape(BaseHTTPRequestHandler):
@@ -55,6 +57,23 @@ class LocalSyntheticCoreShape(BaseHTTPRequestHandler):
                     "vout": [{"n": 0, "value": 0.01,
                               "scriptPubKey": {"hex": "51"}}],
                 }],
+            }
+        elif method == "getrawmempool" and params == []:
+            state.mempool_reads += 1
+            reply = ([] if state.flip_mempool_second
+                     and state.mempool_reads == 2 else [MEMTX])
+        elif method == "getrawtransaction" and params == [MEMTX, 2]:
+            reply = {
+                "txid": MEMTX, "vin": [{"txid": PREV, "vout": 0}],
+                "vout": [{"n": 0, "value": 0.001,
+                          "scriptPubKey": {"hex": "51"}}],
+            }
+        elif method == "getrawtransaction" and params == [PREV, 1]:
+            reply = {
+                "txid": MEMTX if state.bad_prevout else PREV,
+                "vin": [{"coinbase": "0101"}],
+                "vout": [{"n": 0, "value": 0.01,
+                          "scriptPubKey": {"hex": "51"}}],
             }
         else:
             state.violations.append(method)
@@ -100,6 +119,9 @@ def _run(source_root: Path) -> None:
     server.tip = TIP
     server.observed_methods = []
     server.violations = []
+    server.mempool_reads = 0
+    server.flip_mempool_second = False
+    server.bad_prevout = False
     worker = threading.Thread(target=server.serve_forever, daemon=True)
     worker.start()
     try:
@@ -138,6 +160,73 @@ def _run(source_root: Path) -> None:
                         or not scanner.ready):
                     raise RuntimeError("WSP1_NATIVE_REORG_FAILED")
                 print("WSP1_ACTUAL_SCANNER_LOCAL_SYNTHETIC_REORG_PASS")
+
+                # Genuine pinned WSP scanner parses mempool tx/prevout via
+                # our real localhost scanner-only RPC and real SQLite store.
+                mempool_rpc = Wsp1ScannerOnlyRpc(
+                    endpoint, auth, include_mempool=True,
+                )
+                count = scanner.sync_mempool(mempool_rpc)
+                rows = [
+                    tuple(r) for r in scanner.store.db.execute(
+                        "SELECT txid,vout,spending FROM mempool_spends"
+                    )
+                ]
+                if (count != 1 or rows != [(PREV, 0, MEMTX)]
+                        or scanner.mempool_ready is not True
+                        or server.mempool_reads != 2):
+                    raise RuntimeError("WSP1_NATIVE_MEMPOOL_SYNC_FAILED")
+                print("WSP1_ACTUAL_SCANNER_LOCAL_SYNTHETIC_MEMPOOL_PASS")
+
+                # Default session's mempool lookup must fail before socket.
+                before = len(server.observed_methods)
+                try:
+                    second_rpc.call("getrawtransaction", [MEMTX, 2])
+                except WspScannerRpcError as exc:
+                    if str(exc) != "WSP_SCAN_MEMPOOL_DENIED":
+                        raise
+                else:
+                    raise RuntimeError("WSP1_DEFAULT_MEMPOOL_SCOPE_WIDENED")
+                if len(server.observed_methods) != before:
+                    raise RuntimeError("WSP1_MEMPOOL_SCOPE_SENT_WIRE")
+
+                # The real upstream SQLite transaction must roll back if a
+                # peer changes mempool membership before the second read.
+                server.mempool_reads = 0
+                server.flip_mempool_second = True
+                try:
+                    scanner.sync_mempool(Wsp1ScannerOnlyRpc(
+                        endpoint, auth, include_mempool=True,
+                    ))
+                except ValueError as exc:
+                    if str(exc) != "MEMPOOL_CHANGED_RETRY":
+                        raise
+                else:
+                    raise RuntimeError("WSP1_MEMPOOL_CHANGE_ACCEPTED")
+                if ([tuple(r) for r in scanner.store.db.execute(
+                        "SELECT txid,vout,spending FROM mempool_spends"
+                    )] != rows or scanner.mempool_ready):
+                    raise RuntimeError("WSP1_MEMPOOL_ROLLBACK_NOT_ATOMIC")
+                print("WSP1_ACTUAL_SCANNER_LOCAL_SYNTHETIC_MEMPOOL_ROLLBACK_PASS")
+
+                # A wrong prevout identity must also preserve the previously
+                # committed scanner snapshot, with no partial writes.
+                server.flip_mempool_second = False
+                server.bad_prevout = True
+                try:
+                    scanner.sync_mempool(Wsp1ScannerOnlyRpc(
+                        endpoint, auth, include_mempool=True,
+                    ))
+                except WspScannerRpcError as exc:
+                    if str(exc) != "WSP_SCAN_REPLY_DENIED":
+                        raise
+                else:
+                    raise RuntimeError("WSP1_FORGED_PREVOUT_ACCEPTED")
+                if ([tuple(r) for r in scanner.store.db.execute(
+                        "SELECT txid,vout,spending FROM mempool_spends"
+                    )] != rows or scanner.mempool_ready):
+                    raise RuntimeError("WSP1_FORGED_PREVOUT_ROLLBACK_FAILED")
+                print("WSP1_ACTUAL_SCANNER_LOCAL_SYNTHETIC_PREVOUT_DENIED_PASS")
 
                 before = len(server.observed_methods)
                 for forbidden in ("sendrawtransaction", "getwalletinfo", "stop"):
