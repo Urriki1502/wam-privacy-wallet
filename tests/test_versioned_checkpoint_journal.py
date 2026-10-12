@@ -97,8 +97,8 @@ class VersionedCheckpointJournalTests(unittest.TestCase):
         self.assertEqual(len(digest),64)
         p=self.root/"versions"/"0000000000000001"
         self.assertEqual(stat.S_IMODE(p.stat().st_mode),0o700)
-        self.assertEqual([f.name for f in p.iterdir()],
-                         ["checkpoint.wsp.enc","manifest.json","ready.sha256"])
+        self.assertEqual({f.name for f in p.iterdir()},
+                         {"checkpoint.wsp.enc","manifest.json","ready.sha256"})
 
     @linux_or_deny
     def test_no_overwrite_generation_or_file(self):
