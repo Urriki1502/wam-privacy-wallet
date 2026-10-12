@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from tools import wsp1_pinned_surface as review
+from wam_privacy_wallet.integrations import wsp1_source_review as review
 
 
 _API = '''class SilentWallet:
