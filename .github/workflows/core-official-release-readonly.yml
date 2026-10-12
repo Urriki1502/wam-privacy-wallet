@@ -8,6 +8,8 @@ on:
       - '.github/workflows/core-official-release-readonly.yml'
       - 'src/wam_privacy_wallet/node/core_signed_linux_memfd.py'
       - 'tools/verify_core_release_sealed.py'
+      - 'tools/verify_official_regtest_readiness.py'
+      - 'src/wam_privacy_wallet/node/core_elf_preflight.py'
   workflow_dispatch:
 
 permissions:
@@ -89,6 +91,46 @@ jobs:
           print("CORE_NODE_SHA256=" + receipt["node_sha256"])
           print("CORE_ARCHIVE_SHA256=" + receipt["archive_sha256"])
           print("CORE_EXECUTION_ALLOWED=false; REAL_REGTEST_QUALIFIED=false")
+          PY
+
+          # The current official v0.1.11 signed member is authentically
+          # inspected and must remain BLOCKED due GNU_STACK RWE. This report
+          # explicitly asserts no WAM Core execution and no wallet authority.
+          python -m tools.verify_official_regtest_readiness \
+            --archive "$ARCHIVE_PATH" \
+            --gpg "$TRUSTED_GPG" \
+            > "$TMP_DIR/regtest-blocked.json"
+
+          python - "$TMP_DIR/regtest-blocked.json" <<'PY'
+          import json
+          from pathlib import Path
+          import sys
+          p = json.loads(Path(sys.argv[1]).read_text())
+          if p.get("status") != "OFFICIAL_WAM_CORE_REGTEST_BLOCKED_NO_EXEC":
+              raise SystemExit("CORE_REGTEST_BLOCKED_STATUS_REQUIRED")
+          if p.get("signed_official_member_sha256") != (
+              "625609c08afef441e9dddd71330dcab1cec112d6fabe361769b9907f0efe7ab4"
+          ):
+              raise SystemExit("CORE_REGTEST_SIGNED_MEMBER_MISMATCH")
+          if p.get("elf_policy_denial") != "CORE_ELF_EXECUTABLE_STACK_DENIED":
+              raise SystemExit("CORE_REGTEST_EXEC_STACK_POLICY_HOLD_REQUIRED")
+          if p.get("known_elf_exec_stack_denial") is not True:
+              raise SystemExit("CORE_REGTEST_EXEC_STACK_FLAG_REQUIRED")
+          if p.get("official_archive_verified_for_review") is not True:
+              raise SystemExit("CORE_REGTEST_SIGNATURE_REQUIRED")
+          for key in (
+              "publisher_build_mapping_approved",
+              "dynamic_loader_and_dso_authenticated",
+              "kernel_executed_image_bound",
+              "dev_wam_binary_approved",
+              "genuine_two_node_regtest_qualified",
+              "wam_core_executed",
+              "wallet_enabled", "signing_allowed",
+              "broadcast_allowed", "mainnet_allowed",
+          ):
+              if p.get(key) is not False:
+                  raise SystemExit("CORE_REGTEST_EXECUTION_AUTHORITY_DENIED")
+          print("AUTHENTIC_WAM_V0_1_11_BLOCKED_EXECSTACK_NO_EXECUTION")
           PY
 
           # Re-verify the actual official signed bytes and stream ONLY wamd
