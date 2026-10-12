@@ -204,6 +204,7 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
             "test_app_scanner_session_workflow.py": 14,
             "test_app_wsp_scan_coordinator.py": 15,
             "test_scan_only_account_session.py": 14,
+            "test_scan_preview_workflow.py": 15,
         }
         self.assertEqual(MINIMUM_CASES, expected)
         self.assertEqual(MANDATORY_SUITES, tuple(expected))
