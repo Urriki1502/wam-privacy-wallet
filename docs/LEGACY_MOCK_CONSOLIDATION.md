@@ -103,3 +103,9 @@
 - Linux-only private `versions/<generation-hex>` holds a **real upstream AES-GCM-encrypted WSP-1 checkpoint**, strict canonical JSON manifest, predecessor SHA-256 digest, source pin, synthetic account-scope digest, and a synced ready marker; no overwrite and no automatic latest selection.
 - The real pinned WSP native test exports `Store.export_checkpoint`, writes one generation and verifies its hash/manifest; the default reader fails with `SNAPSHOT_TRUSTED_ANCHOR_REQUIRED`. A dedicated `allow_unanchored_synthetic=True` pathway is test-only for synthetic regtest; its use MUST NOT be promoted into a wallet restore path.
 - A self-contained hash chain is **not anti-rollback**. Publication/crash consistency remains a prototype; independently trusted high-water mark, safe version selection, durable atomic manifest/head policy, retention, pruning and production key custody are **NOT** implemented by #149.
+
+## Issue #148 second slice / PR #150: bounded local lineage and crash-snapshot inspection
+
+- Verify a caller-named generation (never an auto-selected latest) across the complete bounded synthetic-regtest predecessor chain, from generation 1 through N. Missing/half-written generation, tampered old manifest, wrong predecessor or cross-account scope fails closed with fixed redacted codes.
+- Native WSP integration writes two generations containing **actual upstream AES-GCM checkpoint ciphertext** and checks predecessor linkage. A forged local hash, callback or mock proof cannot approve operational anti-rollback: `evaluate_trusted_rollback_status` always denies until a separately qualified independent external high-water trust anchor exists.
+- **All local files can be rolled back together.** No external trusted anchor, hardware monotonicity, fully recoverable on-disk rotation, safe deletion or production restore exists. These are test and architecture evidence only.

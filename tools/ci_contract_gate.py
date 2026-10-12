@@ -85,6 +85,7 @@ MINIMUM_CASES = {
     "test_encrypted_checkpoint_archive.py": 21,
     "test_checkpoint_recovery_workflow.py": 18,
     "test_versioned_checkpoint_journal.py": 15,
+    "test_snapshot_lineage_preflight.py": 14,
 }
 MANDATORY_SUITES = tuple(MINIMUM_CASES)
 

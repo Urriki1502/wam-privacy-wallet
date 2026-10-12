@@ -42,6 +42,10 @@ from wam_privacy_wallet.application.versioned_checkpoint_journal import (
     VersionedCheckpointError, write_unanchored_regtest_generation,
     read_unanchored_regtest_generation,
 )
+from wam_privacy_wallet.application.snapshot_lineage_preflight import (
+    SnapshotLineageError, inspect_untrusted_generation_lineage,
+    evaluate_trusted_rollback_status,
+)
 from wam_privacy_wallet.application.checkpoint_recovery_workflow import (
     CheckpointRecoveryError, recover_checkpoint_scan_preview,
 )
@@ -701,6 +705,27 @@ def _run(source_root: Path) -> None:
                     raise RuntimeError("WSP_GENERATION_REAL_CRYPTO_FILE_MISMATCH")
                 print("WSP1_REAL_IMMUTABLE_GENERATION_CHECKPOINT_PASS")
                 print("WSP1_UNANCHORED_GENERATION_RESTORE_DENIED_PASS")
+                second_digest = write_unanchored_regtest_generation(
+                    retained_dir, 2, encrypted_checkpoint,
+                    scope_digest=scoped, tip_height=2, tip_hash=PAYTIP,
+                    predecessor_digest=upstream_commitment,
+                )
+                linked = inspect_untrusted_generation_lineage(
+                    retained_dir, 2, allow_unanchored_synthetic=True,
+                )
+                if (linked.manifest_digest != second_digest
+                        or linked.trusted_anchor_verified is not False
+                        or linked.wallet_operational is not False):
+                    raise RuntimeError("WSP_REAL_CHECKPOINT_LINEAGE_BAD")
+                try:
+                    evaluate_trusted_rollback_status(linked)
+                except SnapshotLineageError as denial:
+                    if str(denial) != "LINEAGE_INDEPENDENT_ANCHOR_REQUIRED":
+                        raise
+                else:
+                    raise RuntimeError("WSP_UNTRUSTED_LINEAGE_ANTIROLLBACK_BYPASS")
+                print("WSP1_REAL_CHECKPOINT_TWO_GENERATIONS_LINKED_PASS")
+                print("WSP1_TRUSTED_ANTIROLLBACK_UNSUPPORTED_DENIED_PASS")
 
                 # Actual application orchestration: two distinct saved WSP-1
                 # AES-GCM blobs -> genuine fresh Scanner/SQLite checkpoint
