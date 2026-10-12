@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # These protect against accidental shrinking of a named test module.
 MINIMUM_CASES = {
     "test_two_node_readiness.py": 5,
-    "test_binary_path_race_preflight.py": 7,
+    "test_binary_path_race_preflight.py": 12,
     "test_scaffold.py": 5,
     "test_core_profile.py": 9,
     "test_core_source_pin.py": 14,
