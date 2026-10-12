@@ -6,3 +6,8 @@ src/wam_privacy_wallet/research_models/network_privacy/policy.py text eol=lf
 src/wam_privacy_wallet/research_models/payjoin_safety/model.py text eol=lf
 src/wam_privacy_wallet/research_models/payjoin_safety/validator.py text eol=lf
 src/wam_privacy_wallet/research_models/wsp_public/codec.py text eol=lf
+
+# Exact MIT upstream wallet privacy source commit db3d2dcaa540f1129d540101813b761167d33174
+src/wam_privacy_wallet/research_models/wallet_privacy/__init__.py text eol=lf
+src/wam_privacy_wallet/research_models/wallet_privacy/model.py text eol=lf
+src/wam_privacy_wallet/research_models/wallet_privacy/policy.py text eol=lf

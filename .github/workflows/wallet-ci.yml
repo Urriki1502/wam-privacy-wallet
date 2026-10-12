@@ -83,6 +83,9 @@ jobs:
       - name: Native source-pinned PayJoin policy regressions (no signer)
         run: python tools/ci_pinned_network_policy.py .pinned-privacy --payjoin
 
+      - name: Native source-pinned wallet privacy policy and property regressions (no spend)
+        run: python tools/ci_pinned_network_policy.py .pinned-privacy --coin-selection
+
       # Real detached GnuPG verification with an ephemeral synthetic test key.
       # This never runs WAM Core and never claims the official release is verified.
       - name: Verify GnuPG detached signatures with disposable test key (Linux)

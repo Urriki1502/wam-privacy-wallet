@@ -66,3 +66,45 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## App policy integration: actual upstream privacy coin selection (PR #155)
+
+Additional **unmodified** MIT-licensed files from the same
+`wam-privacy` commit `db3d2dcaa540f1129d540101813b761167d33174`:
+
+| Upstream | Pinned Git blob |
+| --- | --- |
+| `prototypes/wallet_privacy/__init__.py` | `d1a5272b8e389add8ca5e13767ccfe0ec319b1ee` |
+| `prototypes/wallet_privacy/model.py` | `c53df0c40f183bd51fbfaffe64d6a5aa899c8a43` |
+| `prototypes/wallet_privacy/policy.py` | `4c37f9c78d1c0f2818bf6530871cd0a87f4741dd` |
+
+The Application `review_regtest_coin_selection` verifies **all three
+Git blob hashes before import** and invokes actual deterministic upstream
+`select_coins` on caller-provided normalized regtest-only coin candidates
+and exactly one payment intent. Implicit cross-cluster merging is blocked;
+even explicit merging requires matching consent and policy. It filters
+reserved/underconfirmed candidates, rejects duplicate outpoints and dust
+change and returns only immutable redacted counts and warning codes.
+
+This is a **dynamic pure-policy integration**, not a hard-coded mock PASS.
+Input UTXO ownership, amount, fee, consensus and final chain validity are
+**not** proven; upstream blob identity is not publisher authentication.
+There is no PSBT, WSP signer, Core launch, RPC, wallet balance, transaction
+broadcast or mainnet authorization. CORE-003/shielded consensus is excluded.
+
+## Coin selection application and native regression qualification
+
+The existing pure upstream policy is unchanged at `db3d2dcaa540f1129d540101813b761167d33174`.
+Application review uses exact model types, explicit consent and separately
+confirmed cluster merge. String subclasses are rejected before algorithm
+comparisons, and the application limits exact search to the upstream default
+budget (18 candidates / width 4). Results retain only counts, change presence
+and bounded warning codes; normalized fixture coins are not ownership evidence.
+
+CI executes the original source-pinned 10 Phase2 policy cases and three property
+cases (including 500 seeded scenarios) in a fresh native process on Linux,
+macOS, Windows x64 and Windows x86. Raw Git blob hashes are verified before
+imports; no source line-ending normalization or algorithm fork is used. These
+13 native cases complement 22 application adversarial cases and all existing
+mandatory suites. Neither suite grants wallet balance, Core, signer, broadcast
+or mainnet authority.
