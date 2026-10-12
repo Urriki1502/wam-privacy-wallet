@@ -105,6 +105,8 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_offline_integration_status.OfflineIntegrationStatusTests.test_mismatched_reorg_segment_or_recovery_fails_atomic_replacement",
     "test_regtest_cookie_descriptor.RegtestCookieDescriptorTests.test_exact_terminal_crlf_is_accepted_but_internal_crlf_denied",
     "test_regtest_cookie_descriptor.RegtestCookieDescriptorTests.test_swap_between_lstat_and_fd_open_is_rejected",
+    "test_two_node_ancestry_cli.BoundedAncestryCliTests.test_forged_true_authority_is_redacted_and_denied",
+    "test_two_node_ancestry_cli.BoundedAncestryCliTests.test_missing_or_malformed_review_receipt_is_refused",
     "test_two_node_ancestry_cli.BoundedAncestryCliTests.test_noninteractive_stdio_is_denied_no_secret_prompts",
     "test_two_node_ancestry_cli.BoundedAncestryCliTests.test_rpc_denial_does_not_leak_password_or_remote_error",
     "test_two_node_ancestry_cli.BoundedAncestryCliTests.test_live_cli_boundary_never_launches_core",
@@ -142,7 +144,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 762
+FULL_MIN_CASES = 764
 
 
 def _cases(suite: unittest.TestSuite):
