@@ -57,7 +57,7 @@ MINIMUM_CASES = {
     "test_offline_rescan_segments.py": 23,
     "test_offline_reorg_reconciliation.py": 24,
     "test_offline_integration_status.py": 31,
-    "test_regtest_scanner_wire.py": 19,
+    "test_regtest_scanner_wire.py": 20,
     "test_core_artifact_staging.py": 20,
     "test_core_candidate_bridge.py": 14,
     "test_core_signed_release.py": 20,
