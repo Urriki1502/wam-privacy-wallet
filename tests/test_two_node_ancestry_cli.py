@@ -85,6 +85,115 @@ class BoundedAncestryCliTests(unittest.TestCase):
             "mainnet_allowed": False,
         }
 
+
+    @staticmethod
+    def _default_p2p():
+        return {
+            "status": "UNTRUSTED_LOCAL_REGTEST_P2P_TOPOLOGY_ONLY",
+            "peer_count_a": 1, "peer_count_b": 1,
+            "localhost_only_observed": True,
+            "expected_direction_observed": True,
+            "reported_chain_agrees": True,
+            "genuine_wam_process_verified": False,
+            "independent_processes_verified": False,
+            "external_network_exclusion_proven": False,
+            "real_two_node_regtest_qualified": False,
+            "scanner_enabled": False,
+            "wallet_ready": False,
+            "signing_allowed": False,
+            "broadcast_allowed": False,
+            "mainnet_allowed": False,
+        }
+
+    @staticmethod
+    def _p2p_args():
+        return ["--include-p2p-topology", "--node-a-p2p-port", "39201",
+                "--node-b-p2p-port", "39202"]
+
+    def test_p2p_default_off_no_constructor_or_rpc(self):
+        with patch("tools.audit_two_node_ancestry.TwoNodeP2PReadOnlyAudit") as p2p:
+            code, _, err, _, _ = self._invoke()
+        self.assertEqual((code, err), (0, ""))
+        p2p.assert_not_called()
+
+    def test_p2p_opt_in_reuses_two_prompted_credentials_only(self):
+        with patch("tools.audit_two_node_ancestry.TwoNodeP2PReadOnlyAudit") as p2p:
+            p2p.return_value.audit.return_value = self._default_p2p()
+            code, out, err, prompt, _ = self._invoke(ARGUMENTS + self._p2p_args())
+        self.assertEqual((code, err), (0, ""))
+        self.assertEqual(prompt.call_count, 2)
+        self.assertEqual(p2p.call_count, 2)
+        self.assertEqual(p2p.call_args_list[1].args[1].password, "ONE")
+        self.assertEqual(p2p.call_args_list[1].args[3].password, "TWO")
+        report = json.loads(out)
+        self.assertTrue(report["rpc_reported_p2p_topology_match"])
+        self.assertIs(report["same_epoch_proven"], False)
+        self.assertIs(report["wallet_ready"], False)
+        self.assertIs(report["mainnet_allowed"], False)
+
+    def test_p2p_and_header_combined_observation_non_authorizing(self):
+        with patch("tools.audit_two_node_ancestry.TwoNodeP2PReadOnlyAudit") as p2p:
+            p2p.return_value.audit.return_value = self._default_p2p()
+            code, out, err, _, _ = self._invoke(
+                ARGUMENTS + ["--include-header-links"] + self._p2p_args()
+            )
+        self.assertEqual((code, err), (0, ""))
+        report = json.loads(out)
+        self.assertTrue(report["rpc_reported_parent_links_match"])
+        self.assertTrue(report["rpc_reported_p2p_topology_match"])
+        self.assertIs(report["cryptographic_headers_verified"], False)
+        self.assertIs(report["same_epoch_proven"], False)
+        self.assertIs(report["genuine_core_processes_verified"], False)
+
+    def test_p2p_ports_missing_or_unrequested_are_denied_before_prompt(self):
+        cases = [
+            (ARGUMENTS + ["--include-p2p-topology", "--node-a-p2p-port", "39201"],
+             "REGTEST_ANCESTRY_P2P_PORTS_REQUIRED"),
+            (ARGUMENTS + ["--node-a-p2p-port", "39201"],
+             "REGTEST_ANCESTRY_P2P_OPT_IN_REQUIRED"),
+        ]
+        for args, error in cases:
+            with self.subTest(error=error):
+                code, out, err, prompt, _ = self._invoke(args)
+                self.assertEqual((code, out, err.strip()), (2, "", error))
+                prompt.assert_not_called()
+
+    def test_p2p_port_collisions_fail_before_secrets_or_rpc(self):
+        for first, second in [(39101, 39202), (39201, 39201), (39201, 39103)]:
+            args = ARGUMENTS + [
+                "--include-p2p-topology", "--node-a-p2p-port", str(first),
+                "--node-b-p2p-port", str(second),
+            ]
+            with self.subTest(ports=(first, second)):
+                code, out, err, prompt, _ = self._invoke(args)
+                self.assertEqual((code, out), (2, ""))
+                self.assertEqual(err.strip(), "REGTEST_ANCESTRY_P2P_PORTS_DENIED")
+                prompt.assert_not_called()
+
+    def test_p2p_forged_authority_extra_keys_and_counts_denied(self):
+        for report in [
+            {**self._default_p2p(), "wallet_ready": True},
+            {**self._default_p2p(), "peer_count_a": True},
+            {**self._default_p2p(), "peer_count_b": 2},
+            {**self._default_p2p(), "private_key": "SECRET"},
+            {"status": "APPROVED"},
+        ]:
+            with self.subTest(keys=tuple(report)):
+                with patch("tools.audit_two_node_ancestry.TwoNodeP2PReadOnlyAudit") as p2p:
+                    p2p.return_value.audit.return_value = report
+                    code, out, err, _, _ = self._invoke(ARGUMENTS + self._p2p_args())
+                self.assertEqual((code, out), (2, ""))
+                self.assertEqual(err.strip(), "REGTEST_ANCESTRY_P2P_RECEIPT_DENIED")
+                self.assertNotIn("SECRET", err)
+
+    def test_p2p_transport_denial_redacted_without_json(self):
+        with patch("tools.audit_two_node_ancestry.TwoNodeP2PReadOnlyAudit") as p2p:
+            p2p.return_value.audit.side_effect = cli.RegtestP2PAuditError("SECRET_BODY")
+            code, out, err, _, _ = self._invoke(ARGUMENTS + self._p2p_args())
+        self.assertEqual((code, out), (2, ""))
+        self.assertEqual(err.strip(), "REGTEST_ANCESTRY_P2P_RPC_DENIED")
+        self.assertNotIn("SECRET_BODY", err)
+
     def test_optional_header_review_reuses_one_tty_prompt_pair(self):
         receipt = {**OUTPUT, "height": 3, "window_start": 1, "window_count": 3}
         code, out, err, prompt, _ = self._invoke(
