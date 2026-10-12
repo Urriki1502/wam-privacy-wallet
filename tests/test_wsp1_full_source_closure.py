@@ -111,6 +111,25 @@ class WspFullSourceClosureTests(unittest.TestCase):
             ):
                 gate.verify_wsp1_full_source_closure(root)
 
+    def test_git_toplevel_equivalent_path_spelling_is_accepted(self):
+        original = gate._git
+        def alternate(root, *args):
+            if args == ("rev-parse", "--show-toplevel"):
+                return (str(self.root) + "/.\n").encode()
+            return original(root, *args)
+        with patch.object(gate, "_git", side_effect=alternate):
+            self.assertEqual(gate.verify_wsp1_full_source_closure(self.root)["python_modules_verified"], len(PYTHON_FILES))
+
+    def test_foreign_git_toplevel_remains_denied(self):
+        original = gate._git
+        def alternate(root, *args):
+            if args == ("rev-parse", "--show-toplevel"):
+                return (str(self.root.parent) + "\n").encode()
+            return original(root, *args)
+        with patch.object(gate, "_git", side_effect=alternate):
+            with self.assertRaises(gate.WspFullSourceError):
+                gate.verify_wsp1_full_source_closure(self.root)
+
     def test_unpinned_commit_denied_even_if_package_bytes_match(self):
         with patch.object(gate, "_git", return_value=b"0" * 40 + b"\n"):
             with self.assertRaises(gate.WspFullSourceError):

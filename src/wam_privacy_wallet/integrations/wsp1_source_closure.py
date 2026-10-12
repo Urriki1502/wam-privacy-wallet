@@ -71,7 +71,13 @@ def verify_wsp1_full_source_closure(root: Path) -> dict[str, object]:
     if commit.decode("ascii", "replace") != PINNED_COMMIT:
         _deny()
     toplevel = _git(root, "rev-parse", "--show-toplevel").strip()
-    if toplevel.decode("utf-8", "replace") != str(root):
+    try:
+        # Git uses slash paths on Windows; compare filesystem identities while
+        # preserving exact raw-byte verification of every source blob below.
+        same_root = Path(toplevel.decode("utf-8")).resolve(strict=True) == root.resolve(strict=True)
+    except (OSError, UnicodeError, ValueError):
+        _deny()
+    if not same_root:
         _deny()
 
     tree = _git(root, "ls-tree", "-r", "-z", "HEAD", "--",
