@@ -37,6 +37,10 @@ from wam_privacy_wallet.application.encrypted_checkpoint_archive import (
     EncryptedCheckpointArchiveError, store_encrypted_checkpoint,
     load_encrypted_checkpoint,
 )
+from wam_privacy_wallet.application.versioned_checkpoint_journal import (
+    VersionedCheckpointError, write_unanchored_regtest_generation,
+    read_unanchored_regtest_generation,
+)
 from wam_privacy_wallet.application.checkpoint_recovery_workflow import (
     CheckpointRecoveryError, recover_checkpoint_scan_preview,
 )
@@ -667,6 +671,35 @@ def _run(source_root: Path) -> None:
                 else:
                     raise RuntimeError("WSP1_DURABLE_CHECKPOINT_OVERWRITTEN")
                 print("WSP1_REAL_ENCRYPTED_CHECKPOINT_DISK_ROUNDTRIP_PASS")
+
+                # Real upstream Store AES-GCM checkpoint ciphertext, recorded
+                # as an immutable versioned synthetic-regtest generation. The
+                # hash chain is explicitly NOT a trusted anti-rollback anchor.
+                scoped = hashlib.sha256(b"CI synthetic WSP scope only").hexdigest()
+                upstream_commitment = write_unanchored_regtest_generation(
+                    retained_dir, 1, encrypted_checkpoint,
+                    scope_digest=scoped, tip_height=2, tip_hash=PAYTIP,
+                    predecessor_digest="0" * 64,
+                )
+                try:
+                    read_unanchored_regtest_generation(retained_dir, 1)
+                except VersionedCheckpointError as denial:
+                    if str(denial) != "SNAPSHOT_TRUSTED_ANCHOR_REQUIRED":
+                        raise
+                else:
+                    raise RuntimeError("WSP_GENERATION_UNANCHORED_RESTORE_ALLOWED")
+                on_disk_manifest, on_disk_ciphertext = (
+                    read_unanchored_regtest_generation(
+                        retained_dir, 1, allow_unanchored_synthetic=True
+                    )
+                )
+                if (on_disk_ciphertext != encrypted_checkpoint
+                        or len(upstream_commitment) != 64
+                        or on_disk_manifest["checkpoint_sha256"]
+                        != hashlib.sha256(encrypted_checkpoint).hexdigest()):
+                    raise RuntimeError("WSP_GENERATION_REAL_CRYPTO_FILE_MISMATCH")
+                print("WSP1_REAL_IMMUTABLE_GENERATION_CHECKPOINT_PASS")
+                print("WSP1_UNANCHORED_GENERATION_RESTORE_DENIED_PASS")
 
                 # Actual application orchestration: two distinct saved WSP-1
                 # AES-GCM blobs -> genuine fresh Scanner/SQLite checkpoint

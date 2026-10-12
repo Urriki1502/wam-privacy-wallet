@@ -97,3 +97,9 @@
 - Injected stage-unlink errors prove nlink=2 causes the hardened reader to refuse the canonical file even if an atomic publish already happened. Injected final-directory-fsync errors prove the writer cannot claim durable success, even though a readable file may remain. The entire operation remains non-transactional across untrusted filesystem failures.
 - Both suites retain all original tests plus new error-injection, cross-platform refusal and ordering checks. The real pinned WSP native integration continues to import/restore ciphertext; **no cryptography, key custody, Core execution, signing or mainnet changes**.
 - The single immutable checkpoint is still vulnerable to rollback of its whole directory and has no trusted version/rotation policy; treat that as an independent design gate, not a solved issue.
+
+## Issue #148 foundation / PR #149: immutable versioned synthetic-regtest checkpoint generations
+
+- Linux-only private `versions/<generation-hex>` holds a **real upstream AES-GCM-encrypted WSP-1 checkpoint**, strict canonical JSON manifest, predecessor SHA-256 digest, source pin, synthetic account-scope digest, and a synced ready marker; no overwrite and no automatic latest selection.
+- The real pinned WSP native test exports `Store.export_checkpoint`, writes one generation and verifies its hash/manifest; the default reader fails with `SNAPSHOT_TRUSTED_ANCHOR_REQUIRED`. A dedicated `allow_unanchored_synthetic=True` pathway is test-only for synthetic regtest; its use MUST NOT be promoted into a wallet restore path.
+- A self-contained hash chain is **not anti-rollback**. Publication/crash consistency remains a prototype; independently trusted high-water mark, safe version selection, durable atomic manifest/head policy, retention, pruning and production key custody are **NOT** implemented by #149.
