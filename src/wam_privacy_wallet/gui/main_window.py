@@ -12,6 +12,7 @@ from PySide6.QtCore import Qt
 from wam_privacy_wallet.application.presentation_lifecycle import OfflinePresentationController, OfflineLifecycleError, _valid_recovery, _valid_resume, _valid_rescan, _valid_reorg, _valid_scanner
 from wam_privacy_wallet.application.node_status import NodeOverview
 from wam_privacy_wallet.application.scanner_session_workflow import ScannerReadOnlyObservation
+from wam_privacy_wallet.application.wsp_scan_coordinator import WspScanSessionSummary
 from wam_privacy_wallet.application.privacy_readiness import PrivacyResearchSnapshot
 from wam_privacy_wallet.application.policy_evidence import SyntheticPolicyReport
 from wam_privacy_wallet.application.receive_vector import ReceiveVectorPreview, _FIXED_FINGERPRINT
@@ -241,6 +242,16 @@ class MainWindow(QMainWindow):
             self.scanner_read_only_notice.setObjectName("smallText")
             self.scanner_read_only_notice.setWordWrap(True)
             column.addWidget(self.scanner_read_only_notice)
+            self.wsp_session_status = QLabel("NO WSP-1 APPLICATION SCAN RECEIPT")
+            column.addWidget(self._status_card(
+                "WSP-1 APPLICATION SCAN · UNTRUSTED", self.wsp_session_status
+            ))
+            self.wsp_session_notice = QLabel(
+                "REAL WSP SCANNER TEST EVIDENCE ONLY · NO VALIDATED CORE / WALLET / SEND"
+            )
+            self.wsp_session_notice.setObjectName("smallText")
+            self.wsp_session_notice.setWordWrap(True)
+            column.addWidget(self.wsp_session_notice)
             placeholder = QLabel("REAL WAM CORE INTEGRATION · BLOCKED")
             placeholder.setObjectName("notice")
             column.addWidget(placeholder)
@@ -353,6 +364,7 @@ class MainWindow(QMainWindow):
                 self.clear_offline_rescan_segments,
                 self.clear_offline_reorg_reconciliation,
                 self.clear_scanner_read_only_observation,
+                self.clear_wsp_scan_session_summary,
             ):
                 try:
                     clear()
@@ -487,6 +499,75 @@ class MainWindow(QMainWindow):
         self.scanner_read_only_status.setText("NO LOCAL SCANNER OBSERVATION")
         self.scanner_read_only_notice.setText(
             "NOT A WALLET SCAN · NO SCANNER / SIGNER / BROADCAST AUTHORITY"
+        )
+
+    def present_wsp_scan_session_summary(self, summary: object) -> None:
+        """Render a sanitized REAL WSP scanner result without live wallet claims.
+
+        External caller may supply only the immutable scalar App DTO. This
+        method never imports WSP, talks to a node, stores the DTO or obtains
+        account material. Any new offline UI transaction clears this receipt.
+        """
+        self._begin_managed_transition()
+        try:
+            self._offline_controller.reset()
+            try:
+                self._clear_managed_panels()
+                if not (
+                    type(summary) is WspScanSessionSummary
+                    and summary.status == "WSP1_SCAN_EXECUTED_UNTRUSTED_CORE"
+                    and type(summary.blocks_processed) is int
+                    and 0 <= summary.blocks_processed <= 16
+                    and type(summary.transactions_processed) is int
+                    and 0 <= summary.transactions_processed <= 160_000
+                    and type(summary.rollback_blocks) is int
+                    and 0 <= summary.rollback_blocks <= 100_000
+                    and type(summary.mempool_transactions_processed) is int
+                    and 0 <= summary.mempool_transactions_processed <= 10_000
+                    and (summary.blocks_processed > 0 or
+                         summary.transactions_processed == 0)
+                    and summary.core_authenticated is False
+                    and summary.wallet_operational is False
+                    and summary.balance_qualified is False
+                    and summary.signer_enabled is False
+                    and summary.broadcast_allowed is False
+                    and summary.mainnet_allowed is False
+                ):
+                    raise ValueError("APP_GUI_WSP_RECEIPT_DENIED")
+                self._managed_render_depth += 1
+                try:
+                    self.wsp_session_status.setText(
+                        f"WSP-1 SCAN EXECUTED · UNTRUSTED CORE · "
+                        f"blocks {summary.blocks_processed} · "
+                        f"tx {summary.transactions_processed} · "
+                        f"reorg {summary.rollback_blocks}"
+                    )
+                    self.wsp_session_notice.setText(
+                        "TESTED WSP-1 SCANNER · NO VALIDATED CORE / BALANCE / "
+                        "WALLET / SIGN / BROADCAST"
+                    )
+                finally:
+                    self._managed_render_depth -= 1
+                self._assert_managed_transition_clean()
+            except Exception:
+                self._offline_controller.reset()
+                try:
+                    self._clear_managed_panels()
+                except Exception:
+                    pass
+                raise ValueError("APP_GUI_WSP_RECEIPT_DENIED") from None
+        finally:
+            self._end_managed_transition()
+
+    def clear_wsp_scan_session_summary(self) -> None:
+        """Erase the untrusted real-scanner receipt with the GUI single writer."""
+        if not self._managed_render_depth:
+            self.clear_offline_presentation()
+            return
+        self.wsp_session_status.setText("NO WSP-1 APPLICATION SCAN RECEIPT")
+        self.wsp_session_notice.setText(
+            "REAL WSP SCANNER TEST EVIDENCE ONLY · "
+            "NO VALIDATED CORE / WALLET / SEND"
         )
 
     def present_offline_recovery_review(self, preview: object) -> None:

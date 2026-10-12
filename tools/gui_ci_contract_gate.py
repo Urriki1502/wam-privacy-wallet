@@ -8,6 +8,11 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 GUI_PATTERN = "test_gui_shell.py"
 GUI_TEST_IDS = frozenset({
+    "test_gui_shell.GuiShellSmokeTests.test_real_wsp_scanner_result_renders_only_as_untrusted_receipt",
+    "test_gui_shell.GuiShellSmokeTests.test_real_wsp_receipt_cleared_by_next_offline_update",
+    "test_gui_shell.GuiShellSmokeTests.test_forged_real_wsp_receipt_denied_and_clears_existing",
+    "test_gui_shell.GuiShellSmokeTests.test_real_wsp_receipt_bool_and_oversize_counts_fail_closed",
+    "test_gui_shell.GuiShellSmokeTests.test_real_wsp_receipt_direct_clear_and_reentrant_guard",
     "test_gui_shell.GuiShellSmokeTests.test_local_scanner_rpc_observation_is_untrusted_gui_only",
     "test_gui_shell.GuiShellSmokeTests.test_forged_scanner_enable_flag_clears_gui_lifecycle",
     "test_gui_shell.GuiShellSmokeTests.test_lifecycle_replacement_never_carries_scanner_preview_forward",
