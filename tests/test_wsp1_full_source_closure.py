@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from tools import wsp1_full_source_closure as gate
+from wam_privacy_wallet.integrations import wsp1_source_closure as gate
 from tools.wsp1_pinned_surface import _git_blob_sha
 
 PYTHON_FILES = sorted(gate._REQUIRED_PY)

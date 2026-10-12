@@ -26,6 +26,8 @@ on:
       - 'tests/test_scan_preview_workflow.py'
       - 'tests/test_app_wsp_scan_coordinator.py'
       - 'tools/wsp1_pinned_surface.py'
+      - 'src/wam_privacy_wallet/integrations/wsp1_source_review.py'
+      - 'src/wam_privacy_wallet/integrations/wsp1_source_closure.py'
       - 'tools/wsp1_full_source_closure.py'
       - 'tests/test_wsp1_full_source_closure.py'
       - 'src/wam_privacy_wallet/integrations/wsp1_scanner_only_rpc.py'

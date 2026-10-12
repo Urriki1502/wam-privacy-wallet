@@ -6,6 +6,8 @@ on:
     paths:
       - '.github/workflows/wsp1-pinned-source-readonly.yml'
       - 'tools/wsp1_pinned_surface.py'
+      - 'src/wam_privacy_wallet/integrations/wsp1_source_review.py'
+      - 'src/wam_privacy_wallet/integrations/wsp1_source_closure.py'
       - 'tests/test_wsp1_pinned_surface.py'
   workflow_dispatch:
 

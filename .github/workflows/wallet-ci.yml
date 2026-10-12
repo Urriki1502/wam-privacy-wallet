@@ -126,6 +126,9 @@ jobs:
       - name: Check GUI dependency consistency
         run: python -m pip check
 
+      - name: Verify installed source-review libraries with isolated Python
+        run: python -I -c "from wam_privacy_wallet.integrations.wsp1_source_review import verify_pinned_wsp1_sources; from wam_privacy_wallet.integrations.wsp1_source_closure import verify_wsp1_full_source_closure"
+
       - name: Check Python syntax
         run: python -m compileall -q src tests
 
