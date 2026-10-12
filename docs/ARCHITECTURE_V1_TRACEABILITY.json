@@ -195,7 +195,7 @@
     },
     {
       "id": "CORE-ELF-HOLD",
-      "issue": 84
+      "pr": 84
     },
     {
       "id": "CORE-REAL-TWO-NODE",
