@@ -12,6 +12,9 @@ from tools.gui_ci_contract_gate import check_and_run
 
 
 _NAMES = (
+    "test_local_scanner_rpc_observation_is_untrusted_gui_only",
+    "test_forged_scanner_enable_flag_clears_gui_lifecycle",
+    "test_lifecycle_replacement_never_carries_scanner_preview_forward",
     "test_pages_and_navigation_are_consistent",
     "test_offline_safety_notice_and_no_funds_state",
     "test_no_payment_actions_are_exposed",
