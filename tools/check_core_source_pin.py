@@ -67,6 +67,10 @@ def main() -> int:
         "head_critical_files_match": bool(args.check_head),
         "genesis": result["regtest_genesis"],
         "rpc_port": result["network_ports"]["regtest"]["rpc"],
+        "consensus_bip94": result["consensus_bip94"],
+        "signed_binary_matches_source": False,
+        "core_execution_allowed": False,
+        "real_regtest_qualified": False,
     }))
     return 0
 
