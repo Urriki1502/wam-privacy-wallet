@@ -1,0 +1,209 @@
+{
+  "schema": "wam-privacy-wallet-v1-architecture/v1",
+  "network_scope": "REGTEST_ONLY",
+  "operational_wallet_enabled": false,
+  "mainnet_allowed": false,
+  "signed_core_launch_allowed": false,
+  "upstream_repositories_unchanged": true,
+  "diagram_source": "User-approved WAM Privacy Wallet V1 architecture diagram (2026-10-12)",
+  "nodes": [
+    {
+      "id": "user",
+      "label": "User",
+      "status": "EXTERNAL_ACTOR",
+      "repository": "Urriki1502/wam-privacy-wallet",
+      "path": "docs/ARCHITECTURE.md"
+    },
+    {
+      "id": "ui",
+      "label": "WAM Privacy Wallet UI",
+      "status": "MERGED_SCAFFOLD",
+      "repository": "Urriki1502/wam-privacy-wallet",
+      "path": "src/wam_privacy_wallet/gui/main_window.py"
+    },
+    {
+      "id": "application",
+      "label": "Application Layer",
+      "status": "MERGED_SCAFFOLD",
+      "repository": "Urriki1502/wam-privacy-wallet",
+      "path": "src/wam_privacy_wallet/application/privacy_readiness.py"
+    },
+    {
+      "id": "wsp1",
+      "label": "WSP-1 / Silent Payments",
+      "status": "EXTERNAL_REVIEW_GATED",
+      "repository": "Urriki1502/wam-silent-payments",
+      "path": "src/wam_sp/api.py"
+    },
+    {
+      "id": "scanner",
+      "label": "Local Scanner",
+      "status": "EXTERNAL_REVIEW_GATED",
+      "repository": "Urriki1502/wam-silent-payments",
+      "path": "src/wam_sp/scanner.py"
+    },
+    {
+      "id": "signer",
+      "label": "PSBTv2 / Signer",
+      "status": "EXTERNAL_REVIEW_GATED",
+      "repository": "Urriki1502/wam-silent-payments",
+      "path": "src/wam_sp/offline_signer.py"
+    },
+    {
+      "id": "recovery",
+      "label": "Backup / Recovery",
+      "status": "EXTERNAL_REVIEW_GATED",
+      "repository": "Urriki1502/wam-silent-payments",
+      "path": "src/wam_sp/backup.py"
+    },
+    {
+      "id": "payjoin",
+      "label": "Wallet Privacy & PayJoin",
+      "status": "MODEL_ONLY",
+      "repository": "Urriki1502/wam-privacy",
+      "path": "prototypes/payjoin_safety/validator.py"
+    },
+    {
+      "id": "disclosure",
+      "label": "Selective Disclosure",
+      "status": "NOT_INTEGRATED",
+      "repository": "Urriki1502/wam-privacy-wallet",
+      "path": "docs/ARCHITECTURE.md"
+    },
+    {
+      "id": "network",
+      "label": "Network Privacy Policy",
+      "status": "MODEL_ONLY",
+      "repository": "Urriki1502/wam-privacy",
+      "path": "prototypes/network_privacy/policy.py"
+    },
+    {
+      "id": "rpc",
+      "label": "WAM SDK / RPC",
+      "status": "MERGED_READ_ONLY",
+      "repository": "Urriki1502/wam-privacy-wallet",
+      "path": "src/wam_privacy_wallet/node/read_rpc.py"
+    },
+    {
+      "id": "core",
+      "label": "User-owned WAM Core Full Node",
+      "status": "BLOCKED_OFFICIAL_CORE",
+      "repository": "Urriki1502/wam-privacy-wallet",
+      "path": "tools/verify_official_regtest_readiness.py"
+    },
+    {
+      "id": "assurance",
+      "label": "WAM Security — Independent Assurance",
+      "status": "EXTERNAL_REVIEW_GATED",
+      "repository": "Urriki1502/wam-security",
+      "path": "README.md"
+    },
+    {
+      "id": "ci",
+      "label": "CI / Release Verification",
+      "status": "MERGED_CI_ONLY",
+      "repository": "Urriki1502/wam-privacy-wallet",
+      "path": "tools/ci_contract_gate.py"
+    }
+  ],
+  "edges": [
+    {
+      "from": "user",
+      "to": "ui"
+    },
+    {
+      "from": "ui",
+      "to": "application"
+    },
+    {
+      "from": "application",
+      "to": "wsp1"
+    },
+    {
+      "from": "application",
+      "to": "payjoin"
+    },
+    {
+      "from": "application",
+      "to": "disclosure"
+    },
+    {
+      "from": "application",
+      "to": "network"
+    },
+    {
+      "from": "application",
+      "to": "rpc"
+    },
+    {
+      "from": "wsp1",
+      "to": "scanner"
+    },
+    {
+      "from": "wsp1",
+      "to": "signer"
+    },
+    {
+      "from": "wsp1",
+      "to": "recovery"
+    },
+    {
+      "from": "scanner",
+      "to": "rpc"
+    },
+    {
+      "from": "signer",
+      "to": "rpc"
+    },
+    {
+      "from": "recovery",
+      "to": "rpc"
+    },
+    {
+      "from": "network",
+      "to": "rpc"
+    },
+    {
+      "from": "rpc",
+      "to": "core"
+    },
+    {
+      "from": "assurance",
+      "to": "wsp1"
+    },
+    {
+      "from": "assurance",
+      "to": "application"
+    },
+    {
+      "from": "ci",
+      "to": "application"
+    },
+    {
+      "from": "ci",
+      "to": "rpc"
+    }
+  ],
+  "blockers": [
+    {
+      "id": "CORE-PROCESS",
+      "issue": 36
+    },
+    {
+      "id": "CORE-GNU-STACK",
+      "issue": 86
+    },
+    {
+      "id": "CORE-ELF-HOLD",
+      "issue": 84
+    },
+    {
+      "id": "CORE-REAL-TWO-NODE",
+      "issue": 9
+    },
+    {
+      "id": "WSP-QUALIFICATION",
+      "pr": 3
+    }
+  ]
+}
