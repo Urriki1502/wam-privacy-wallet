@@ -32,7 +32,7 @@ class EncryptedScanBackupError(ValueError):
 
 def _directory(directory: Path) -> int:
     if (sys.platform != "linux"
-            or type(directory) is not Path or not directory.is_absolute()
+            or type(directory) is not type(Path()) or not directory.is_absolute()
             or not all(hasattr(os, f) for f in
                        ("O_DIRECTORY", "O_NOFOLLOW", "O_CLOEXEC"))):
         raise EncryptedScanBackupError("SCAN_BACKUP_PLATFORM_OR_PATH_DENIED")
