@@ -9,8 +9,9 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 
-from wam_privacy_wallet.application.presentation_lifecycle import OfflinePresentationController, OfflineLifecycleError, _valid_recovery, _valid_resume, _valid_rescan, _valid_reorg
+from wam_privacy_wallet.application.presentation_lifecycle import OfflinePresentationController, OfflineLifecycleError, _valid_recovery, _valid_resume, _valid_rescan, _valid_reorg, _valid_scanner
 from wam_privacy_wallet.application.node_status import NodeOverview
+from wam_privacy_wallet.application.scanner_session_workflow import ScannerReadOnlyObservation
 from wam_privacy_wallet.application.privacy_readiness import PrivacyResearchSnapshot
 from wam_privacy_wallet.application.policy_evidence import SyntheticPolicyReport
 from wam_privacy_wallet.application.receive_vector import ReceiveVectorPreview, _FIXED_FINGERPRINT
@@ -230,6 +231,16 @@ class MainWindow(QMainWindow):
             self.node_diagnostic_notice.setObjectName("smallText")
             self.node_diagnostic_notice.setWordWrap(True)
             column.addWidget(self.node_diagnostic_notice)
+            self.scanner_read_only_status = QLabel("NO LOCAL SCANNER OBSERVATION")
+            column.addWidget(self._status_card(
+                "LOCAL SCAN DATA (READ-ONLY)", self.scanner_read_only_status
+            ))
+            self.scanner_read_only_notice = QLabel(
+                "NOT A WALLET SCAN · NO SCANNER / SIGNER / BROADCAST AUTHORITY"
+            )
+            self.scanner_read_only_notice.setObjectName("smallText")
+            self.scanner_read_only_notice.setWordWrap(True)
+            column.addWidget(self.scanner_read_only_notice)
             placeholder = QLabel("REAL WAM CORE INTEGRATION · BLOCKED")
             placeholder.setObjectName("notice")
             column.addWidget(placeholder)
@@ -341,6 +352,7 @@ class MainWindow(QMainWindow):
                 self.clear_offline_resume_review,
                 self.clear_offline_rescan_segments,
                 self.clear_offline_reorg_reconciliation,
+                self.clear_scanner_read_only_observation,
             ):
                 try:
                     clear()
@@ -391,6 +403,7 @@ class MainWindow(QMainWindow):
         privacy: object = None, policy: object = None, receive: object = None,
         recovery: object = None, resume: object = None,
         rescan: object = None, reorg: object = None,
+        scanner_observation: object = None,
     ) -> None:
         """Atomically validate all eight synthetic DTOs before displaying."""
         self._begin_managed_transition()
@@ -400,6 +413,7 @@ class MainWindow(QMainWindow):
                     expected_revision, node=node, privacy=privacy,
                     policy=policy, receive=receive, recovery=recovery, resume=resume,
                     rescan=rescan, reorg=reorg,
+                    scanner_observation=scanner_observation,
                 )
             except OfflineLifecycleError:
                 # Validation already rejected the revision; still clear every
@@ -431,6 +445,8 @@ class MainWindow(QMainWindow):
                         self.present_offline_rescan_segments(rescan)
                     if state.reorg != "ABSENT":
                         self.present_offline_reorg_reconciliation(reorg)
+                    if state.scanner_session != "ABSENT":
+                        self.present_scanner_read_only_observation(scanner_observation)
                 finally:
                     self._managed_render_depth -= 1
                 self._assert_managed_transition_clean()
@@ -445,6 +461,33 @@ class MainWindow(QMainWindow):
                 raise OfflineLifecycleError("APP_OFFLINE_RENDER_DENIED") from None
         finally:
             self._end_managed_transition()
+
+    def present_scanner_read_only_observation(self, observation: object) -> None:
+        """Show no-authority WSP scanner-RPC counts, NEVER a wallet scan."""
+        if not _valid_scanner(observation):
+            raise ValueError("APP_GUI_SCANNER_OBSERVATION_DENIED")
+        if not self._managed_render_depth:
+            self.replace_offline_presentation(
+                self._offline_controller.state.revision,
+                scanner_observation=observation,
+            )
+            return
+        self.scanner_read_only_status.setText(
+            f"UNTRUSTED · regtest height {observation.reported_tip_height} · "
+            f"blocks read {observation.blocks_observed} · NO WALLET SCAN"
+        )
+        self.scanner_read_only_notice.setText(
+            "LOCAL RPC COUNTS ONLY · NO VALIDATED CORE / SCANNER / KEYS / SEND"
+        )
+
+    def clear_scanner_read_only_observation(self) -> None:
+        if not self._managed_render_depth:
+            self.clear_offline_presentation()
+            return
+        self.scanner_read_only_status.setText("NO LOCAL SCANNER OBSERVATION")
+        self.scanner_read_only_notice.setText(
+            "NOT A WALLET SCAN · NO SCANNER / SIGNER / BROADCAST AUTHORITY"
+        )
 
     def present_offline_recovery_review(self, preview: object) -> None:
         """Display only fixed vocabulary from a synthetic recovery transition.
