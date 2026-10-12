@@ -8,6 +8,10 @@
 - **Open Draft:** [Phase 003 / WSP-1 provenance and public API gate](https://github.com/Urriki1502/wam-privacy-wallet/pull/3). Do not merge or claim integration completion without a separate review.
 - **Not delivered:** real-funds wallet, signer security review, production WSP-1 integration, external audit, signed releases or approved mainnet profile.
 
+## Approved V1 architecture alignment
+
+The user-approved V1 diagram is tracked in [ARCHITECTURE_V1_PLAN](ARCHITECTURE_V1_PLAN.md) and the fail-closed [traceability manifest](ARCHITECTURE_V1_TRACEABILITY.json). All three implementation streams (Core/security, WSP-1/wallet, privacy application) have separate acceptance gates; upstream capabilities are **not** automatically merged into the wallet.
+
 ## Workstreams
 
 ### A. Open-source foundation — documentation and governance
