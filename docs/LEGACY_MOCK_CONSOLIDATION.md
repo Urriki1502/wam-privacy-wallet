@@ -42,3 +42,10 @@
 - One explicit-consent, bounded, **disposable** encrypted scan-backup session runs scanner + SQLite inside an isolated temporary directory; close and cleanup are required, failure is redacted. Native CI exercises upstream AES-GCM scan-only envelope and actual upstream SQLite/scanner with synthetic localhost RPC.
 - KEEP dependency-free adversarial tests as negative fixtures. No old runtime module has yet qualified for deletion.
 - This is **not durable account custody**: plaintext scan secrets exist temporarily in upstream Python objects and memory zeroization is not assured. No persistent encrypted vault, operational GUI, source loader, real Core runtime, signer, broadcast or mainnet authorization is provided.
+
+## Checkpoint: real Scanner → Application → GUI loop (PR #139)
+
+- **Direct integration instead of mock-only progress:** composed merged encrypted scan-only WSP intake (#137) with merged GUI WSP receipt presenter (#138) through a fail-closed application workflow. The native Linux CI runs actual pinned `import_scan`, `Scanner.sync`, SQLite and offscreen `MainWindow` against a synthetic local regtest-shaped HTTP server.
+- **Failure gate:** wrong passphrase must deny before any RPC call and erase stale GUI scan receipt. GUI receives immutable scalar counters only. No API grants spend, signer, broadcast or mainnet authority.
+- **KEEP:** negative security test doubles in `tests/test_scan_preview_workflow.py` because they validate cancellation, consent, cleanup and render exceptions. Native WSP-1 + Qt CI separately proves the real integrated path; no fallback to fake success.
+- **Still missing:** operational WSP source loader, durable encrypted custody, event-loop worker/cancellation semantics, genuine DEV-approved WAM Core two-node regtest, independent production qualification. Qt is invoked synchronously here for a bounded CI-only test; do not enable a user scan button based on this PR.

@@ -25,6 +25,9 @@ from wam_privacy_wallet.application.wsp_scan_coordinator import (
 from wam_privacy_wallet.application.scan_only_account_session import (
     ScanOnlySessionError, run_disposable_scan_only_backup,
 )
+from wam_privacy_wallet.application.scan_preview_workflow import (
+    ScanPreviewError, run_disposable_scan_preview,
+)
 from wam_privacy_wallet.integrations.wsp1_scanner_only_rpc import (
     Wsp1ScannerOnlyRpc, WspScannerRpcError,
 )
@@ -264,6 +267,70 @@ def _run(source_root: Path) -> None:
                         or intake.mainnet_allowed is not False):
                     raise RuntimeError("WSP1_REAL_SCAN_ONLY_INTAKE_FAILED")
                 print("WSP1_REAL_ENCRYPTED_SCAN_ONLY_DISPOSABLE_INTAKE_PASS")
+
+                # Actual pinned encrypted account import + WSP-1 Scanner.sync
+                # + native SQLite + offscreen Qt MainWindow. No GUI scan keys.
+                os.environ["QT_QPA_PLATFORM"] = "offscreen"
+                from PySide6.QtCore import QCoreApplication, QEvent
+                from PySide6.QtWidgets import QApplication, QPushButton
+                from wam_privacy_wallet.gui import MainWindow
+                app = QApplication.instance() or QApplication([])
+                window = MainWindow()
+                print("WSP1_QT_OFFSCREEN_WINDOW_INIT_PASS")
+                try:
+                    try:
+                        result_gui = run_disposable_scan_preview(
+                        envelope, test_password,
+                        import_scan=import_scan, scanner_factory=Scanner,
+                        rpc=Wsp1ScannerOnlyRpc(endpoint, auth),
+                        user_consented=True, max_blocks=1,
+                        clear_preview=window.clear_offline_presentation,
+                        present_preview=window.present_wsp_scan_session_summary,
+                        )
+                    except ScanPreviewError as preview_error:
+                        # Only fixed, locally defined denial vocabulary.
+                        print("WSP1_QT_PREVIEW_" + str(preview_error),
+                              file=sys.stderr)
+                        raise
+                    print("WSP1_QT_APP_WORKFLOW_EXECUTED_PASS")
+                    if (result_gui.blocks_processed != 1
+                            or result_gui.transactions_processed != 1
+                            or result_gui.wallet_operational is not False
+                            or "WSP-1 SCAN EXECUTED" not in
+                            window.wsp_session_status.text()
+                            or "NO VALIDATED CORE" not in
+                            window.wsp_session_notice.text()
+                            or window.session_status.text() != "NO WALLET LOADED"
+                            or window.findChildren(QPushButton)):
+                        raise RuntimeError("WSP1_REAL_SCAN_TO_QT_GUI_DENIED")
+                    print("WSP1_REAL_SCANNER_SQLITE_TO_QT_GUI_PASS")
+                    before_bad = len(server.observed_methods)
+                    try:
+                        run_disposable_scan_preview(
+                            envelope, b"incorrect-test-password",
+                            import_scan=import_scan, scanner_factory=Scanner,
+                            rpc=Wsp1ScannerOnlyRpc(endpoint, auth),
+                            user_consented=True,
+                            clear_preview=window.clear_offline_presentation,
+                            present_preview=window.present_wsp_scan_session_summary,
+                        )
+                    except ScanPreviewError as exc:
+                        if str(exc) != "APP_SCAN_PREVIEW_SCAN_DENIED":
+                            raise
+                    else:
+                        raise RuntimeError("WSP1_GUI_WRONG_PASSWORD_ACCEPTED")
+                    if (len(server.observed_methods) != before_bad
+                            or window.wsp_session_status.text() !=
+                            "NO WSP-1 APPLICATION SCAN RECEIPT"):
+                        raise RuntimeError("WSP1_GUI_FAILURE_STALE_RECEIPT")
+                    print("WSP1_REAL_SCAN_GUI_FAILURE_CLEAR_PASS")
+                finally:
+                    window.close()
+                    window.deleteLater()
+                    QCoreApplication.sendPostedEvents(
+                        None, QEvent.Type.DeferredDelete
+                    )
+                    QCoreApplication.processEvents()
 
                 # A retained old RPC session cannot silently follow a fork.
                 server.tip = FORK
