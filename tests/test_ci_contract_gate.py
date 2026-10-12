@@ -211,7 +211,7 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
             "test_checkpoint_recovery_workflow.py": 18,
             "test_versioned_checkpoint_journal.py": 15,
             "test_snapshot_lineage_preflight.py": 14,
-            "test_core_next_release_audit.py": 18,
+            "test_core_next_release_audit.py": 21,
         }
         self.assertEqual(MINIMUM_CASES, expected)
         self.assertEqual(MANDATORY_SUITES, tuple(expected))
