@@ -66,6 +66,8 @@ GUI_TEST_IDS = frozenset({
 })
 # Security-critical original non-GUI identities; additive to original suite floors.
 CRITICAL_NON_GUI_IDS = frozenset({
+    "test_selective_disclosure_review.DisclosureReviewTests.test_no_consent_or_wrong_scope_denied_before_files_or_child",
+    "test_selective_disclosure_review.DisclosureReviewTests.test_forged_review_spend_sign_broadcast_or_authentication_denied",
     "test_app_coin_selection_review.CoinSelectionApplicationTests.test_consent_denied_before_source_io",
     "test_app_coin_selection_review.CoinSelectionApplicationTests.test_authority_flags_always_false",
     "test_app_coin_selection_review.CoinSelectionApplicationTests.test_nonprimitive_strings_denied_before_policy_callbacks",
@@ -280,7 +282,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 1038
+FULL_MIN_CASES = 1050
 
 
 def _cases(suite: unittest.TestSuite):

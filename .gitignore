@@ -41,3 +41,7 @@ private/
 # Generated local output
 logs/
 reports/local/
+
+# Local research native builds; never treat these as authenticated releases
+native/**/target/
+src/wam_privacy_wallet/integrations/_native/
