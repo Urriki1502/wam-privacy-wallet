@@ -123,5 +123,7 @@ def observe_local_scanner_session(
         )
     except ScannerObservationError:
         raise
-    except (WspScannerRpcError, ValueError, TypeError, OSError):
+    except Exception:
+        # Cancel/UI callbacks and untrusted transports can raise arbitrary
+        # exceptions. Never surface endpoint/credential/payload repr to Qt.
         raise ScannerObservationError("APP_SCANNER_OBSERVATION_DENIED") from None
