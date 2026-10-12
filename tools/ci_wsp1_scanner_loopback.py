@@ -18,6 +18,9 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from tools.wsp1_pinned_surface import PINNED_COMMIT, verify_pinned_wsp1_sources
+from wam_privacy_wallet.application.wsp_scan_coordinator import (
+    ApplicationScanError, run_consented_wsp_scan,
+)
 from wam_privacy_wallet.integrations.wsp1_scanner_only_rpc import (
     Wsp1ScannerOnlyRpc, WspScannerRpcError,
 )
@@ -183,10 +186,35 @@ def _run(source_root: Path) -> None:
             scanner = Scanner(path / "synthetic-scan-only.sqlite", (account,))
             try:
                 first_rpc = Wsp1ScannerOnlyRpc(endpoint, auth)
-                stats = scanner.sync(first_rpc, max_blocks=1)
-                if (stats.blocks != 1 or stats.transactions != 1
+                # The production APP coordinator (not a CI-only mock)
+                # must refuse to access even a real WSP scanner without
+                # explicit consent; no RPC should hit the synthetic peer.
+                seen_before = len(server.observed_methods)
+                try:
+                    run_consented_wsp_scan(
+                        scanner, first_rpc, user_consented=False, max_blocks=1,
+                    )
+                except ApplicationScanError as error:
+                    if str(error) != "APP_WSP_SCAN_INPUT_DENIED":
+                        raise
+                else:
+                    raise RuntimeError("WSP1_APP_SCAN_CONSENT_BYPASS")
+                if len(server.observed_methods) != seen_before:
+                    raise RuntimeError("WSP1_APP_SCAN_DENIED_SENT_RPC")
+
+                stats = run_consented_wsp_scan(
+                    scanner, first_rpc, user_consented=True, max_blocks=1,
+                )
+                if (stats.blocks_processed != 1
+                        or stats.transactions_processed != 1
+                        or stats.rollback_blocks != 0
+                        or stats.status != "WSP1_SCAN_EXECUTED_UNTRUSTED_CORE"
+                        or stats.wallet_operational is not False
+                        or stats.signer_enabled is not False
+                        or stats.broadcast_allowed is not False
                         or not scanner.ready or scanner.store.tip() != (1, TIP)):
-                    raise RuntimeError("WSP1_ACTUAL_SCANNER_SYNC_FAILED")
+                    raise RuntimeError("WSP1_ACTUAL_APP_SCANNER_SYNC_FAILED")
+                print("WSP1_ACTUAL_APP_COORDINATOR_CONSENT_SYNC_PASS")
                 print("WSP1_ACTUAL_SCANNER_LOCAL_SYNTHETIC_SYNC_PASS")
 
                 # A retained old RPC session cannot silently follow a fork.
