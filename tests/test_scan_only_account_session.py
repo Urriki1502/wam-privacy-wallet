@@ -73,8 +73,9 @@ class DisposableScanOnlyTests(unittest.TestCase):
             "user_consented": True,
         }
         kwargs.update(changes)
+        test_password = kwargs.pop("password", b"test-only-password")
         return m.run_disposable_scan_only_backup(
-            b"E" * 52, b"test-only-password", **kwargs
+            b"E" * 52, test_password, **kwargs
         )
 
     def test_consent_denied_before_any_decryption_or_io(self):
