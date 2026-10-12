@@ -276,15 +276,23 @@ def _run(source_root: Path) -> None:
                 from wam_privacy_wallet.gui import MainWindow
                 app = QApplication.instance() or QApplication([])
                 window = MainWindow()
+                print("WSP1_QT_OFFSCREEN_WINDOW_INIT_PASS")
                 try:
-                    result_gui = run_disposable_scan_preview(
+                    try:
+                        result_gui = run_disposable_scan_preview(
                         envelope, test_password,
                         import_scan=import_scan, scanner_factory=Scanner,
                         rpc=Wsp1ScannerOnlyRpc(endpoint, auth),
                         user_consented=True, max_blocks=1,
                         clear_preview=window.clear_offline_presentation,
                         present_preview=window.present_wsp_scan_session_summary,
-                    )
+                        )
+                    except ScanPreviewError as preview_error:
+                        # Only fixed, locally defined denial vocabulary.
+                        print("WSP1_QT_PREVIEW_" + str(preview_error),
+                              file=sys.stderr)
+                        raise
+                    print("WSP1_QT_APP_WORKFLOW_EXECUTED_PASS")
                     if (result_gui.blocks_processed != 1
                             or result_gui.transactions_processed != 1
                             or result_gui.wallet_operational is not False
