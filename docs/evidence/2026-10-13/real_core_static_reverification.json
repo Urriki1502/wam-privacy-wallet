@@ -1,0 +1,60 @@
+{
+  "broadcast_allowed": false,
+  "captured_utc": "2026-10-13T11:43:55.036057+00:00",
+  "checksum_metadata_sha256": "9c8d54bba2284e53513c0f5b4569fdc4a5750352c4aaa17ce29e9180c1477d8f",
+  "current_core_main": "c85259102a366caf62ea82837775f9bd47af1efc",
+  "dynamic_loader_and_dso_authenticated": false,
+  "elf_stack_policy": {
+    "gnu_stack": "RWE",
+    "reason": "CORE_ELF_EXECUTABLE_STACK_DENIED",
+    "status": "FAIL"
+  },
+  "evidence_schema": 1,
+  "evidence_scope": "REAL_OFFICIAL_ARTIFACT_STATIC_ONLY_NO_CORE_EXEC",
+  "fresh_fixed_https_metadata": {
+    "reason": "CORE_OFFICIAL_TRANSPORT_DENIED",
+    "status": "BLOCKED"
+  },
+  "key_matches_current_git_text_ignoring_terminal_newline": true,
+  "key_revocation_freshness_qualified": false,
+  "mainnet_allowed": false,
+  "metadata_source": "CACHED_OFFICIAL_BYTES_MATCHING_LIVE_GITHUB_ASSET_DIGESTS",
+  "process_execution_identity": {
+    "reason": "CORE_EXECUTION_REVIEW_REQUIRED",
+    "status": "BLOCKED"
+  },
+  "publisher_build_mapping_approved": false,
+  "real_core_rpc_and_two_node_e2e": {
+    "acceptance": "LOCAL ACCEPTANCE PENDING",
+    "status": "NOT RUN"
+  },
+  "real_kernel_noexec_sealed_elf": {
+    "audit_pass": true,
+    "byte_count": 12132344,
+    "elf_denial": "CORE_ELF_EXECUTABLE_STACK_DENIED",
+    "execution_identity_bound": false,
+    "node_sha256": "625609c08afef441e9dddd71330dcab1cec112d6fabe361769b9907f0efe7ab4",
+    "scope": "ACTUAL_SIGNED_ARTIFACT_STATIC_ONLY_NO_CORE_EXEC",
+    "wam_core_executed": false
+  },
+  "release_prerelease": true,
+  "release_source_commit": "8a3f4fe4f1d804c378f795d4cc281ec5125f75f3",
+  "release_tag": "v0.1.11",
+  "signature_archive_member": {
+    "archive_name": "wam-coin-v0.1.11-x86_64-linux-gnu.tar.gz",
+    "archive_sha256": "bd010ed615ab8063d5c12aa61236311ece7e9d19896d9541dacba1888dd9987a",
+    "core_execution_allowed": false,
+    "execution_identity_bound": false,
+    "mainnet_allowed": false,
+    "node_byte_count": 12132344,
+    "node_entry": "wam-coin-v0.1.11/bin/wamd",
+    "node_sha256": "625609c08afef441e9dddd71330dcab1cec112d6fabe361769b9907f0efe7ab4",
+    "real_regtest_qualified": false,
+    "real_wallet_allowed": false,
+    "signer_fingerprint": "4BD4A8D3AFD43F5CBCB500E23798462FE00ADBA4",
+    "status": "SIGNED_ARCHIVE_REVIEW_ONLY"
+  },
+  "signature_metadata_sha256": "cc6f5e4e8312b251996a7c364d27f90bbdaab8c2d5827f754f61697b797f2c30",
+  "signing_allowed": false,
+  "wam_core_executed": false
+}

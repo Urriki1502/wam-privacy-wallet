@@ -204,3 +204,52 @@ directory-descriptor walk via `private_checkpoint_directory`.
   old-key fallback or external-anchor approval is enabled.
 
 GitHub CI for this unit is pending until its exact-head checks are observed.
+
+## GitHub checkpoint: checkpoint custody unit merged
+
+[PR #196](https://github.com/Urriki1502/wam-privacy-wallet/pull/196), exact head
+`ea11b59580224cd80677e964234c14b740c12f56`, merged as
+`2d845c6b7f196cec4875d611b8d61448dbaf380c` after all 17 applicable checks PASS
+and exact-head/current-base clean mergeability verification.
+
+- [Wallet CI](https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38390105614):
+  eight required jobs PASS; 1521/1521 Linux full discovery and passing
+  Windows/macOS full discovery.
+- [Native WSP CI](https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38390105582):
+  five jobs PASS, retaining genuine pinned WSP encryption/checkpoint/Qt
+  regressions with synthetic RPC. No Core daemon was run.
+- [CodeQL](https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38390105387):
+  actions/python/rust and aggregate PASS.
+
+## Completed unit: agentless public-key release verification
+
+A fresh real signature check exposed an environment dependency: GnuPG imports
+the public key but returns failure when it cannot start gpg-agent. The existing
+verifier correctly denied this nonzero result. It now uses the fingerprint-
+checked public key in one ephemeral dearmored keyring and `--no-default-keyring`
+for verification. All calls forbid agent autostart. No agent is needed for
+public verification; no secret key or signing operation is introduced.
+
+- Pinned primary fingerprint, return-code checks, GOOD/VALIDSIG requirements,
+  revoked/expired/bad-signature refusals, checksum verification, isolated home,
+  scrubbed environment, no shell/network retrieval and Core launch HOLD stay.
+- Four additive tests cover keyring isolation, decode failure before archive
+  access, wrong primary before keyring use, and valid text with a nonzero exit.
+  Focused tests PASS: 40 signed-release/sealed-bridge, 12 offline receipt,
+  17 ELF policy and 34 CI-gate cases. Full floor increases 1470 → 1474.
+- **Actual v0.1.11 artifact bytes** were reverified with host GnuPG: genuine
+  detached signature, exact signed archive hash and exact wamd member hash.
+  A real Linux NOEXEC sealed snapshot re-audited exact bytes and independently
+  refused ELF execution-stack policy with `CORE_ELF_EXECUTABLE_STACK_DENIED`.
+  These are real static artifact checks, not mocked cryptographic results.
+- Cached official checksum/signature bytes match live GitHub release asset
+  digests. The cached public key text matches the current Core Git source
+  ignoring only its terminal newline. Fresh fixed HTTPS metadata retrieval
+  is BLOCKED in Work: `OfficialMetadataError / CORE_OFFICIAL_TRANSPORT_DENIED`.
+  No fresh HTTPS success, revocation freshness or publisher approval is claimed.
+- Sanitized public evidence is in
+  `docs/evidence/2026-10-13/real_core_static_reverification.json`.
+  Core execution, process identity, dynamic loader trust, Core RPC/E2E and
+  signed-binary approval remain unqualified. #82/#86 stay OPEN/BLOCKED.
+
+The official binary was neither patched nor launched, including --help.

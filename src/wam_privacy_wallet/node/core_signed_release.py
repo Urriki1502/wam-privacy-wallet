@@ -127,7 +127,8 @@ def _run_gpg(
     try:
         cp = subprocess.run(
             [str(gpg_executable), "--homedir", str(homedir), "--batch",
-             "--no-tty", "--no-options", "--no-auto-key-retrieve", *args],
+             "--no-tty", "--no-options", "--no-auto-key-retrieve",
+             "--no-autostart", *args],
             shell=False, check=False, stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             cwd=homedir, env=env, timeout=timeout,
@@ -219,11 +220,18 @@ def verify_wam_signed_distribution(
         if status != 0:
             raise CoreReleaseSignatureError("CORE_RELEASE_SIGNER_DENIED")
         _gpg_primary_fingerprint(listing)
-        imported, _ = _run_gpg(gpg_path, home, ("--import", str(key)))
-        if imported != 0:
+        # Public signature verification requires no secret-key agent. Importing
+        # a key into a normal GPG home can nevertheless try to start gpg-agent.
+        # Decode the already fingerprint-checked public key into one ephemeral
+        # keyring instead. Never use user/default keyrings or autostart agents.
+        keyring = home / "release-public.gpg"
+        decoded, _ = _run_gpg(gpg_path, home, ("--dearmor", "--output",
+                                            str(keyring), str(key)))
+        if decoded != 0:
             raise CoreReleaseSignatureError("CORE_RELEASE_SIGNER_DENIED")
         checked, verdict = _run_gpg(
-            gpg_path, home, ("--status-fd", "1", "--verify",
+            gpg_path, home, ("--no-default-keyring", "--keyring", str(keyring),
+                             "--status-fd", "1", "--verify",
                              str(sig), str(sums)),
         )
         if checked != 0:
