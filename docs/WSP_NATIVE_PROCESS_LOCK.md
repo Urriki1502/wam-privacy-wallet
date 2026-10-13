@@ -41,3 +41,8 @@ encrypted backups/checkpoint durability, trusted anti-rollback, source loader
 sandboxing or resistance to malicious same-UID/OS compromise. Linux-only
 retained application guards stay held on macOS/Windows. #9/#82/#86/#153 and
 #148/#151 remain blocked; synthetic RPC success is not actual Core E2E.
+
+Source/dependency/origin negative fixtures explicitly model 64-bit refusal paths
+so native Windows x86 can test those layers independently. They import no WSP
+and confer no 32-bit qualification. The actual 32-bit pre-source refusal and
+native Windows x86 scanner denial job remain unchanged.

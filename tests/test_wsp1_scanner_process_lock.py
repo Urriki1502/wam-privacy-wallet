@@ -15,6 +15,9 @@ from tools import ci_wsp1_scanner_process_lock as proof
 
 
 class NativeProcessLockBoundaryTests(unittest.TestCase):
+    # Source/dependency/origin fixtures model 64-bit refusal paths. They never
+    # import WSP or qualify a 32-bit runtime; the real 32-bit gate is tested
+    # independently before any source read and by the native Windows CI job.
     def setUp(self):
         self.root = Path.cwd().resolve()
 
@@ -34,7 +37,8 @@ class NativeProcessLockBoundaryTests(unittest.TestCase):
                 proof._qualify(self.root)
             source.assert_not_called()
 
-    def test_relative_source_denies_before_source_or_dependency_reads(self):
+    @patch.object(proof.struct, "calcsize", return_value=8)
+    def test_relative_source_denies_before_source_or_dependency_reads(self, _pointer_width):
         with patch.object(proof, "verify_wsp1_full_source_closure") as source, \
              patch.object(proof.importlib.metadata, "version") as dependency:
             with self.assertRaisesRegex(RuntimeError, "SOURCE_DENIED"):
@@ -42,7 +46,8 @@ class NativeProcessLockBoundaryTests(unittest.TestCase):
             source.assert_not_called()
             dependency.assert_not_called()
 
-    def test_preloaded_wsp_denies_before_source_or_native_dependency_reads(self):
+    @patch.object(proof.struct, "calcsize", return_value=8)
+    def test_preloaded_wsp_denies_before_source_or_native_dependency_reads(self, _pointer_width):
         with patch.dict(sys.modules, {"wam_sp.scanner": object()}), \
              patch.object(proof, "verify_wsp1_full_source_closure") as source, \
              patch.object(proof.importlib.metadata, "version") as dependency:
@@ -51,7 +56,8 @@ class NativeProcessLockBoundaryTests(unittest.TestCase):
             source.assert_not_called()
             dependency.assert_not_called()
 
-    def test_changed_pin_denies_before_dependency_reads_or_native_imports(self):
+    @patch.object(proof.struct, "calcsize", return_value=8)
+    def test_changed_pin_denies_before_dependency_reads_or_native_imports(self, _pointer_width):
         with patch.object(proof, "verify_wsp1_full_source_closure", return_value={
                 "pinned_commit": "0" * 40, "scanner_enabled": False}), \
              patch.object(proof.importlib.metadata, "version") as dependency, \
@@ -61,7 +67,8 @@ class NativeProcessLockBoundaryTests(unittest.TestCase):
             dependency.assert_not_called()
             origin.assert_not_called()
 
-    def test_changed_dependency_denies_before_package_origin_or_imports(self):
+    @patch.object(proof.struct, "calcsize", return_value=8)
+    def test_changed_dependency_denies_before_package_origin_or_imports(self, _pointer_width):
         with patch.object(proof, "verify_wsp1_full_source_closure", return_value={
                 "pinned_commit": proof.PIN, "scanner_enabled": False}), \
              patch.object(proof.importlib.metadata, "version", return_value="0.0.0"), \
@@ -70,7 +77,8 @@ class NativeProcessLockBoundaryTests(unittest.TestCase):
                 proof._qualify(self.root)
             origin.assert_not_called()
 
-    def test_wrong_installed_origin_cannot_qualify_unreviewed_native_code(self):
+    @patch.object(proof.struct, "calcsize", return_value=8)
+    def test_wrong_installed_origin_cannot_qualify_unreviewed_native_code(self, _pointer_width):
         versions = {"coincurve": "21.0.0", "cryptography": "50.0.0", "pycryptodome": "3.23.0"}
         with patch.object(proof, "verify_wsp1_full_source_closure", return_value={
                 "pinned_commit": proof.PIN, "scanner_enabled": False}), \
