@@ -2,7 +2,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
+from pathlib import Path
 import re
+import struct
+import subprocess
+import sys
 
 from .synthetic_policy_demo import _verify_source_bytes
 from .synthetic_input_shape import has_exact_primitive_fields
@@ -86,3 +91,63 @@ def review_synthetic_payjoin_proposal(
     except Exception:
         raise PayjoinProposalReviewError("APP_PAYJOIN_PROPOSAL_REVIEW_DENIED") from None
     return PayjoinProposalReview()
+
+
+@dataclass(frozen=True, slots=True)
+class PayjoinPsbtReview:
+    """Exact wire parsing and signature validity do not prove input ownership."""
+    privacy_source_commit: str = "db3d2dcaa540f1129d540101813b761167d33174"
+    wsp_source_commit: str = "ac55f13423620252bdbf848c7e8a280c3b84721e"
+    evidence: str = "PINNED_PSBT_V2_PAYJOIN_REVIEW_UNQUALIFIED"
+    ownership_verified: bool = False
+    chain_verified: bool = False
+    sign_allowed: bool = False
+    broadcast_allowed: bool = False
+
+
+def review_synthetic_payjoin_psbt_v2(
+    original: object, proposal: object, *, source_root: object,
+    payment_output_index: object, scope: object, consent: object,
+) -> PayjoinPsbtReview:
+    """Fixed read-only worker; strict P2TR, zero sender contribution profile.
+
+    Consent authorizes this local fixture review only. Original inputs are
+    candidate sender inputs, never an authenticated wallet ownership set.
+    No PSBT, key, output, witness or signer object returns from the child.
+    """
+    try:
+        if (consent is not True or type(scope) is not str or scope != "synthetic-regtest"
+                or type(payment_output_index) is not int
+                or not 0 <= payment_output_index < 256
+                or any(type(raw) is not bytes or not 5 <= len(raw) <= 1_000_000
+                       for raw in (original, proposal))
+                or struct.calcsize("P") != 8
+                or sys.platform not in ("linux", "darwin", "win32")):
+            raise ValueError
+        if (type(source_root) is not type(Path()) or not source_root.is_absolute()
+                or source_root.is_symlink()):
+            raise ValueError
+        # Length framing preserves exact binary bytes; no filenames or commands
+        # are accepted from a remote proposal. Index is a bounded local choice.
+        payload = (payment_output_index.to_bytes(2, "big")
+                   + len(original).to_bytes(4, "big") + original + proposal)
+        result = subprocess.run(
+            [sys.executable, "-I", "-B", "-m",
+             "wam_privacy_wallet.application._payjoin_psbt_worker",
+             "--source-root", str(source_root)],
+            input=payload, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            timeout=30, check=False,
+        )
+        if result.returncode != 0 or not 1 <= len(result.stdout) <= 2048:
+            raise ValueError
+        data = json.loads(result.stdout)
+        expected = PayjoinPsbtReview()
+        if (type(data) is not dict or len(data) != len(expected.__slots__)
+                or any(type(k) is not str for k in data)
+                or set(data) != set(expected.__slots__)
+                or any(type(data[k]) is not type(getattr(expected, k))
+                       or data[k] != getattr(expected, k) for k in data)):
+            raise ValueError
+        return expected
+    except Exception:
+        raise PayjoinProposalReviewError("APP_PAYJOIN_PSBT_REVIEW_DENIED") from None
