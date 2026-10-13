@@ -10,13 +10,16 @@ import sys
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
     QCheckBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QListWidget,
-    QMainWindow, QPushButton, QSpinBox, QStackedWidget, QVBoxLayout, QWidget,
+    QMainWindow, QPlainTextEdit, QPushButton, QSpinBox, QStackedWidget, QVBoxLayout, QWidget,
 )
 
 from wam_privacy_wallet.application.regtest_lifecycle import BLOCKERS, RegtestLifecycleError
 from wam_privacy_wallet.application.qualified_scan_session import ScanSnapshot
 from wam_privacy_wallet.node.gui_two_node_readonly import LiveNodeGuiEvidence
 from wam_privacy_wallet.application.qt_native_wsp_bridge import QtNativeScanEvidence
+from wam_privacy_wallet.application.qt_native_private_workflow import (
+    PrivateQtHistoryRow, PrivateQtWorkflowEvidence,
+)
 from wam_privacy_wallet.integrations.wsp1_source_review import PINNED_COMMIT
 from .regtest_worker import RegtestWorkerController
 
@@ -128,6 +131,40 @@ class RegtestWindow(QMainWindow):
                 )
                 self.scan_button.clicked.connect(self._scan_existing)
                 layout.addWidget(self.scan_button)
+            if name == "Transactions":
+                self.history_ack = QCheckBox(
+                    "I explicitly consent to display PRIVATE local REGTEST transaction IDs and amounts"
+                )
+                self.history_ack.toggled.connect(self._refresh_controls)
+                layout.addWidget(self.history_ack)
+                self.history_button = QPushButton("Read newest 20 WSP-1 confirmed transactions")
+                self.history_button.clicked.connect(lambda: self._private_action("history"))
+                layout.addWidget(self.history_button)
+                self.private_history_status = QPlainTextEdit()
+                self.private_history_status.setReadOnly(True)
+                self.private_history_status.setPlainText("NO PRIVATE TRANSACTION HISTORY")
+                layout.addWidget(self.private_history_status)
+            if name == "Backup / Recovery":
+                self.backup_ack = QCheckBox(
+                    "I understand: checkpoint is create-once; no trusted anti-rollback protection"
+                )
+                self.backup_ack.toggled.connect(self._refresh_controls)
+                layout.addWidget(self.backup_ack)
+                self.checkpoint_button = QPushButton("Save encrypted WSP-1 checkpoint once")
+                self.restore_button = QPushButton(
+                    "Restore checkpoint in NEW scan-only directory, then rescan"
+                )
+                self.checkpoint_button.clicked.connect(
+                    lambda: self._private_action("checkpoint")
+                )
+                self.restore_button.clicked.connect(
+                    lambda: self._private_action("restore")
+                )
+                layout.addWidget(self.checkpoint_button)
+                layout.addWidget(self.restore_button)
+                self.backup_status = QLabel("NO BACKUP / RECOVERY OPERATION")
+                self.backup_status.setWordWrap(True)
+                layout.addWidget(self.backup_status)
             layout.addStretch()
             self.pages.addWidget(page)
         body.addWidget(self.navigation, 1)
@@ -138,6 +175,7 @@ class RegtestWindow(QMainWindow):
         column.addWidget(self.blocker_status)
         self.setCentralWidget(root)
         self.navigation.currentRowChanged.connect(self.pages.setCurrentIndex)
+        self.navigation.currentRowChanged.connect(self._hide_private_history)
         self.navigation.setCurrentRow(0)
         self.mode_button.clicked.connect(self._select)
         self.inspect_button.clicked.connect(self._inspect)
@@ -149,6 +187,8 @@ class RegtestWindow(QMainWindow):
         self.controller.node_probe_failed.connect(self._node_failed)
         self.controller.scan_completed.connect(self._scan_completed)
         self.controller.scan_failed.connect(self._scan_failed)
+        self.controller.private_completed.connect(self._private_completed)
+        self.controller.private_failed.connect(self._private_failed)
         self._render(self.controller.lifecycle.state)
 
     def _select(self):
@@ -214,6 +254,108 @@ class RegtestWindow(QMainWindow):
             )
         except (RegtestLifecycleError, ValueError):
             self.scan_review_status.setText("QT_NATIVE_WSP_SCAN_DENIED")
+
+    def _hide_private_history(self, _index):
+        # Never carry private txids/amounts into another GUI page.
+        self.private_history_status.setPlainText("NO PRIVATE TRANSACTION HISTORY")
+        self.history_ack.setChecked(False)
+
+    def _private_action(self, operation):
+        self.private_history_status.setPlainText("NO PRIVATE TRANSACTION HISTORY")
+        self.backup_status.setText("NO BACKUP / RECOVERY OPERATION")
+        try:
+            page = self.navigation.currentRow()
+            ack = ((operation == "history" and page == 3
+                    and self.history_ack.isChecked()) or
+                   (operation in ("checkpoint", "restore") and page == 6
+                    and self.backup_ack.isChecked()))
+            if not ack:
+                raise RegtestLifecycleError("APP_REGTEST_PRIVATE_SCOPE_DENIED")
+            a_password = self.node_inputs["a_password"].text()
+            b_password = self.node_inputs["b_password"].text()
+            passphrase = self.scan_inputs["passphrase"].text()
+            self.node_inputs["a_password"].clear()
+            self.node_inputs["b_password"].clear()
+            self.scan_inputs["passphrase"].clear()
+            self.controller.private_workflow(
+                operation=operation,
+                source_root=self.scan_inputs["source"].text(),
+                private_dir=self.scan_inputs["private"].text(),
+                scan_password=passphrase,
+                node_a_rpc=self.node_ports["a_rpc"].value(),
+                node_a_p2p=self.node_ports["a_p2p"].value(),
+                node_a_user=self.node_inputs["a_user"].text(),
+                node_a_password=a_password,
+                node_b_rpc=self.node_ports["b_rpc"].value(),
+                node_b_p2p=self.node_ports["b_p2p"].value(),
+                node_b_user=self.node_inputs["b_user"].text(),
+                node_b_password=b_password,
+                consent=self.consent.isChecked(),
+                unverified_core_ack=self.node_ack.isChecked(),
+                private_display_ack=True,
+            )
+        except (ValueError, RegtestLifecycleError):
+            if operation == "history":
+                self.private_history_status.setPlainText("QT_PRIVATE_WORK_DENIED")
+            else:
+                self.backup_status.setText("QT_PRIVATE_WORK_DENIED")
+
+    def _private_completed(self, revision, receipt):
+        state = self.controller.lifecycle.state
+        try:
+            if (self._closing or type(revision) is not int
+                    or revision != state.revision
+                    or state.mode != "REGTEST"
+                    or state.phase in ("CLOSED", "CANCELLED")
+                    or not self.consent.isChecked() or not self.node_ack.isChecked()
+                    or type(receipt) is not PrivateQtWorkflowEvidence
+                    or ((receipt.operation == "history" and
+                         (self.navigation.currentRow() != 3
+                          or not self.history_ack.isChecked()))
+                        or (receipt.operation != "history" and
+                            (self.navigation.currentRow() != 6
+                             or not self.backup_ack.isChecked())))):
+                raise ValueError
+            rows = tuple(PrivateQtHistoryRow(
+                x.txid, x.height, x.confirmations,
+                x.credit_atoms, x.debit_atoms
+            ) for x in receipt.rows)
+            checked = PrivateQtWorkflowEvidence(
+                receipt.operation, receipt.tip_height, rows
+            )
+            if checked != receipt:
+                raise ValueError
+        except Exception:
+            self.private_history_status.setPlainText("NO PRIVATE TRANSACTION HISTORY")
+            self.backup_status.setText("NO BACKUP / RECOVERY OPERATION")
+            return
+        if receipt.operation == "history":
+            lines = [
+                "PRIVATE LOCAL WSP-1 HISTORY · UNQUALIFIED CORE · NO SIGNING"
+            ]
+            if not receipt.rows:
+                lines.append("NO CONFIRMED TRANSACTIONS IN LATEST PAGE")
+            for row in receipt.rows:
+                lines.append(
+                    f"txid {row.txid} · block {row.height} · "
+                    f"conf {row.confirmations} · credit {row.credit_atoms} atoms · "
+                    f"debit {row.debit_atoms} atoms (UNQUALIFIED)"
+                )
+            self.private_history_status.setPlainText("\n".join(lines))
+        else:
+            msg = (
+                "ENCRYPTED CHECKPOINT CREATED (CREATE-ONCE)"
+                if receipt.operation == "checkpoint"
+                else "ENCRYPTED CHECKPOINT RESTORED AND RESCANNED"
+            )
+            self.backup_status.setText(
+                msg + " · UNTRUSTED ANTI-ROLLBACK · NO VERIFIED CORE"
+            )
+
+    def _private_failed(self, revision):
+        if type(revision) is int and revision == self.controller.lifecycle.state.revision:
+            self.private_history_status.setPlainText("QT_PRIVATE_WORK_DENIED")
+            self.backup_status.setText("QT_PRIVATE_WORK_DENIED")
 
     def _scan_completed(self, revision, receipt):
         state = self.controller.lifecycle.state
@@ -298,12 +440,27 @@ class RegtestWindow(QMainWindow):
                     for key in ("a_user","a_password","b_user","b_password"))
             and all(self.scan_inputs[key].text() for key in ("source","private","passphrase"))
         )
+        private_ready = self.scan_button.isEnabled()
+        self.history_button.setEnabled(
+            private_ready and self.history_ack.isChecked()
+            and self.navigation.currentRow() == 3
+        )
+        self.checkpoint_button.setEnabled(
+            private_ready and self.backup_ack.isChecked()
+            and self.navigation.currentRow() == 6
+        )
+        self.restore_button.setEnabled(
+            private_ready and self.backup_ack.isChecked()
+            and self.navigation.currentRow() == 6
+        )
 
     def _render(self, state):
         self.lifecycle_status.setText(f"{state.mode} · {state.phase} · {state.readiness}")
         # This local lifecycle never loads a wallet or authorizes a backend.
         self.authority_status.setText("NO WALLET LOADED · SIGNER / BROADCAST BLOCKED")
         self.clear_scan_review()
+        self.private_history_status.setPlainText("NO PRIVATE TRANSACTION HISTORY")
+        self.backup_status.setText("NO BACKUP / RECOVERY OPERATION")
         self.node_probe_status.setText("NO NODE CONNECTION INSPECTION")
         self._refresh_controls()
 
@@ -366,4 +523,6 @@ class RegtestWindow(QMainWindow):
             self.lifecycle_status.setText("CLOSING · waiting for cooperative worker cleanup")
             QTimer.singleShot(25, self.close)
             return
+        self.private_history_status.setPlainText("NO PRIVATE TRANSACTION HISTORY")
+        self.backup_status.setText("NO BACKUP / RECOVERY OPERATION")
         event.accept()
