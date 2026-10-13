@@ -100,6 +100,60 @@ def main():
             self.assertFalse(any((root/'src/wam_sp').rglob('*.pyc')))
             verify_wsp1_full_source_closure(root)
 
+    # Public disposable fixture key (scalar 3), never a wallet or real funds.
+    # Signing exists ONLY in test fixture construction with the upstream engine;
+    # the application worker independently denies every signing call.
+    from coincurve import PrivateKey
+    from wam_privacy_wallet.application.payjoin_proposal_review import (
+        review_synthetic_payjoin_psbt_v2, PayjoinProposalReviewError,
+    )
+    receiver_key = PrivateKey.from_int(3)
+    receiver_script = b"\x51\x20" + receiver_key.public_key.format()[1:]
+    def pair(**changes):
+        before = PSBT(Tx((("01"*32, 0),), ((50000, script), (49000, script))),
+                      ((100000, script),))
+        tx = Tx((("01"*32, 0), ("02"*32, 1)),
+                ((69000, script), (changes.get("change", 49000), script)),
+                version=changes.get("version", 2))
+        utxos = ((100000, changes.get("sender_script", script)), (20000, receiver_script))
+        after = PSBT(tx, utxos).sign((None, receiver_key))
+        sig = after.signatures[1]
+        after = PSBT(tx, utxos, input_extra=({}, {b"\x08": b"\x01"+blob(sig)}))
+        return before, after
+
+    class ActualPinnedPayjoinTests(unittest.TestCase):
+        def review(self, a=None, b=None, **kw):
+            a, b = pair() if a is None else (a, b)
+            return review_synthetic_payjoin_psbt_v2(a.encode(), b.encode(),
+                **(dict(source_root=root, payment_output_index=0,
+                        scope="synthetic-regtest", consent=True) | kw))
+        def denied(self, a, b, **kw):
+            with self.assertRaisesRegex(PayjoinProposalReviewError, "^APP_PAYJOIN_PSBT_REVIEW_DENIED$"):
+                self.review(a, b, **kw)
+        def test_actual_parser_validator_and_receiver_verification_no_authority(self):
+            value = self.review()
+            self.assertEqual(value.evidence, "PINNED_PSBT_V2_PAYJOIN_REVIEW_UNQUALIFIED")
+            self.assertFalse(value.ownership_verified or value.chain_verified or value.sign_allowed or value.broadcast_allowed)
+        def test_sender_contribution_denied(self): self.denied(*pair(change=48999))
+        def test_sender_utxo_script_swap_denied(self): self.denied(*pair(sender_script=receiver_script))
+        def test_changed_version_denied(self): self.denied(*pair(version=3))
+        def test_receiver_invalid_witness_denied(self):
+            a,b=pair(); b=PSBT(b.tx,b.utxos,input_extra=({}, {b"\x08":b"\x01\x40"+bytes(64)})); self.denied(a,b)
+        def test_receiver_missing_witness_denied(self):
+            a,b=pair(); self.denied(a,PSBT(b.tx,b.utxos))
+        def test_protected_output_swap_invalidates_signature_and_denies(self):
+            a,b=pair(); tx=Tx(b.tx.inputs,((69000,receiver_script),(49000,script)))
+            self.denied(a,PSBT(tx,b.utxos,input_extra=b.input_extra))
+        def test_sender_finalize_and_keypath_metadata_denied(self):
+            for extra in ({b"\x08":b"PRIVATE"},{b"\x06x":b"PRIVATE"}):
+                a,b=pair(); self.denied(a,PSBT(b.tx,b.utxos,input_extra=(extra,b.input_extra[1])))
+        def test_unknown_fields_and_v0_denied(self):
+            a,b=pair(); self.denied(a.to_v0(),b)
+            self.denied(a,PSBT(b.tx,b.utxos,global_extra={b"\xfcx":b"PRIVATE"},input_extra=b.input_extra))
+        def test_consent_scope_index_and_wrong_source_denied(self):
+            for kw in (dict(consent=False),dict(scope="mainnet"),dict(payment_output_index=True),dict(source_root=root.parent)):
+                self.denied(*pair(),**kw)
+
     if args.gui:
         import os
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -134,9 +188,10 @@ def main():
                     self.assertEqual(self.window.offline_presentation_state.authority, 'BLOCKED')
 
     suite=unittest.defaultTestLoader.loadTestsFromTestCase(ActualPinnedPsbtTests)
+    suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(ActualPinnedPayjoinTests))
     if args.gui:
         suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(ActualParserGuiTests))
-    expected = 23 if args.gui else 21
+    expected = 33 if args.gui else 31
     if suite.countTestCases()!=expected: raise SystemExit('NATIVE_PSBT_DISCOVERY_DENIED')
     result=unittest.TextTestRunner(verbosity=2).run(suite)
     if not result.wasSuccessful() or result.skipped or result.expectedFailures or result.unexpectedSuccesses:

@@ -170,6 +170,38 @@ class PayjoinProposalReviewTests(unittest.TestCase):
         with self.assertRaises(FrozenInstanceError):
             result.sign_allowed = True
 
+    def test_psbt_consent_scope_and_bounds_denied_before_child(self):
+        from pathlib import Path
+        from wam_privacy_wallet.application.payjoin_proposal_review import review_synthetic_payjoin_psbt_v2
+        for changes in (dict(consent=False), dict(scope="mainnet"), dict(payment_output_index=True), dict(original=bytearray(b"psbt\xff")), dict(proposal=b"x"*1_000_001)):
+            params=dict(original=b"psbt\xff",proposal=b"psbt\xff",source_root=Path.cwd(),payment_output_index=0,scope="synthetic-regtest",consent=True)
+            params.update(changes)
+            with patch("subprocess.run") as child:
+                with self.assertRaisesRegex(PayjoinProposalReviewError,"^APP_PAYJOIN_PSBT_REVIEW_DENIED$"):
+                    review_synthetic_payjoin_psbt_v2(**params)
+                child.assert_not_called()
+
+    def test_psbt_forged_authority_and_coerced_flags_denied(self):
+        import json
+        from pathlib import Path
+        from dataclasses import asdict
+        from types import SimpleNamespace
+        from wam_privacy_wallet.application.payjoin_proposal_review import review_synthetic_payjoin_psbt_v2, PayjoinPsbtReview
+        for key in ("sign_allowed","broadcast_allowed","ownership_verified","chain_verified"):
+            for value in (True,0):
+                receipt=asdict(PayjoinPsbtReview());receipt[key]=value
+                with patch("subprocess.run",return_value=SimpleNamespace(returncode=0,stdout=json.dumps(receipt).encode())),patch("struct.calcsize",return_value=8):
+                    with self.assertRaisesRegex(PayjoinProposalReviewError,"^APP_PAYJOIN_PSBT_REVIEW_DENIED$"):
+                        review_synthetic_payjoin_psbt_v2(b"psbt\xff",b"psbt\xff",source_root=Path.cwd(),payment_output_index=0,scope="synthetic-regtest",consent=True)
+
+    def test_psbt_worker_bad_frames_denied_before_source_import(self):
+        from pathlib import Path
+        from wam_privacy_wallet.application import _payjoin_psbt_worker as worker
+        with patch.object(worker,"qualify_read_only_source") as verify:
+            for value in (b"",bytearray(20),bytes(2_000_007),b"\x00\x00"+bytes(4)+b"x"*10):
+                with self.assertRaises(ValueError):worker.review_pair(value,Path.cwd())
+            verify.assert_not_called()
+
 
 if __name__ == '__main__':
     unittest.main()

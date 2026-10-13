@@ -50,10 +50,9 @@ def _profile_no_sign(frame, event, arg):
             _deny()
 
 
-def parse_pinned_unsigned_fixture(raw: bytes, root: Path) -> PsbtV2Review:
-    """Internal one-shot function; imports only after exact source qualification."""
-    if (type(raw) is not bytes or not 5 <= len(raw) <= 1_000_000
-            or struct.calcsize("P") != 8 or sys.platform not in ("linux", "darwin", "win32")):
+def qualify_read_only_source(root: Path) -> None:
+    """Shared one-shot worker gate; installs the existing denial instrumentation."""
+    if struct.calcsize("P") != 8 or sys.platform not in ("linux", "darwin", "win32"):
         _deny()
     if any(name == "wam_sp" or name.startswith("wam_sp.") for name in sys.modules):
         _deny()
@@ -69,6 +68,13 @@ def parse_pinned_unsigned_fixture(raw: bytes, root: Path) -> PsbtV2Review:
         _deny()
     sys.addaudithook(_audit_read_only)
     sys.setprofile(_profile_no_sign)
+
+
+def parse_pinned_unsigned_fixture(raw: bytes, root: Path) -> PsbtV2Review:
+    """Internal one-shot function; imports only after exact source qualification."""
+    if type(raw) is not bytes or not 5 <= len(raw) <= 1_000_000:
+        _deny()
+    qualify_read_only_source(root)
     try:
         # Actual unchanged pinned parser primitives, not a copied wire parser.
         from wam_sp.psbt import PSBT, Reader, _read_map, _count
