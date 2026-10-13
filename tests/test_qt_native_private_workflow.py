@@ -140,6 +140,30 @@ class NativeQtPrivateWorkflowTests(unittest.TestCase):
             self.assertFalse(value.signing_allowed)
             self.assertNotIn(code, repr(value))
 
+    def test_private_dto_rejects_mixed_projection_and_false_authority(self):
+        """Untrusted GUI caller cannot transform observed atoms into spend rights."""
+        valid_receive = "wamrtsp1" + "q" * 105
+        good = m.PrivateQtWorkflowEvidence(
+            "receive", 7, receive_code=valid_receive,
+        )
+        self.assertNotIn(valid_receive, repr(good))
+        self.assertFalse(good.wallet_operational)
+        for values in (
+            dict(operation="receive", tip_height=7,
+                 receive_code=valid_receive, observed_atoms=1),
+            dict(operation="balance", tip_height=7,
+                 observed_atoms=True),
+            dict(operation="balance", tip_height=7,
+                 observed_atoms=-1),
+            dict(operation="balance", tip_height=7,
+                 observed_atoms=5, signing_allowed=True),
+            dict(operation="history", tip_height=7,
+                 receive_code=valid_receive),
+        ):
+            with self.subTest(values=values):
+                with self.assertRaises(m.QtPrivateWorkflowError):
+                    m.PrivateQtWorkflowEvidence(**values)
+
     def test_receive_balance_mixed_and_forged_receipts_denied(self):
         if sys.platform != "linux":
             return
