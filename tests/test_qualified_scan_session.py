@@ -34,6 +34,33 @@ class FailingEngine:
 
 
 class QualifiedScanBoundaryTests(unittest.TestCase):
+    def test_private_history_dto_rejects_invalid_rows(self):
+        for fields in (("x" * 64, 1, 1, 100, 0),
+                       ("a" * 64, 1, 0, 100, 0),
+                       ("a" * 64, 1, 1, 0, 0)):
+            with self.assertRaises(app.QualifiedScanError):
+                app.PrivateHistoryRow(*fields)
+        good = app.PrivateHistoryRow("b" * 64, 1, 1, 100, 0)
+        self.assertNotIn("b" * 64, repr(good))
+        self.assertFalse(app.PrivateHistoryPage((good,), 1, 0).signer_enabled)
+
+    def test_invalid_history_limit_denied_before_any_scanner_io(self):
+        _, session = self.session()
+        for kwargs in ({"limit": 0}, {"limit": True},
+                       {"limit": 101}, {"offset": -1}):
+            with self.assertRaisesRegex(app.QualifiedScanError,
+                                        "^APP_QUALIFIED_SCAN_HISTORY_INPUT_DENIED$"):
+                session.history(user_consented=True, **kwargs)
+        self.assertFalse(session.closed)
+
+    def test_unscanned_history_fails_closed(self):
+        engine, session = self.session()
+        with self.assertRaisesRegex(app.QualifiedScanError,
+                                    "^APP_QUALIFIED_SCAN_NOT_CURRENT$"):
+            session.history(user_consented=True)
+        self.assertTrue(engine.closed)
+        self.assertTrue(session.closed)
+
     def runtime(self, **changes):
         kwargs = dict(user_consented=True)
         kwargs.update(changes)
