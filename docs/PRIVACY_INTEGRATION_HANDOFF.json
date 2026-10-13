@@ -1,0 +1,744 @@
+{
+  "schema": "wam-privacy-wallet-sprint-handoff/v1",
+  "start_main": "51d523f05c082a4935145477c774ec2b38e2e832",
+  "final_main": "66161a021a9782f03cbb14fd33a7e4be7ee3db9b",
+  "final_tree": "d2d8fdb559fee92828ff1ecbcf613b0895c4f3cb",
+  "source_commits": {
+    "privacy": "db3d2dcaa540f1129d540101813b761167d33174",
+    "wsp": "ac55f13423620252bdbf848c7e8a280c3b84721e",
+    "security": "c9b1ce872c2b0b65276883d4e210b6a2f7c96467",
+    "silent_wallet_inventory_only": "44e749a5c8fde82f672d0bc9d11e43af4e52c673",
+    "core_main": "c85259102a366caf62ea82837775f9bd47af1efc",
+    "core_release_tag_commit": "8a3f4fe4f1d804c378f795d4cc281ec5125f75f3"
+  },
+  "upstream_wsp_pr3": {
+    "state": "OPEN_DRAFT_HOLD",
+    "head": "396f444e3a5f1b8f3105144c6fa8dd7e465e7fae"
+  },
+  "units": [
+    {
+      "pr": 190,
+      "head": "2b9447931e079debb639717cdff323987a7f31ed",
+      "merge": "ab0ee910ecee645cad65e7656cdbbc9992aeaf39",
+      "checks": [
+        {
+          "name": "Verify pinned WAM Core source and current main (GET only)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38364143484/job/115187723879"
+        },
+        {
+          "name": "CodeQL",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/runs/115185326378"
+        },
+        {
+          "name": "GUI + full test discovery / ubuntu-latest",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38364143484/job/115185118477"
+        },
+        {
+          "name": "GUI + full test discovery / macos-latest",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38364143484/job/115185118449"
+        },
+        {
+          "name": "Offline contracts / windows-latest / x64",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38364143484/job/115185118420"
+        },
+        {
+          "name": "GUI + full test discovery / windows-latest",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38364143484/job/115185118384"
+        },
+        {
+          "name": "Offline contracts / windows-latest / x86",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38364143484/job/115185118240"
+        },
+        {
+          "name": "Offline contracts / macos-latest / x64",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38364143484/job/115185118228"
+        },
+        {
+          "name": "Offline contracts / ubuntu-latest / x64",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38364143484/job/115185118125"
+        },
+        {
+          "name": "Actual source-pinned unsigned PSBTv2 / windows-latest / x64",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38364143481/job/115185117950"
+        },
+        {
+          "name": "Actual source-pinned unsigned PSBTv2 / macos-latest / x64",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38364143481/job/115185117911"
+        },
+        {
+          "name": "Actual source-pinned unsigned PSBTv2 / ubuntu-latest / x64",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38364143481/job/115185117899"
+        },
+        {
+          "name": "Windows x86 parser UNQUALIFIED / denial only",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38364143481/job/115185117629"
+        },
+        {
+          "name": "Analyze (actions)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38364140923/job/115185113824"
+        },
+        {
+          "name": "Analyze (python)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38364140923/job/115185113776"
+        },
+        {
+          "name": "Analyze (rust)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38364140923/job/115185113536"
+        }
+      ],
+      "wallet_run": 38364143484,
+      "feature_run": 38364143481,
+      "codeql_run": 38364140923
+    },
+    {
+      "pr": 191,
+      "head": "ccf28ae371b1e5d5464c09aca40c14512900687f",
+      "merge": "137efdd4e1ff9244d0aa44bf46c72aa2011e5c45",
+      "checks": [
+        {
+          "name": "Verify pinned WAM Core source and current main (GET only)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38365318809/job/115191383302"
+        },
+        {
+          "name": "CodeQL",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/runs/115189140059"
+        },
+        {
+          "name": "Offline contracts / windows-latest / x86",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38365318809/job/115188933312"
+        },
+        {
+          "name": "GUI + full test discovery / ubuntu-latest",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38365318809/job/115188933273"
+        },
+        {
+          "name": "Offline contracts / ubuntu-latest / x64",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38365318809/job/115188933266"
+        },
+        {
+          "name": "Offline contracts / macos-latest / x64",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38365318809/job/115188933210"
+        },
+        {
+          "name": "Offline contracts / windows-latest / x64",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38365318809/job/115188933079"
+        },
+        {
+          "name": "GUI + full test discovery / macos-latest",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38365318809/job/115188933066"
+        },
+        {
+          "name": "GUI + full test discovery / windows-latest",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38365318809/job/115188932789"
+        },
+        {
+          "name": "Analyze (actions)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38365316546/job/115188930032"
+        },
+        {
+          "name": "Analyze (rust)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38365316546/job/115188929756"
+        },
+        {
+          "name": "Analyze (python)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38365316546/job/115188929521"
+        }
+      ],
+      "wallet_run": 38365318809,
+      "codeql_run": 38365316546
+    },
+    {
+      "pr": 192,
+      "head": "c0b4be1ba19ad03559314197b036ea9326512ccf",
+      "merge": "21ab2b5df08fac6d618443999819c802f6202bb2",
+      "checks": [
+        {
+          "name": "Verify pinned WAM Core source and current main (GET only)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38366320890/job/115195467816"
+        },
+        {
+          "name": "Offline contracts / windows-latest / x64",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38366320890/job/115192533665"
+        },
+        {
+          "name": "Offline contracts / windows-latest / x86",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38366320890/job/115192533529"
+        },
+        {
+          "name": "Offline contracts / macos-latest / x64",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38366320890/job/115192533461"
+        },
+        {
+          "name": "GUI + full test discovery / windows-latest",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38366320890/job/115192533334"
+        },
+        {
+          "name": "Offline contracts / ubuntu-latest / x64",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38366320890/job/115192533287"
+        },
+        {
+          "name": "GUI + full test discovery / ubuntu-latest",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38366320890/job/115192533268"
+        },
+        {
+          "name": "GUI + full test discovery / macos-latest",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38366320890/job/115192533141"
+        },
+        {
+          "name": "CodeQL",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/runs/115192349750"
+        },
+        {
+          "name": "Native preview / linux-x64",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38366320776/job/115192202858"
+        },
+        {
+          "name": "Windows x86 WSP scanner UNQUALIFIED / denial only",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38366320791/job/115192202762"
+        },
+        {
+          "name": "Actual pinned WSP-1 scanner-only / macos-latest / x64",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38366320791/job/115192202715"
+        },
+        {
+          "name": "Actual pinned WSP-1 scanner-only / windows-latest / x64",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38366320791/job/115192202711"
+        },
+        {
+          "name": "Native preview / windows-x64",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38366320776/job/115192202689"
+        },
+        {
+          "name": "Actual pinned WSP-1 scanner-only / ubuntu-latest / x64",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38366320791/job/115192202641"
+        },
+        {
+          "name": "Native preview / macos-arm64",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38366320776/job/115192202607"
+        },
+        {
+          "name": "Actual pinned WSP-1 Scanner.sync with local synthetic RPC (NO Core)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38366320791/job/115192202392"
+        },
+        {
+          "name": "Native preview / macos-x64",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38366320776/job/115192202310"
+        },
+        {
+          "name": "Analyze (python)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38366316758/job/115192194983"
+        },
+        {
+          "name": "Analyze (actions)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38366316758/job/115192194890"
+        },
+        {
+          "name": "Analyze (rust)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38366316758/job/115192194594"
+        }
+      ],
+      "wallet_run": 38366320890,
+      "feature_run": 38366320791,
+      "preview_run": 38366320776,
+      "codeql_run": 38366316758
+    },
+    {
+      "pr": 193,
+      "head": "6fa2091de098d7fb3e5e8404db43101a2e7a504c",
+      "merge": "66161a021a9782f03cbb14fd33a7e4be7ee3db9b",
+      "wallet_run": 38367920756,
+      "feature_run": 38367920731,
+      "codeql_run": 38367919130,
+      "checks": [
+        {
+          "name": "Verify pinned WAM Core source and current main (GET only)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38367920756/job/115200638544"
+        },
+        {
+          "name": "CodeQL",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/runs/115197580047"
+        },
+        {
+          "name": "Offline contracts / ubuntu-latest / x64",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38367920756/job/115197427516"
+        },
+        {
+          "name": "Offline contracts / windows-latest / x86",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38367920756/job/115197427480"
+        },
+        {
+          "name": "GUI + full test discovery / macos-latest",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38367920756/job/115197427397"
+        },
+        {
+          "name": "GUI + full test discovery / ubuntu-latest",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38367920756/job/115197427392"
+        },
+        {
+          "name": "Offline contracts / windows-latest / x64",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38367920756/job/115197427347"
+        },
+        {
+          "name": "Offline contracts / macos-latest / x64",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38367920756/job/115197427339"
+        },
+        {
+          "name": "Actual source-pinned unsigned PSBTv2 / windows-latest / x64",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38367920731/job/115197427331"
+        },
+        {
+          "name": "Actual source-pinned unsigned PSBTv2 / ubuntu-latest / x64",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38367920731/job/115197427255"
+        },
+        {
+          "name": "Actual source-pinned unsigned PSBTv2 / macos-latest / x64",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38367920731/job/115197427196"
+        },
+        {
+          "name": "GUI + full test discovery / windows-latest",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38367920756/job/115197427089"
+        },
+        {
+          "name": "Windows x86 parser UNQUALIFIED / denial only",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38367920731/job/115197426813"
+        },
+        {
+          "name": "Analyze (rust)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38367919130/job/115197425472"
+        },
+        {
+          "name": "Analyze (actions)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38367919130/job/115197425328"
+        },
+        {
+          "name": "Analyze (python)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38367919130/job/115197425150"
+        }
+      ]
+    }
+  ],
+  "changed_files": [
+    ".github/workflows/psbt-v2-native-readonly.yml",
+    ".github/workflows/wsp1-real-scanner-synthetic-regtest.yml",
+    "README.md",
+    "docs/ARCHITECTURE.md",
+    "docs/ARCHITECTURE_V1_PLAN.md",
+    "docs/ARCHITECTURE_V1_TRACEABILITY.json",
+    "docs/NETWORK_PRIVACY_APPLICATION_POLICY.md",
+    "docs/PAYJOIN_CANONICAL_WITNESS_REVIEW.md",
+    "docs/PRIVACY_INTEGRATION_2026_10_13.md",
+    "docs/ROADMAP.md",
+    "docs/SELECTED_HISTORY_LOCAL_EXPORT.md",
+    "docs/THREAT_MODEL.md",
+    "src/wam_privacy_wallet/application/_payjoin_psbt_worker.py",
+    "src/wam_privacy_wallet/application/_psbt_v2_worker.py",
+    "src/wam_privacy_wallet/application/network_plan_review.py",
+    "src/wam_privacy_wallet/application/payjoin_proposal_review.py",
+    "src/wam_privacy_wallet/application/selected_history_export.py",
+    "src/wam_privacy_wallet/gui/regtest_window.py",
+    "tests/test_architecture_v1_traceability.py",
+    "tests/test_ci_contract_gate.py",
+    "tests/test_network_plan_review.py",
+    "tests/test_payjoin_proposal_review.py",
+    "tests/test_regtest_gui.py",
+    "tests/test_selected_history_export.py",
+    "tools/architecture_v1_gate.py",
+    "tools/ci_contract_gate.py",
+    "tools/ci_pinned_psbt_v2.py",
+    "tools/ci_qualified_scan_session.py",
+    "tools/gui_ci_contract_gate.py"
+  ],
+  "issues": [
+    {
+      "number": 82,
+      "state": "open",
+      "title": "CORE-EXEC-082: signed node member → immutable regtest launch binding"
+    },
+    {
+      "number": 86,
+      "state": "open",
+      "title": "CORE-BUILD-EXECSTACK: official WAM v0.1.11 Linux GNU_STACK RWE needs DEV review"
+    },
+    {
+      "number": 153,
+      "state": "open",
+      "title": "CORE-CONFIG: qualify generated wam.conf against same signed wamd --help and safe regtest defaults"
+    },
+    {
+      "number": 9,
+      "state": "open",
+      "title": "REGTEST-E2E-001: real WAM Core qualification with pinned binary and isolated two-node fixture"
+    },
+    {
+      "number": 148,
+      "state": "open",
+      "title": "Design: versioned WSP encrypted checkpoints, rotation, crash consistency and external anti-rollback anchor"
+    },
+    {
+      "number": 151,
+      "state": "open",
+      "title": "Design #151: external monotonic checkpoint anchor, CAS rotation and crash/recovery threat matrix"
+    },
+    {
+      "number": 120,
+      "state": "open",
+      "title": "V1-PRIVACY-001: integrate PayJoin, selective disclosure and network route policies behind explicit consent"
+    }
+  ],
+  "existing_open_prs": [
+    {
+      "number": 184,
+      "branch": "feat/core-successor-offline-signed-intake",
+      "head": "ef3402f0ee68bea71b9ce16b5d82b74dba29bc5c",
+      "draft": false,
+      "title": "feat(core): offline DEV-signed successor intake with immutable release/static config review"
+    },
+    {
+      "number": 84,
+      "branch": "security/core-signed-elf-loader-preflight",
+      "head": "5f75177d470cbc4c5bd623711fce5e528a07cad8",
+      "draft": true,
+      "title": "security(core): static ELF64 loader preflight on actual signed NOEXEC WAM bytes"
+    },
+    {
+      "number": 66,
+      "branch": "storage/offline-recovery-disposition-20261011",
+      "head": "04b00608ec8249db8be12cc8adef7221e4411953",
+      "draft": true,
+      "title": "feat(storage): enforce fail-closed offline WSP recovery disposition"
+    },
+    {
+      "number": 65,
+      "branch": "integration/scanner-window-offline-20261011",
+      "head": "62353fcb09a7c75e6a2077898fd05135700f7c9f",
+      "draft": true,
+      "title": "feat(scanner): fail-closed synthetic multi-block window coherence"
+    },
+    {
+      "number": 64,
+      "branch": "integration/scanner-response-shape-offline-20261011",
+      "head": "dba9466782089673d0936c975f8443905d2fd668",
+      "draft": true,
+      "title": "feat(scanner): pin bounded offline reply-shape contract before RPC bridge"
+    },
+    {
+      "number": 61,
+      "branch": "security/g1-core-preflight-nonauthority-20261011",
+      "head": "b50b8867c5ef45356d8f8630c57e9c842eaa9382",
+      "draft": true,
+      "title": "security(g1): make Core preflight qualification evidence non-authorizing"
+    },
+    {
+      "number": 60,
+      "branch": "app/offline-presentation-lifecycle-20261011",
+      "head": "df201335fd5fa0504090bf9e4f45526e6111642e",
+      "draft": true,
+      "title": "feat(app): fail-closed offline presentation lifecycle and GUI regression gates"
+    },
+    {
+      "number": 51,
+      "branch": "security/g1-binary-fd-prehash-race-20261011",
+      "head": "7fafef52450cc0a3ed9ff274d3369c86bf52a116",
+      "draft": true,
+      "title": "security(g1): detect binary path swaps during SHA verification — OFFLINE/HOLD"
+    },
+    {
+      "number": 50,
+      "branch": "security/g1-cookie-after-g1-05-20261011",
+      "head": "66d3577a40758813bf086ad78f0896abde859d67",
+      "draft": true,
+      "title": "security(g1): review cookie descriptor race mitigation after G1-05 — HOLD"
+    },
+    {
+      "number": 34,
+      "branch": "docs/governance-g1-safe-integration-gates",
+      "head": "4ef0356c91b4940fdb6be0e609cb2e187f822a61",
+      "draft": true,
+      "title": "docs(governance): main protection runbook and reviewed G1 integration queue"
+    },
+    {
+      "number": 18,
+      "branch": "dependabot/github_actions/actions/setup-python-7",
+      "head": "e9aa72e250f1b37b110614ba4a79cdf7a6294504",
+      "draft": false,
+      "title": "build(deps): bump actions/setup-python from 5 to 7"
+    },
+    {
+      "number": 17,
+      "branch": "dependabot/github_actions/actions/checkout-7",
+      "head": "a08dfa01be454c0fb6f5cb34565a93b96183aa71",
+      "draft": false,
+      "title": "build(deps): bump actions/checkout from 4 to 7"
+    },
+    {
+      "number": 16,
+      "branch": "research/010-scanner-read-rpc-contract",
+      "head": "ef3f9a8ed6aeb6bca4053936b963eeb63e4612c5",
+      "draft": true,
+      "title": "Phase 010 (research): fail-closed offline WSP scanner read-RPC shape contract"
+    },
+    {
+      "number": 3,
+      "branch": "feat/003-wsp1-pinned-probe",
+      "head": "59820c2208a2563b0b968c1e88490ade06ce14e2",
+      "draft": true,
+      "title": "Phase 003: pinned WSP-1 engine provenance and public API gate"
+    }
+  ],
+  "local_static_core": {
+    "evidence": "LOCAL_STATIC_RECHECK_NO_EXEC",
+    "archive_sha256": "bd010ed615ab8063d5c12aa61236311ece7e9d19896d9541dacba1888dd9987a",
+    "member_sha256": "625609c08afef441e9dddd71330dcab1cec112d6fabe361769b9907f0efe7ab4",
+    "member_bytes": 12132344,
+    "gnu_stack": "RWE",
+    "example_wam_conf_present": false,
+    "executed_core": false,
+    "help_executed": false,
+    "signature_reverified_this_sprint": false,
+    "all_runtime_scenarios": "NOT_RUN"
+  },
+  "operational_core_execution": false,
+  "mainnet_allowed": false,
+  "signing_allowed": false,
+  "broadcast_allowed": false,
+  "core_003_integrated": false,
+  "external_rollback_acceptance": false,
+  "work_credit_balance_exposed": false,
+  "numeric_credit_consumption_claimed": false,
+  "full_discovery_final_pr": {
+    "observed": 1438,
+    "passed": 1438,
+    "job": 115197427392
+  },
+  "native_psbt_payjoin_qt": {
+    "observed": 34,
+    "passed": 34,
+    "job": 115197427255,
+    "evidence": "REAL_PINNED_SOURCE_SYNTHETIC_TRANSACTIONS"
+  },
+  "native_wsp_sqlite_qt": {
+    "observed": 19,
+    "passed": 19,
+    "job": 115192202392,
+    "evidence": "REAL_PINNED_SOURCE_SYNTHETIC_CHAIN_RPC"
+  },
+  "unmerged_sprint_code": [],
+  "checkpoint_branch": {
+    "name": "docs/2026-10-13-credit-sprint-handoff",
+    "parent": "a27a9cde399ec41649d3df2979f3c1c435093aa3",
+    "purpose": "Intentional documentation-only artifact, not code integration; resume code from final main."
+  },
+  "verified_at": "2026-10-13T08:33:56.085Z",
+  "final_release_list": [
+    {
+      "tag": "v0.1.11",
+      "published": "2026-09-27T14:53:56Z",
+      "prerelease": true
+    },
+    {
+      "tag": "v0.1.10",
+      "published": "2026-09-25T17:05:24Z",
+      "prerelease": true
+    }
+  ],
+  "post_merge_checks": [
+    {
+      "name": "Verify pinned WAM Core source and current main (GET only)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38368972433/job/115203674079"
+    },
+    {
+      "name": "Offline contracts / ubuntu-latest / x64",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38368972433/job/115200912323"
+    },
+    {
+      "name": "GUI + full test discovery / macos-latest",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38368972433/job/115200912287"
+    },
+    {
+      "name": "GUI + full test discovery / windows-latest",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38368972433/job/115200912237"
+    },
+    {
+      "name": "Offline contracts / macos-latest / x64",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38368972433/job/115200912228"
+    },
+    {
+      "name": "Offline contracts / windows-latest / x86",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38368972433/job/115200912158"
+    },
+    {
+      "name": "Offline contracts / windows-latest / x64",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38368972433/job/115200912071"
+    },
+    {
+      "name": "Analyze (python)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38368971433/job/115200912065"
+    },
+    {
+      "name": "Analyze (rust)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38368971433/job/115200911950"
+    },
+    {
+      "name": "GUI + full test discovery / ubuntu-latest",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38368972433/job/115200911735"
+    },
+    {
+      "name": "Analyze (actions)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38368971433/job/115200911684"
+    }
+  ],
+  "post_merge_wallet_run": 38368972433,
+  "post_merge_codeql_run": 38368971433
+}
