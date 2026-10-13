@@ -276,7 +276,7 @@ class RegtestWorkerController(QObject):
                 consent is not True or unverified_core_ack is not True or
                 private_display_ack is not True or
                 type(operation) is not str or
-                operation not in ("history", "checkpoint", "restore")):
+                operation not in ("history", "checkpoint", "restore", "receive", "balance")):
             raise RegtestLifecycleError("APP_REGTEST_PRIVATE_SCOPE_DENIED")
         try:
             kwargs = dict(
