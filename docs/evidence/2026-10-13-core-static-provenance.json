@@ -1,0 +1,17 @@
+{
+  "artifact_id": 11792947270,
+  "artifact_zip_sha256": "c420ad9f8d107c1751dc2ced4bde034e2a9dc08842e1039493223329d8ae56d7",
+  "core_executed": false,
+  "download_digest_verified": true,
+  "manifest_from_actual_ci": true,
+  "manifest_sha256": "d20885cb7581cc2d28e6abd6daa6d72c0e0df38c8d9b71022c2173cc5797a4e0",
+  "merged_main": "38aff2bffa5fee555b01e1690476f2863a312b4a",
+  "pr": 188,
+  "pr_head": "7105708b2c2f6afbcc82ded15cde0390b41735f5",
+  "real_core_e2e_qualified": false,
+  "repository": "Urriki1502/wam-privacy-wallet",
+  "schema": 1,
+  "tested_checkout_merge_sha": "b8423029f9a3965f840af97c949907d9fd2b2225",
+  "workflow_run_id": 38355855265,
+  "workflow_url": "https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38355855265"
+}
