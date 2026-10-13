@@ -5,7 +5,11 @@ transport, endpoint identity, Core connection or permission to send.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from ipaddress import ip_address, IPv6Address
+import re
+
+from ..node.endpoint import LocalRegtestEndpoint
 
 from .synthetic_policy_demo import _verify_source_bytes
 from .synthetic_input_shape import has_exact_primitive_fields
@@ -26,6 +30,7 @@ class NetworkPlanReview:
     scan_allowed: bool = False
     sign_allowed: bool = False
     broadcast_allowed: bool = False
+    runtime_status: str = field(default="NOT_QUALIFIED_NO_CONNECTION", init=False)
 
 
 def review_synthetic_network_plan(
@@ -57,6 +62,34 @@ def review_synthetic_network_plan(
                 "encrypted_transport", "authenticated_transport", "fallback"
             )):
                 raise ValueError
+            # The application supports one explicit route per operation. The
+            # upstream model only forbids DIRECT fallbacks; private or scan
+            # fallbacks still need runtime qualification and cannot be selected.
+            if row["fallback"] is not False:
+                raise ValueError
+            host = row["host"]
+            if row["role"] == "chain_scan":
+                # Reuse the actual RPC descriptor boundary (numeric loopback,
+                # no DNS, zone identifier or mapped-address ambiguity).
+                LocalRegtestEndpoint(host, row["port"])
+            else:
+                # Require a canonical identity so DNS case/trailing-dot/IP
+                # aliases cannot evade upstream public-role separation.
+                try:
+                    address = ip_address(host)
+                except ValueError:
+                    if (host != host.lower() or len(host) > 253
+                            or any(re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", label) is None
+                                   for label in host.split("."))):
+                        raise ValueError
+                else:
+                    if (str(address) != host or address.is_loopback
+                            or isinstance(address, IPv6Address) and address.ipv4_mapped is not None):
+                        raise ValueError
+                if row["route"] not in ("tor", "i2p", "ohttp"):
+                    raise ValueError
+                if row["role"] == "payjoin_directory" and not async_payjoin:
+                    raise ValueError
         _verify_source_bytes()
         from ..research_models.network_privacy.model import Endpoint, NetworkPlan, NetworkPolicy
         from ..research_models.network_privacy.policy import validate_network_plan

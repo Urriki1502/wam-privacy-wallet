@@ -138,6 +138,41 @@ class NetworkPlanReviewTests(unittest.TestCase):
         with self.assertRaises(FrozenInstanceError):
             receipt.broadcast_allowed = True
 
+    def test_any_private_or_scan_fallback_denied_before_upstream(self):
+        for role, host, route in (("chain_scan","remote.invalid","tor"),("chain_scan","127.0.0.2","local"),("tx_broadcast","backup.invalid","i2p")):
+            with patch("wam_privacy_wallet.application.network_plan_review._verify_source_bytes") as source:
+                self.denied(plan()+(endpoint(role,host,route,fallback=True),))
+                source.assert_not_called()
+
+    def test_scan_reuses_numeric_local_rpc_boundary(self):
+        a,b=plan()
+        for host in ("localhost","127.0.0.1.invalid","::ffff:127.0.0.1","::1%eth0"):
+            a["host"]=host;self.denied((a,b))
+        for host in ("127.0.0.2","::1"):
+            a["host"]=host;self.review((a,b))
+
+    def test_ambiguous_public_endpoint_identity_denied(self):
+        a,b=plan()
+        for host in ("BROADCAST.invalid","broadcast.invalid.","user:password@host.invalid","https://host.invalid","host.invalid/path","-bad.invalid","host..invalid","2001:0db8::1"):
+            b["host"]=host;self.denied((a,b))
+
+    def test_unused_or_direct_directory_cannot_broaden_scope(self):
+        self.denied(plan()+(endpoint("payjoin_directory","directory.invalid","ohttp"),))
+        self.denied(plan()+(endpoint("payjoin_directory","directory.invalid","direct"),),async_payjoin=True)
+
+    def test_route_names_never_imply_available_transport_or_rpc_authority(self):
+        receipt=self.review()
+        self.assertEqual(receipt.runtime_status,"NOT_QUALIFIED_NO_CONNECTION")
+        self.assertFalse(receipt.transport_verified or receipt.scan_allowed or receipt.sign_allowed or receipt.broadcast_allowed)
+
+    def test_sensitive_invalid_endpoint_has_fixed_redacted_denial(self):
+        a,b=plan();b["host"]="user:PRIVATE_SECRET@host.invalid"
+        try:self.review((a,b))
+        except NetworkPlanReviewError as exc:
+            self.assertEqual(str(exc),"APP_NETWORK_PLAN_REVIEW_DENIED")
+            self.assertNotIn("PRIVATE_SECRET",repr(exc))
+        else:self.fail("sensitive endpoint accepted")
+
 
 if __name__ == '__main__':
     unittest.main()
