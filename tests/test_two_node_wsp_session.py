@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from wam_privacy_wallet.application import two_node_wsp_session as subject
+from wam_privacy_wallet.node.attestation import ChainIdentity, WAM_REGTEST_GENESIS
 from wam_privacy_wallet.node.endpoint import LocalRegtestEndpoint
 from wam_privacy_wallet.node.read_rpc import ExplicitRpcAuth
 
@@ -20,6 +21,19 @@ class TwoNodeWspScopeTests(unittest.TestCase):
             node_a_p2p_port=29555, node_b_p2p_port=29557,
             user_consented=True, acknowledge_unverified_binaries=True,
         )
+
+    def test_compare_independent_endpoints_by_chain_not_endpoint(self):
+        identity_a = ChainIdentity(self.a, WAM_REGTEST_GENESIS, 42, "a" * 64)
+        identity_b = ChainIdentity(self.b, WAM_REGTEST_GENESIS, 42, "a" * 64)
+        self.assertNotEqual(identity_a, identity_b)
+        self.assertTrue(subject.same_reported_chain(identity_a, identity_b))
+        self.assertFalse(subject.same_reported_chain(
+            identity_a, ChainIdentity(self.b, WAM_REGTEST_GENESIS, 41, "a" * 64),
+        ))
+        self.assertFalse(subject.same_reported_chain(
+            identity_a, ChainIdentity(self.b, WAM_REGTEST_GENESIS, 42, "b" * 64),
+        ))
+        self.assertFalse(subject.same_reported_chain(identity_a, identity_a))
 
     def test_all_scope_denials_before_network(self):
         variants = [

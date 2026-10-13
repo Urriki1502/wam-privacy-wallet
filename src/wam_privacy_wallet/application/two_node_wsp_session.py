@@ -9,10 +9,22 @@ from __future__ import annotations
 from pathlib import Path
 
 from wam_privacy_wallet.application.live_regtest_scanner import scan_existing_regtest
+from wam_privacy_wallet.node.attestation import ChainIdentity
 from wam_privacy_wallet.node.endpoint import LocalRegtestEndpoint
 from wam_privacy_wallet.node.read_rpc import ExplicitRpcAuth
 from wam_privacy_wallet.node.regtest_gateway import LocalRegtestIdentityGateway
 from wam_privacy_wallet.node.two_node_p2p_readonly import TwoNodeP2PReadOnlyAudit
+
+
+def same_reported_chain(a: ChainIdentity, b: ChainIdentity) -> bool:
+    """Two distinct endpoints must never compare equal by endpoint identity."""
+    return (
+        type(a) is ChainIdentity and type(b) is ChainIdentity
+        and a.endpoint != b.endpoint
+        and a.genesis == b.genesis
+        and a.height == b.height
+        and a.best_block_hash == b.best_block_hash
+    )
 
 
 class TwoNodeWspSessionError(ValueError):
@@ -66,9 +78,7 @@ def scan_two_existing_regtest_nodes(
         topology.audit()
         first_a = gateway_a.probe_core_profile()
         first_b = gateway_b.probe_core_profile()
-        if (first_a.identity.genesis != first_b.identity.genesis
-            or first_a.identity.height != first_b.identity.height
-            or first_a.identity.best_block_hash != first_b.identity.best_block_hash):
+        if not same_reported_chain(first_a.identity, first_b.identity):
             raise TwoNodeWspSessionError("TWO_NODE_WSP_CHAIN_DIVERGED")
         scan = scan_existing_regtest(
             source_root, private_dir, scan_password,
@@ -92,9 +102,7 @@ def scan_two_existing_regtest_nodes(
         # Scanning against one snapshot while the other node changes is not
         # an accepted two-node session; require a retry with fresh RPC views.
         if (first_a != second_a or first_b != second_b
-                or (second_a.identity.genesis != second_b.identity.genesis
-                    or second_a.identity.height != second_b.identity.height
-                    or second_a.identity.best_block_hash != second_b.identity.best_block_hash)
+                or not same_reported_chain(second_a.identity, second_b.identity)
                 or (scan["chain_current"] and
                     scan["tip_height"] != second_a.identity.height)):
             raise TwoNodeWspSessionError("TWO_NODE_WSP_MOVED_DENIED")
