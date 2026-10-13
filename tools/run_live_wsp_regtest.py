@@ -23,6 +23,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--rpc-port", type=int, required=True)
     parser.add_argument("--rpc-user", required=True)
     parser.add_argument("--max-blocks", type=int, default=16)
+    parser.add_argument("--receive-account-index", type=int,
+                        help="Opt in to show local receive code after a current scan (0–15)")
+    parser.add_argument("--show-observed-balance", action="store_true",
+                        help="Opt in to unqualified confirmed atoms; NOT a spendable balance")
     parser.add_argument("--history-limit", type=int,
                         help="Opt in to private local transaction history (1–100)")
     parser.add_argument("--save-checkpoint", action="store_true",
@@ -50,6 +54,8 @@ def main(argv: list[str] | None = None) -> int:
             history_limit=args.history_limit,
             save_checkpoint=args.save_checkpoint,
             restore_checkpoint=args.restore_checkpoint,
+            receive_account_index=args.receive_account_index,
+            show_observed_balance=args.show_observed_balance,
         )
     except (ValueError, LiveRegtestScanError, EOFError, KeyboardInterrupt):
         print("LIVE_REGTEST_WSP_SCAN_DENIED", file=sys.stderr)

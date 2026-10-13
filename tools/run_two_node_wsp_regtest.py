@@ -27,6 +27,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--node-b-p2p-port", type=int, required=True)
     parser.add_argument("--node-b-rpc-user", required=True)
     parser.add_argument("--max-blocks", type=int, default=16)
+    parser.add_argument("--receive-account-index", type=int,
+                        help="Opt in to show local receive code after both nodes agree")
+    parser.add_argument("--show-observed-balance", action="store_true",
+                        help="Opt in to unqualified confirmed atoms; NOT spendable")
     parser.add_argument("--history-limit", type=int)
     parser.add_argument("--save-checkpoint", action="store_true")
     parser.add_argument("--restore-checkpoint", action="store_true")
@@ -55,6 +59,8 @@ def main(argv: list[str] | None = None) -> int:
             max_blocks=opts.max_blocks, history_limit=opts.history_limit,
             save_checkpoint=opts.save_checkpoint,
             restore_checkpoint=opts.restore_checkpoint,
+            receive_account_index=opts.receive_account_index,
+            show_observed_balance=opts.show_observed_balance,
         )
     except (ValueError, EOFError, KeyboardInterrupt):
         print("TWO_NODE_WSP_SESSION_DENIED", file=sys.stderr)

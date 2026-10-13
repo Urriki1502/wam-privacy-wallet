@@ -50,6 +50,9 @@ class TwoNodeWspScopeTests(unittest.TestCase):
             dict(max_blocks=0),
             dict(history_limit=True),
             dict(history_limit=101),
+            dict(receive_account_index=True),
+            dict(receive_account_index=16),
+            dict(show_observed_balance=1),
             dict(save_checkpoint=True, restore_checkpoint=True),
         ]
         with patch.object(subject, "TwoNodeP2PReadOnlyAudit") as audit:
@@ -99,6 +102,7 @@ class TwoNodeWspScopeTests(unittest.TestCase):
             "broadcast_allowed": False,
             "mainnet_allowed": False,
             "chain_current": True, "tip_height": 42,
+            "real_two_node_regtest_qualified": False,
         }
         with patch.object(subject, "TwoNodeP2PReadOnlyAudit") as topology, \
              patch.object(subject, "LocalRegtestIdentityGateway") as gateways, \
@@ -158,3 +162,5 @@ class TwoNodeWspScopeTests(unittest.TestCase):
             self.assertNotIn(prohibited, params)
         self.assertIn("history_limit", params)
         self.assertIn("restore_checkpoint", params)
+        self.assertIn("receive_account_index", params)
+        self.assertIn("show_observed_balance", params)
