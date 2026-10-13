@@ -2,7 +2,8 @@
 
 Disposable WSP Keyring in the CI funding test; actual pinned upstream
 TTY-only signer EXECUTED IN A DISTINCT PYTHON PROCESS, using a PTY.
-OS network isolation is not attested. No Core execution, real
+Native Linux child seccomp denies socket+exec syscalls. No complete OS
+filesystem or process-image attestation. No Core execution, real
 funds, broadcast, mainnet or executable provenance claims.
 """
 from __future__ import annotations
@@ -26,6 +27,7 @@ from wam_privacy_wallet.application.encrypted_scan_backup import (
     provision_encrypted_scan_backup,
 )
 from tools.ci_wsp_offline_signer_tty import run_offline_signer_tty
+from tools.ci_wsp_offline_signer_seccomp_probe import probe_child_seccomp
 from wam_privacy_wallet.application.offline_signed_psbt_review import (
     review_signed_regtest_psbt, SignedPsbtReviewError,
 )
@@ -48,6 +50,7 @@ def run(source_root: Path) -> None:
     from wam_sp.wallet import decode_request
     from wam_sp.psbt import PSBT
 
+    probe_child_seccomp()  # no network, exec or namespace bypass fallback
     keyring = Keyring(bytes(range(32)))  # disposable deterministic regtest only
     account = keyring.accounts()[0]
     scanner_backup = export_scan((account,), _SCAN)
@@ -156,7 +159,8 @@ def run(source_root: Path) -> None:
             assert not server.violations, "SYNTHETIC_RPC_SCOPE_VIOLATION"
             print("PINNED_WSP_SIGNED_PSBT_SIGNATURE_AND_INTENT_REVIEW_OK")
             print("PINNED_WSP_OFFLINE_SIGNER_CLI_CHILD_TTY_APPROVAL_AND_REVIEW_OK")
-            print("SYNTHETIC_CHAIN_ONLY_NO_CORE_E2E_NO_OS_NETWORK_ISOLATION")
+            print("WSP_SIGNER_CHILD_SECCOMP_NET_EXEC_DENIAL_PASS")
+            print("SYNTHETIC_CHAIN_ONLY_NO_CORE_E2E_NO_FILESYSTEM_ISOLATION")
     finally:
         server.shutdown()
         server.server_close()
