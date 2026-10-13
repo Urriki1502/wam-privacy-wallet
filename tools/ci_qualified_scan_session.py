@@ -37,6 +37,14 @@ def _denied(action, code: str) -> None:
         raise AssertionError("ACTUAL_SESSION_DENIAL_MISSING")
 
 
+class _CaseProgress(list):
+    """Fixed test identities only; make partial CI failures diagnosable."""
+
+    def append(self, case):
+        super().append(case)
+        print("PINNED_RETAINED_APP_SESSION_" + case + "_PASS", flush=True)
+
+
 def run(root: Path) -> None:
     if not __debug__:
         raise RuntimeError("ACTUAL_SESSION_OPTIMIZED_TESTS_DENIED")
@@ -72,7 +80,7 @@ def run(root: Path) -> None:
     }
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    passed = []
+    passed = _CaseProgress()
     session = None
     try:
         with TemporaryDirectory(prefix="actual-adapter-public-regtest-") as name:
@@ -234,8 +242,6 @@ def run(root: Path) -> None:
     ]
     if passed != expected:
         raise RuntimeError("ACTUAL_SESSION_CASE_COUNT_DENIED")
-    for case in passed:
-        print("PINNED_RETAINED_APP_SESSION_" + case + "_PASS")
     print("PINNED_RETAINED_APP_SESSION_OK 14/14; synthetic peer only; operational Core/WSP gates held")
 
 
@@ -245,7 +251,18 @@ def main() -> int:
     args = parser.parse_args()
     try:
         run(Path(args.source_root))
-    except Exception:
+    except Exception as error:
+        # Only already-redacted adapter codes or a fixed class category; never
+        # repr/tracebacks, password, path or arbitrary upstream exception text.
+        category = "UNEXPECTED_TEST_FAILURE"
+        if type(error) is QualifiedScanError:
+            code = str(error)
+            if code.startswith("APP_QUALIFIED_SCAN_") and all(
+                    char in "ABCDEFGHIJKLMNOPQRSTUVWXYZ_" for char in code):
+                category = code
+        elif type(error) is AssertionError:
+            category = "TEST_ASSERTION_FAILURE"
+        print("PINNED_RETAINED_APP_SESSION_FAILURE_CATEGORY=" + category, file=sys.stderr)
         print("PINNED_RETAINED_APP_SESSION_DENIED", file=sys.stderr)
         return 2
     return 0
