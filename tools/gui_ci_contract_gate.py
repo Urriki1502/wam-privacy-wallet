@@ -79,6 +79,13 @@ GUI_TEST_IDS = frozenset({
 })
 # Security-critical original non-GUI identities; additive to original suite floors.
 CRITICAL_NON_GUI_IDS = frozenset({
+    "test_macos_encrypted_scan_backup.MacosEncryptedScanBackupTests.test_unsupported_platform_refuses_before_directory_io",
+    "test_macos_encrypted_scan_backup.MacosEncryptedScanBackupTests.test_file_access_acl_refused_even_with_mode_0600",
+    "test_macos_encrypted_scan_backup.MacosEncryptedScanBackupTests.test_native_full_flush_precedes_link_and_directory_fsync",
+    "test_macos_encrypted_scan_backup.MacosEncryptedScanBackupTests.test_stage_replacement_before_unlink_never_deletes_foreign_inode",
+    "test_macos_encrypted_scan_backup.MacosEncryptedScanBackupTests.test_stage_cleanup_failure_denies_and_reader_rejects_extra_link",
+    "test_macos_scan_backup_native.MacosScanBackupNativeBoundaryTests.test_other_platforms_deny_before_source_or_storage",
+    "test_macos_scan_backup_native.MacosScanBackupNativeBoundaryTests.test_optimized_interpreter_cannot_disable_crypto_proof_assertions",
     "test_wsp1_scanner_process_lock.NativeProcessLockBoundaryTests.test_32bit_denies_before_source_dependency_or_wsp_reads",
     "test_wsp1_scanner_process_lock.NativeProcessLockBoundaryTests.test_preloaded_wsp_denies_before_source_or_native_dependency_reads",
     "test_wsp1_scanner_process_lock.NativeProcessLockBoundaryTests.test_optimized_python_cannot_silently_disable_native_proof_assertions",
@@ -339,8 +346,8 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-# Add 25 macOS custody and 20 engineering lease cases without lowering prior floors.
-FULL_MIN_CASES = 1527
+# Cumulative custody, lease, scanner and envelope additions preserve every prior floor.
+FULL_MIN_CASES = 1563
 
 
 def _cases(suite: unittest.TestSuite):
