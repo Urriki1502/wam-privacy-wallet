@@ -1,7 +1,8 @@
 """Actual WSP Schnorr-signed PSBT cryptographic reviewer regression.
 
-Disposable WSP Keyring/Signer in CI ONLY, funded by SYNTHETIC LOCAL RPC.
-Not the approved isolated offline signer process; no Core execution, real
+Disposable WSP Keyring in the CI funding test; actual pinned upstream
+TTY-only signer EXECUTED IN A DISTINCT PYTHON PROCESS, using a PTY.
+OS network isolation is not attested. No Core execution, real
 funds, broadcast, mainnet or executable provenance claims.
 """
 from __future__ import annotations
@@ -24,12 +25,14 @@ from tools.ci_wsp1_scanner_loopback import (
 from wam_privacy_wallet.application.encrypted_scan_backup import (
     provision_encrypted_scan_backup,
 )
+from tools.ci_wsp_offline_signer_tty import run_offline_signer_tty
 from wam_privacy_wallet.application.offline_signed_psbt_review import (
     review_signed_regtest_psbt, SignedPsbtReviewError,
 )
 
 _SCAN = b"ONLY_PUBLIC_DISPOSABLE_SCAN_ACCOUNT_PASSPHRASE"
 _INTENT = b"ONLY_PUBLIC_DISPOSABLE_INTENT_PASSPHRASE"
+_KEY_PASSWORD = b"ONLY_PUBLIC_DISPOSABLE_KEYRING_PASSPHRASE"
 
 
 def run(source_root: Path) -> None:
@@ -42,7 +45,7 @@ def run(source_root: Path) -> None:
     assert proof["status"] == "WSP1_FULL_SOURCE_CLOSURE_VERIFIED_NO_AUTHORITY"
     from wam_sp.core import Input, pub, send
     from wam_sp.keystore import Keyring, export_scan
-    from wam_sp.wallet import decode_request, Signer
+    from wam_sp.wallet import decode_request
     from wam_sp.psbt import PSBT
 
     keyring = Keyring(bytes(range(32)))  # disposable deterministic regtest only
@@ -99,16 +102,27 @@ def run(source_root: Path) -> None:
             request_file = transfer / "wsp-intent-v1.enc"
             encrypted = request_file.read_bytes()
             proposal = decode_request(encrypted, _INTENT)
-            # This is an ephemeral signing REGRESSION ONLY, independent of
-            # the wallet app and NOT a qualified offline signer deployment.
-            signer = Signer(keyring)
-            signed = signer.sign(signer.prepare(proposal),
-                                 proposal.intents, proposal.fee)
-            signed_psbt = PSBT.decode(signed)
-            assert signed_psbt.finalize()  # real Schnorr/BIP352 verification
+            # The real upstream CLI now runs as its own new Python process.
+            # No direct Signer() call is allowed in the application or in this
+            # native regression parent. This proves a file+TTY process handoff
+            # ONLY, not a network sandbox or approved signer OS isolation.
+            keys = transfer / "wsp-test-keys.enc"
+            keys.write_bytes(keyring.backup(_KEY_PASSWORD))
+            keys.chmod(0o600)
             file = transfer / "signed-psbt.b64"
-            file.write_bytes(signed_psbt.base64().encode("ascii"))
-            file.chmod(0o600)
+            refused = run_offline_signer_tty(
+                source_root, keys, request_file, file, key_password=_KEY_PASSWORD,
+                request_password=_INTENT, approve=False,
+            )
+            assert refused is False and not file.exists(), "SIGNER_REFUSAL_BYPASS"
+            approved = run_offline_signer_tty(
+                source_root, keys, request_file, file, key_password=_KEY_PASSWORD,
+                request_password=_INTENT, approve=True,
+            )
+            assert approved is True and file.is_file(), "SIGNER_TTY_APPROVAL_DENIED"
+            assert file.stat().st_mode & 0o777 == 0o600
+            signed_psbt = PSBT.from_base64(file.read_text("ascii"))
+            assert signed_psbt.finalize()  # actual Schnorr + BIP352 proof
             digest = sha256(encrypted).hexdigest()
             receipt = review_signed_regtest_psbt(
                 source_root, request_file, file, _INTENT,
@@ -141,7 +155,8 @@ def run(source_root: Path) -> None:
                 raise AssertionError("INVALID_SIGNATURE_ACCEPTED")
             assert not server.violations, "SYNTHETIC_RPC_SCOPE_VIOLATION"
             print("PINNED_WSP_SIGNED_PSBT_SIGNATURE_AND_INTENT_REVIEW_OK")
-            print("WSP_SIGNED_REVIEW_SYNTHETIC_CHAIN_ONLY_NO_CORE_E2E_OR_SIGNER_ISOLATION")
+            print("PINNED_WSP_OFFLINE_SIGNER_CLI_CHILD_TTY_APPROVAL_AND_REVIEW_OK")
+            print("SYNTHETIC_CHAIN_ONLY_NO_CORE_E2E_NO_OS_NETWORK_ISOLATION")
     finally:
         server.shutdown()
         server.server_close()
