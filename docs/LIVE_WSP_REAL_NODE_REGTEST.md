@@ -41,3 +41,27 @@ Core RPC port 29554 and regtest genesis
 are from official WAM source, with exact source and port drift already checked
 by `compat/wam_core_source_pin.json`. Production wallet operation requires
 genuine two-node Core acceptance and an approved isolated signer.
+
+## Operator workflow (actual RPC and upstream SQLite, no synthetic fallback)
+
+The same command provides a strictly local, opt-in private transaction
+history. Add `--history-limit 20` to return up to twenty upstream SQLite
+rows (txid, confirmed block, confirmations, credit/debit atoms). **This data
+is PRIVATE** and is emitted only to the interactive operator console; it is
+never exported to GUI public receipts or application diagnostics. If the
+block scan is incomplete, history refuses rather than display stale rows.
+
+On a current chain, add `--save-checkpoint` to export a single WSP upstream
+AES-GCM checkpoint into the private directory through the existing
+create-once Linux archive. It cannot replace, rotate or renew an existing
+archive and it does not qualify external anti-rollback. To recover, provision
+a fresh empty private scan-only directory with the encrypted scan-account
+backup **and the archived encrypted checkpoint**, then use
+`--restore-checkpoint`. WSP authenticates and restores the checkpoint,
+then mandates a new actual RPC scan/revalidation before it returns any
+private history.
+
+`--save-checkpoint` and `--restore-checkpoint` together are rejected.
+No CLI operation signs, broadcasts, creates Core processes or enables
+mainnet. These features require genuine operator-host Core execution
+evidence and are NOT validated by synthetic-only GitHub Actions.

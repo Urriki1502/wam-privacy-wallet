@@ -23,6 +23,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--rpc-port", type=int, required=True)
     parser.add_argument("--rpc-user", required=True)
     parser.add_argument("--max-blocks", type=int, default=16)
+    parser.add_argument("--history-limit", type=int,
+                        help="Opt in to private local transaction history (1–100)")
+    parser.add_argument("--save-checkpoint", action="store_true",
+                        help="Write one immutable WSP encrypted checkpoint after current scan")
+    parser.add_argument("--restore-checkpoint", action="store_true",
+                        help="Restore WSP checkpoint to an EMPTY fresh scan-only DB")
     parser.add_argument("--acknowledge-unverified-binary", action="store_true")
     args = parser.parse_args(argv)
     try:
@@ -41,6 +47,9 @@ def main(argv: list[str] | None = None) -> int:
             rpc_auth=ExplicitRpcAuth(args.rpc_user, rpc_secret),
             user_consented=True, acknowledge_unverified_binary=True,
             max_blocks=args.max_blocks,
+            history_limit=args.history_limit,
+            save_checkpoint=args.save_checkpoint,
+            restore_checkpoint=args.restore_checkpoint,
         )
     except (ValueError, LiveRegtestScanError, EOFError, KeyboardInterrupt):
         print("LIVE_REGTEST_WSP_SCAN_DENIED", file=sys.stderr)

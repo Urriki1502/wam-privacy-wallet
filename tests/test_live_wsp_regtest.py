@@ -17,7 +17,9 @@ class LiveRegtestContractTests(unittest.TestCase):
         with patch.object(m, "LocalRegtestIdentityGateway") as gateway:
             for changed in ({"user_consented": False},
                             {"acknowledge_unverified_binary": False},
-                            {"max_blocks": 17}):
+                            {"max_blocks": 17}, {"history_limit": True},
+                            {"history_limit": 101},
+                            {"save_checkpoint": True, "restore_checkpoint": True}):
                 with self.subTest(changed=changed):
                     values = dict(kwargs)
                     values.update(changed)
@@ -34,3 +36,6 @@ class LiveRegtestContractTests(unittest.TestCase):
         self.assertNotIn("mock_peer", params)
         self.assertNotIn("core_executable", params)
         self.assertNotIn("signer", params)
+        self.assertIn("restore_checkpoint", params)
+        self.assertIn("history_limit", params)
+        self.assertIn("save_checkpoint", params)
