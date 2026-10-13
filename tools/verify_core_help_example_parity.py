@@ -12,7 +12,7 @@ from pathlib import Path
 import sys
 
 from wam_privacy_wallet.node.core_help_example_parity import (
-    CoreHelpExampleError, inspect_help_example_text,
+    CoreHelpExampleError, inspect_help_example_text, inspect_two_node_help_coverage,
 )
 
 
@@ -22,6 +22,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--captured-help", required=True)
     parser.add_argument("--example-conf", required=True)
+    parser.add_argument("--two-node-ports", nargs=4, type=int,
+                        metavar=("RPC_A", "P2P_A", "RPC_B", "P2P_B"),
+                        help="Optional canonical two-node option-name coverage; no launch")
     args = parser.parse_args(argv)
     try:
         a = Path(args.captured_help)
@@ -33,13 +36,28 @@ def main(argv: list[str] | None = None) -> int:
                 or b.stat().st_size > 256 * 1024):
             raise CoreHelpExampleError("CORE_CONFIG_INPUT_FILE_DENIED")
         evidence = inspect_help_example_text(a.read_bytes(), b.read_bytes())
+        result = asdict(evidence)
+        if args.two_node_ports is not None:
+            from wam_privacy_wallet.node.two_node_topology import (
+                TwoNodeTopologyError, plan_two_node_topology,
+            )
+            try:
+                plan = plan_two_node_topology(tuple(args.two_node_ports))
+            except TwoNodeTopologyError:
+                raise CoreHelpExampleError("CORE_CONFIG_TWO_NODE_PLAN_DENIED") from None
+            # Re-read content must be bound to the exact compared capture.
+            captured = a.read_bytes()
+            coverage = inspect_two_node_help_coverage(captured, plan)
+            if coverage.help_text_sha256 != evidence.help_text_sha256:
+                raise CoreHelpExampleError("CORE_CONFIG_HELP_CHANGED_DENIED")
+            result["two_node_help_coverage"] = asdict(coverage)
     except CoreHelpExampleError as exc:
         print(str(exc), file=sys.stderr)
         return 2
     except OSError:
         print("CORE_CONFIG_INPUT_FILE_DENIED", file=sys.stderr)
         return 2
-    print(json.dumps(asdict(evidence), sort_keys=True, separators=(",", ":")))
+    print(json.dumps(result, sort_keys=True, separators=(",", ":")))
     return 0
 
 

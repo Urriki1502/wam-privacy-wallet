@@ -34,6 +34,29 @@ def _fake_signed_review(**_):
 
 
 class OfficialRegtestReadinessTests(unittest.TestCase):
+    def test_machine_manifest_has_separate_actual_core_not_run_scenarios(self):
+        meta, snapshot = self._patched()
+        with meta, snapshot, patch.object(readiness,"inspect_sealed_linux_elf",
+            side_effect=readiness.SealedElfError("CORE_ELF_EXECUTABLE_STACK_DENIED")):
+            report=readiness.inspect_official_regtest_readiness(**self._inputs())
+        self.assertEqual(report['evidence_schema'],1)
+        gates={row['id']:row['status'] for row in report['acceptance_gates']}
+        self.assertEqual(gates['signed_archive_member'],'PASS')
+        self.assertEqual(gates['elf_stack_policy'],'FAIL')
+        self.assertEqual(gates['executed_process_identity'],'BLOCKED')
+        self.assertEqual(gates['same_build_help_config'],'BLOCKED')
+        self.assertEqual(gates['external_checkpoint_anchor'],'BLOCKED')
+        self.assertEqual(len(report['core_scenarios']),7)
+        self.assertTrue(all(row['status']=='NOT RUN' for row in report['core_scenarios']))
+
+    def test_clean_static_elf_does_not_elevate_core_scenario_status(self):
+        meta,snapshot=self._patched()
+        with meta,snapshot,patch.object(readiness,'inspect_sealed_linux_elf',return_value=object()):
+            report=readiness.inspect_official_regtest_readiness(**self._inputs())
+        self.assertEqual(report['acceptance_gates'][1]['status'],'PASS')
+        self.assertTrue(all(row['status']=='NOT RUN' for row in report['core_scenarios']))
+        self.assertFalse(report['genuine_two_node_regtest_qualified'])
+
     def _inputs(self) -> dict[str, str]:
         root = Path.cwd()
         return {"archive": str(root / "official-v0.1.11.tar.gz"),

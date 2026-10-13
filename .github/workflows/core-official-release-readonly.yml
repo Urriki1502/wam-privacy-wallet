@@ -155,3 +155,16 @@ jobs:
           print("CORE_OFFICIAL_WAMD_NOEXEC_MEMFD_VERIFIED_READ_ONLY")
           print("CORE_EXECUTION_ALLOWED=false; REAL_REGTEST_QUALIFIED=false")
           PY
+
+          # Preserve only the public, redacted static manifest; never upload
+          # archive bytes, publisher key material, datadirs or credentials.
+          mkdir -p .core-static-evidence
+          cp "$TMP_DIR/regtest-blocked.json" .core-static-evidence/regtest-readiness.json
+
+      - name: Retain authenticated static acceptance manifest (NO Core execution)
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-v0.1.11-static-readiness-${{ github.sha }}
+          path: .core-static-evidence/regtest-readiness.json
+          if-no-files-found: error
+          retention-days: 14

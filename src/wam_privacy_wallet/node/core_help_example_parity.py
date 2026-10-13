@@ -141,3 +141,54 @@ def inspect_help_example_text(
         help_text_sha256=hashlib.sha256(daemon_help).hexdigest(),
         example_text_sha256=hashlib.sha256(example_conf).hexdigest(),
     )
+
+
+@dataclass(frozen=True, slots=True)
+class TwoNodeHelpCoverage:
+    schema_version: int
+    configured_option_count: int
+    help_text_sha256: str
+    configuration_pair_sha256: str
+    status: str = "UNTRUSTED_TWO_NODE_HELP_NAME_COVERAGE_ONLY"
+    text_option_coverage: bool = True
+    option_value_semantics_verified: bool = False
+    same_executed_image_proven: bool = False
+    signed_provenance_verified: bool = False
+    help_parity_verified: bool = False
+    core_execution_allowed: bool = False
+    real_regtest_qualified: bool = False
+    signer_enabled: bool = False
+    broadcast_allowed: bool = False
+    mainnet_allowed: bool = False
+
+
+def inspect_two_node_help_coverage(daemon_help: bytes, plan: object) -> TwoNodeHelpCoverage:
+    """Refuse unsupported config names; never invent/alter Core options.
+
+    Reuse canonical G1 schema/policy and bounded help parser. Captured text is
+    not executable-origin proof or evidence of Core option value semantics.
+    """
+    from .two_node_schema import (
+        SCHEMA_VERSION, TwoNodeSchemaError, build_structured_two_node_v1,
+        audit_parallel_two_node_v1, serialize_legacy_preview,
+    )
+    options = _help_options(_text(daemon_help, _MAX_HELP_BYTES,
+                                 "CORE_CONFIG_HELP_TEXT_DENIED"))
+    try:
+        structured = build_structured_two_node_v1(plan)
+        audit_parallel_two_node_v1(plan, structured)
+        required = {option.key for node in structured.nodes for option in node.options}
+        if not required <= options:
+            raise CoreHelpExampleError("CORE_CONFIG_TWO_NODE_UNSUPPORTED_OPTION")
+        previews = tuple(serialize_legacy_preview(n).encode("ascii")
+                         for n in structured.nodes)
+    except TwoNodeSchemaError:
+        raise CoreHelpExampleError("CORE_CONFIG_TWO_NODE_PLAN_DENIED") from None
+    pair = b"WAM/TWO-NODE/CONFIG/V1\x00" + b"".join(
+        len(raw).to_bytes(4, "big") + raw for raw in previews
+    )
+    return TwoNodeHelpCoverage(
+        schema_version=SCHEMA_VERSION, configured_option_count=len(required),
+        help_text_sha256=hashlib.sha256(daemon_help).hexdigest(),
+        configuration_pair_sha256=hashlib.sha256(pair).hexdigest(),
+    )

@@ -205,7 +205,7 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
             "test_core_elf_preflight.py": 17,
             "test_synthetic_linux_fd_exec_binding.py": 3,
             "test_synthetic_linux_proc_identity.py": 4,
-            "test_official_regtest_readiness.py": 5,
+            "test_official_regtest_readiness.py": 7,
             "test_architecture_v1_traceability.py": 6,
             "test_wsp1_pinned_surface.py": 6,
             "test_wsp1_full_source_closure.py": 12,
@@ -222,7 +222,7 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
             "test_snapshot_lineage_preflight.py": 14,
             "test_checkpoint_metadata_auth.py": 25,
             "test_core_next_release_audit.py": 21,
-            "test_core_help_example_parity.py": 21,
+            "test_core_help_example_parity.py": 28,
         }
         self.assertEqual(MINIMUM_CASES, expected)
         self.assertEqual(MANDATORY_SUITES, tuple(expected))
