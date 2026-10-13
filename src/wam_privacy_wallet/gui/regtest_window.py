@@ -13,6 +13,8 @@ from PySide6.QtWidgets import (
 )
 
 from wam_privacy_wallet.application.regtest_lifecycle import BLOCKERS, RegtestLifecycleError
+from wam_privacy_wallet.application.qualified_scan_session import ScanSnapshot
+from wam_privacy_wallet.integrations.wsp1_source_review import PINNED_COMMIT
 from .regtest_worker import RegtestWorkerController
 
 VIEWS = (
@@ -42,6 +44,9 @@ class RegtestWindow(QMainWindow):
         column.addWidget(self.lifecycle_status)
         self.authority_status = QLabel("NO WALLET LOADED · SIGNER / BROADCAST BLOCKED")
         column.addWidget(self.authority_status)
+        self.scan_review_status = QLabel("NO WSP-1 SCAN REVIEW")
+        self.scan_review_status.setWordWrap(True)
+        column.addWidget(self.scan_review_status)
         controls = QHBoxLayout()
         self.mode_button = QPushButton("Select REGTEST")
         self.consent = QCheckBox("I consent to local readiness inspection")
@@ -104,7 +109,60 @@ class RegtestWindow(QMainWindow):
         self.lifecycle_status.setText(f"{state.mode} · {state.phase} · {state.readiness}")
         # This local lifecycle never loads a wallet or authorizes a backend.
         self.authority_status.setText("NO WALLET LOADED · SIGNER / BROADCAST BLOCKED")
+        self.clear_scan_review()
         self._refresh_controls()
+
+    def clear_scan_review(self):
+        """Erase prior scanner display whenever a GUI lifecycle revision changes."""
+        self.scan_review_status.setText("NO WSP-1 SCAN REVIEW")
+
+    def present_untrusted_scan_receipt(self, receipt, *, user_consented: bool,
+                                       expected_revision: int):
+        """Read-only Qt projection of scalar scanner evidence, never wallet state.
+
+        This accepts a source-pinned DTO but cannot authenticate its origin.
+        No node, WSP engine, wallet, signing role or RPC is loaded here.
+        """
+        self.clear_scan_review()
+        state = self.controller.lifecycle.state
+        if (user_consented is not True or state.mode != "REGTEST"
+                or state.phase not in ("REGTEST_SELECTED", "BLOCKED")
+                or type(expected_revision) is not int
+                or expected_revision != state.revision
+                or self._closing or self.controller.busy
+                or type(receipt) is not ScanSnapshot):
+            raise RegtestLifecycleError("APP_REGTEST_SCAN_REVIEW_DENIED")
+        try:
+            # Revalidate even a frozen dataclass: Python code can mutate slots.
+            checked = ScanSnapshot(
+                receipt.tip_height, receipt.confirmed_utxo_count,
+                receipt.unqualified_confirmed_atoms, receipt.history_count,
+                receipt.mempool_observed, receipt.mempool_utxo_count,
+                receipt.unqualified_mempool_atoms, receipt.mempool_spend_count,
+                chain_current=receipt.chain_current,
+                blocks_processed=receipt.blocks_processed,
+                transactions_processed=receipt.transactions_processed,
+                rollback_blocks=receipt.rollback_blocks,
+                mempool_transactions_processed=receipt.mempool_transactions_processed,
+            )
+            if (checked != receipt or receipt.source_commit != PINNED_COMMIT
+                    or receipt.evidence != "PINNED_SCAN_STORE_PROJECTED_UNTRUSTED"
+                    or receipt.scope != "disposable-regtest-review"
+                    or any(getattr(receipt, flag) is not False for flag in (
+                        "core_authenticated", "wallet_operational", "balance_qualified",
+                        "signer_enabled", "broadcast_allowed", "mainnet_allowed"))):
+                raise ValueError("not a non-authorizing receipt")
+        except Exception:
+            raise RegtestLifecycleError("APP_REGTEST_SCAN_REVIEW_DENIED") from None
+        # Do not render amounts, addresses, account IDs, txids or any user secret.
+        # Chain-current is only the upstream scanner's *last observed* local tip.
+        coins = (str(receipt.confirmed_utxo_count) + " UNQUALIFIED"
+                 if receipt.chain_current else "UNAVAILABLE (INCOMPLETE SCAN)")
+        self.scan_review_status.setText(
+            "REVIEW_ONLY_UNTRUSTED · NO VERIFIED CORE · NO WALLET BALANCE · "
+            f"reported tip {receipt.tip_height} · blocks {receipt.blocks_processed} · "
+            f"tx {receipt.transactions_processed} · observed UTXOs {coins}"
+        )
 
     def closeEvent(self, event):
         self._closing = True
