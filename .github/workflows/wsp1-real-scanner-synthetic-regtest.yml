@@ -8,6 +8,9 @@ on:
       - '.github/workflows/wsp1-real-scanner-synthetic-regtest.yml'
       - 'tools/ci_wsp1_scanner_loopback.py'
       - 'tools/ci_wsp1_scanner_native_only.py'
+      - 'tools/ci_qualified_scan_session.py'
+      - 'src/wam_privacy_wallet/application/qualified_scan_session.py'
+      - 'tests/test_qualified_scan_session.py'
       - 'src/wam_privacy_wallet/application/wsp_scan_coordinator.py'
       - 'src/wam_privacy_wallet/application/scan_only_account_session.py'
       - 'src/wam_privacy_wallet/application/encrypted_scan_backup.py'
@@ -43,6 +46,8 @@ jobs:
     name: Actual pinned WSP-1 Scanner.sync with local synthetic RPC (NO Core)
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
     steps:
       - name: Checkout WAM Privacy Wallet (no credentials)
         uses: actions/checkout@v4
@@ -84,6 +89,12 @@ jobs:
           python -m pip install --disable-pip-version-check -e ./wsp-source
           python -m pip install --disable-pip-version-check -e '.[gui]'
           python -m pip check
+
+      - name: Actual source-qualified retained application session (public synthetic peer ONLY)
+        env:
+          PYTHONPATH: src
+          PYTHONUNBUFFERED: '1'
+        run: python -B -m tools.ci_qualified_scan_session --source-root "$GITHUB_WORKSPACE/wsp-source"
 
       - name: Compile/test actual WSP-1 Scanner.sync against disposable loopback peer
         shell: bash
@@ -137,6 +148,23 @@ jobs:
         run: python -m pip install --disable-pip-version-check -e ./wsp-source -e ".[gui]"
       - name: Check dependency consistency
         run: python -m pip check
+      - name: Retained application persistence remains unqualified on macOS and Windows
+        if: runner.os != 'Linux'
+        shell: python
+        env:
+          PYTHONPATH: src
+        run: |
+          import sys
+          from pathlib import Path
+          from wam_privacy_wallet.application.qualified_scan_session import SourceQualifiedScanRuntime, QualifiedScanError
+          try:
+              SourceQualifiedScanRuntime(Path.cwd(), user_consented=True)
+          except QualifiedScanError as error:
+              assert str(error) == 'APP_QUALIFIED_SCAN_PLATFORM_UNQUALIFIED'
+          else:
+              raise AssertionError('unqualified retained persistence enabled')
+          assert not any(name == 'wam_sp' or name.startswith('wam_sp.') for name in sys.modules)
+          print('ACTUAL_NON_LINUX_RETAINED_SESSION_PLATFORM_DENIAL_ONLY')
       - name: Actual public BIP352 scanner, SQLite, reorg and Qt proof (NO Core)
         run: python -B -m tools.ci_wsp1_scanner_native_only --source-root "${{ github.workspace }}/wsp-source"
 
@@ -173,4 +201,12 @@ jobs:
                   raise AssertionError('unqualified scanner enabled')
               source.assert_not_called()
           assert not any(name.startswith('wam_sp') or name.startswith('PySide6') for name in sys.modules)
+          from wam_privacy_wallet.application.qualified_scan_session import SourceQualifiedScanRuntime, QualifiedScanError
+          try:
+              SourceQualifiedScanRuntime(Path.cwd(), user_consented=True)
+          except QualifiedScanError as error:
+              assert str(error) == 'APP_QUALIFIED_SCAN_PLATFORM_UNQUALIFIED'
+          else:
+              raise AssertionError('unqualified retained persistence enabled')
+          assert not any(name == 'wam_sp' or name.startswith('wam_sp.') for name in sys.modules)
           print('WINDOWS_X86_WSP_SCANNER_UNQUALIFIED_DENIAL_ONLY; not native scanner qualification')
