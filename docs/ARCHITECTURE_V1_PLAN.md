@@ -14,9 +14,9 @@
 | Local Scanner | External `wam_sp.scanner`; no production app scanner | Separate scan-only capability, real OS single-writer lock (including Windows), restart/reorg/rescan and local node test |
 | PSBTv2 / Signer | External offline signer only | Independent approval tied to inputs, destination, amounts, fee; explicit operator consent; no auto-sign |
 | Backup / Recovery | External authenticated recovery, app synthetic previews | Authenticated restore into a new DB, rollback/replay and crash consistency; sensitive-state redaction |
-| Wallet Privacy & PayJoin | `wam-privacy` models, not transaction integration | Fee/output invariants on real regtest constructs; no silent direct fallback |
-| Selective Disclosure | V1 concept, not integrated | Scoped consent, verifier binding, revocation and cross-process negative tests |
-| Network Privacy Policy | Model-only transport preferences | Measured first-hop P2P and hardened actual route enforcement; failure never falls back to public direct broadcast |
+| Wallet Privacy & PayJoin | Pinned privacy validator + exact PSBTv2 read-only WSP review; ownership/Core unqualified | Fee/output invariants on real regtest constructs; no silent direct fallback |
+| Selective Disclosure | Selected WSP history local export + private Qt APIs; no reusable authorization/proof | Trusted selection/save UX, scoped consent qualification; reusable authorization/proof only under a separate protocol |
+| Network Privacy Policy | Pinned policy + strict application fallback/endpoint review; no actual private transport | Measured first-hop P2P and hardened actual route enforcement; failure never falls back to public direct broadcast |
 | WAM SDK / RPC | Fixed local loopback read-only RPC, topology and P2P observer | WAM-profile-reviewed bounded scanner read interface; all required methods explicit, no write/broadcast in read-only adapter |
 | User-owned WAM Core Full Node | Official signed v0.1.11 verified **without execution**, GNU_STACK RWE blocker | DEV-approved binary, immutable executed-image/process+loader binding, isolated genuine two-node regtest (#9) |
 | WAM Security assurance | External `wam-security` frozen evidence baseline | Immutable reviewed SHA for every reused invariant/test, independent review and reproducible evidence |
@@ -39,3 +39,21 @@
 - [#3](https://github.com/Urriki1502/wam-privacy-wallet/pull/3): app WSP-1 review **DRAFT**, must not merge automatically.
 
 **Release definition:** a working desktop wallet is **not** established by Qt navigation, mocked scanner, valid ELF static report, external upstream capability, synthetic kernel process tests or green CI. V1 acceptance requires actual integrated behavior and explicit review of each trust boundary. Real keys, transactions and mainnet remain out of scope for current baseline.
+
+## Privacy integration evidence categories
+
+The three privacy boxes now map to their application review boundaries in the
+machine-checked manifest. This is review integration, not operational acceptance.
+All 14 nodes, 19 edges, WSP/Core/ELF HOLDs and false authority flags are retained.
+The legacy `privacy_readiness.py` DTO continues to describe conservative
+operational readiness; it does not activate the new review APIs.
+
+| Component | IMPLEMENTED | TESTED | INTEGRATED | ACCEPTED | BLOCKED |
+| --- | --- | --- | --- | --- | --- |
+| PayJoin | Pinned PSBTv2 parser + unchanged validator + canonical receiver public verification | Native synthetic transaction cases and adversarial application boundary | Fixed read-only application worker | Operational: NO | Authenticated sender ownership, chain/UTXO inclusion, WSP/Core compatibility and consent qualification |
+| Network policy | Unchanged source policy + strict no-fallback/canonical endpoint profile | Source and application negative tests; Qt regression | Existing application/Qt policy review | Operational: NO | Actual Tor/I2P/OHTTP runtime route and first-hop evidence |
+| Local selected disclosure | Scope/field allowlist, exact-byte one-use approval, cancellation/expiry | Real WSP SQLite/Qt with synthetic chain; adversarial policy | Existing private-history Qt preview/export APIs | Operational: NO | Trusted selection/save UX, persistent consent qualification; no proof protocol implemented |
+
+Exact source SHAs, PR/CI evidence and next tasks:
+[Privacy Integration Sprint](PRIVACY_INTEGRATION_2026_10_13.md).
+CORE-003 research stays excluded and upstream sources are untouched.

@@ -32,3 +32,13 @@ A single Python/Qt desktop GUI for macOS and Windows, connected to a user-owned 
 ## Change control
 
 No unpinned dependency integrations. Changes touching signer, wallet storage, scanner, RPC, disclosure, policy, or release status require explicit tests and review. Research baselines in source repositories remain untouched.
+
+## Review integrations now present
+
+See the [V1 evidence categories](ARCHITECTURE_V1_PLAN.md#privacy-integration-evidence-categories)
+and [source reuse map](PRIVACY_INTEGRATION_2026_10_13.md). PayJoin and network
+reviews reuse unchanged pinned privacy models. Local selective disclosure uses
+existing WSP history state only. All are non-authorizing review interfaces;
+private transport, authenticated ownership and operational wallet acceptance
+remain unqualified. The local export is a copy of selected observations, not a
+reusable capability or cryptographic proof; copied data cannot be revoked.

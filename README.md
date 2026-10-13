@@ -29,6 +29,8 @@ A proposed cross-platform, privacy-focused WAM desktop wallet. Its intended arch
 
 The WSP scanner-to-Qt testing above uses real upstream library code but **synthetic blockchain/RPC inputs**. It does not support creating or storing a real user wallet, operational scan buttons, real receive addresses, balances, signing, broadcast or mainnet. An authenticated WAM Core runner, durable scan-key custody and native release qualification remain blocked/review-gated. Original frozen WSP source review [#3](https://github.com/Urriki1502/wam-privacy-wallet/pull/3) is still not approved for production.
 
+Privacy application review foundations are tracked in [the sprint reuse map and evidence ledger](docs/PRIVACY_INTEGRATION_2026_10_13.md): pinned PSBTv2 PayJoin validation, fail-closed network-plan review and one-shot selected WSP-history export APIs. These execute real library code on synthetic transactions/chain inputs. Private transport availability, authenticated ownership/Core integration and operational acceptance remain blocked. [Selected local export](docs/SELECTED_HISTORY_LOCAL_EXPORT.md) is a user-approved copy, not a shielded viewing capability or a cryptographic proof.
+
 The words *merged* and *CI passed* establish repository change status only; they **do not** establish wallet functional completeness, protocol correctness, signer safety or production acceptance.
 
 ## Architecture
@@ -41,8 +43,8 @@ User
              -> local scanner / address derivation
              -> backup and recovery
              -> separately authorized PSBT / signer boundary
-          -> PayJoin policy / selective disclosure (future, review-gated)
-          -> network privacy (future, review-gated)
+          -> PayJoin / selected local export (review-only application APIs)
+          -> network policy review (runtime transport unqualified)
           -> loopback-only WAM RPC profile / identity gate
               -> user-owned, locally validating WAM Core full node
 

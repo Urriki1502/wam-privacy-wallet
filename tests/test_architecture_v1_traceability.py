@@ -51,7 +51,7 @@ class V1ArchitectureTraceabilityTests(unittest.TestCase):
             if node["id"] in ("wsp1","scanner","signer","recovery","assurance"):
                 self.assertEqual(node["status"],"EXTERNAL_REVIEW_GATED")
             if node["id"] in ("payjoin","network"):
-                self.assertEqual(node["status"],"MODEL_ONLY")
+                self.assertEqual(node["status"],"OFFLINE_REVIEW_INTEGRATED")
         for target in ("wsp1","payjoin","network","disclosure","core"):
             fake=deepcopy(self.raw)
             next(x for x in fake["nodes"] if x["id"]==target)["status"]="PRODUCTION_READY"
@@ -93,6 +93,27 @@ class V1ArchitectureTraceabilityTests(unittest.TestCase):
         target=next(x for x in wrong_type["blockers"] if x["id"]=="CORE-ELF-HOLD")
         target["issue"]=target.pop("pr")
         self.denied(wrong_type)
+
+    def test_privacy_review_status_never_becomes_operational_acceptance(self):
+        expected={"payjoin":"OFFLINE_REVIEW_INTEGRATED","network":"OFFLINE_REVIEW_INTEGRATED","disclosure":"LOCAL_EXPORT_REVIEW_ONLY"}
+        for name,status in expected.items():
+            self.assertEqual(next(x for x in self.raw["nodes"] if x["id"]==name)["status"],status)
+            fake=deepcopy(self.raw)
+            next(x for x in fake["nodes"] if x["id"]==name)["status"]="OPERATIONAL_ACCEPTED"
+            self.denied(fake)
+        self.assertFalse(audit_checked_in_v1()["operational_wallet_enabled"])
+
+    def test_privacy_targets_pin_application_boundaries_not_shielded_source(self):
+        targets={"payjoin":"payjoin_proposal_review.py","network":"network_plan_review.py","disclosure":"selected_history_export.py"}
+        for name,path in targets.items():
+            node=next(x for x in self.raw["nodes"] if x["id"]==name)
+            self.assertEqual(node["repository"],"Urriki1502/wam-privacy-wallet")
+            self.assertEqual(node["path"],"src/wam_privacy_wallet/application/"+path)
+            fake=deepcopy(self.raw)
+            target=next(x for x in fake["nodes"] if x["id"]==name)
+            target["repository"]="Urriki1502/wam-privacy"
+            target["path"]="prototypes/shielded_notes/viewing.py"
+            self.denied(fake)
 
 
 if __name__ == "__main__":
