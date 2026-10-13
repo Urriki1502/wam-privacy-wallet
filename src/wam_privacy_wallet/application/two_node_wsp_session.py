@@ -66,7 +66,9 @@ def scan_two_existing_regtest_nodes(
         topology.audit()
         first_a = gateway_a.probe_core_profile()
         first_b = gateway_b.probe_core_profile()
-        if first_a.identity != first_b.identity:
+        if (first_a.identity.genesis != first_b.identity.genesis
+            or first_a.identity.height != first_b.identity.height
+            or first_a.identity.best_block_hash != first_b.identity.best_block_hash):
             raise TwoNodeWspSessionError("TWO_NODE_WSP_CHAIN_DIVERGED")
         scan = scan_existing_regtest(
             source_root, private_dir, scan_password,
@@ -90,7 +92,9 @@ def scan_two_existing_regtest_nodes(
         # Scanning against one snapshot while the other node changes is not
         # an accepted two-node session; require a retry with fresh RPC views.
         if (first_a != second_a or first_b != second_b
-                or second_a.identity != second_b.identity
+                or (second_a.identity.genesis != second_b.identity.genesis
+                    or second_a.identity.height != second_b.identity.height
+                    or second_a.identity.best_block_hash != second_b.identity.best_block_hash)
                 or (scan["chain_current"] and
                     scan["tip_height"] != second_a.identity.height)):
             raise TwoNodeWspSessionError("TWO_NODE_WSP_MOVED_DENIED")
