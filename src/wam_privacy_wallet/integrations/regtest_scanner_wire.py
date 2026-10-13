@@ -24,6 +24,7 @@ from wam_privacy_wallet.node.core_profile import CoreProfileError
 from wam_privacy_wallet.node.endpoint import LocalRegtestEndpoint
 from wam_privacy_wallet.node.read_rpc import ExplicitRpcAuth, LocalReadOnlyRpc, LocalRpcError
 from wam_privacy_wallet.node.regtest_gateway import LocalRegtestIdentityGateway
+from wam_privacy_wallet.node.rpc_json import decode_rpc_json
 
 _HASH = re.compile(r"[0-9a-f]{64}\Z", re.ASCII)
 _MAX_WIRE_BYTES = 8 * 1024 * 1024
@@ -85,6 +86,7 @@ class _ScannerOnlyWire:
         conn = http.client.HTTPConnection(
             self._endpoint.host, self._endpoint.port, timeout=self._timeout,
         )
+        response = None
         try:
             conn.request("POST", "/", wire, headers={
                 "Authorization": "Basic " + token,
@@ -105,7 +107,7 @@ class _ScannerOnlyWire:
             if len(raw) > _MAX_WIRE_BYTES:
                 raise RegtestScannerWireError("SCAN_RPC_RESPONSE_LIMIT")
             try:
-                payload = json.loads(raw)
+                payload = decode_rpc_json(raw)
             except (ValueError, UnicodeDecodeError, RecursionError):
                 raise RegtestScannerWireError("SCAN_RPC_REPLY_DENIED") from None
             if (type(payload) is not dict or type(payload.get("id")) is not int
@@ -118,6 +120,8 @@ class _ScannerOnlyWire:
         except (OSError, TimeoutError, http.client.HTTPException):
             raise RegtestScannerWireError("SCAN_RPC_TRANSPORT_DENIED") from None
         finally:
+            if response is not None:
+                response.close()
             conn.close()
 
 

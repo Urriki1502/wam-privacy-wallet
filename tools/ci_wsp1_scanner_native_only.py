@@ -65,7 +65,7 @@ def run(root):
     # It does not construct/sign a valid transaction or send any RPC.
     sender_script=b'\x51\x20'+pub(7)[1:]
     xonly=send((Input(PREV,0,sender_script,witness=(b'\x01',),secret=7),),(account.payment_code(),))[0]
-    server.silent_payment={'txid':PAYTX,'vin':[{'txid':PREV,'vout':0,'prevout':{'scriptPubKey':{'hex':sender_script.hex()}},'scriptSig':{'hex':''},'txinwitness':['01']}], 'vout':[{'n':0,'value':0.002,'scriptPubKey':{'hex':'5120'+xonly.hex()}}]}
+    server.silent_payment={'txid':PAYTX,'vin':[{'txid':PREV,'vout':0,'prevout':{'value':0.003,'scriptPubKey':{'hex':sender_script.hex()}},'scriptSig':{'hex':''},'txinwitness':['01']}], 'vout':[{'n':0,'value':0.002,'scriptPubKey':{'hex':'5120'+xonly.hex()}}]}
     thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
     passed=[]
     try:

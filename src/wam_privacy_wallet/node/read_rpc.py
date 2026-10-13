@@ -14,6 +14,7 @@ import re
 from dataclasses import dataclass
 
 from .endpoint import LocalRegtestEndpoint
+from .rpc_json import decode_rpc_json
 
 _READ_METHODS = frozenset({"getblockhash", "getblockcount", "getbestblockhash", "getblockchaininfo", "getblockheader"})
 _HEADER_HASH_RE = re.compile(r"[0-9a-f]{64}\Z", re.ASCII)
@@ -90,6 +91,7 @@ class LocalReadOnlyRpc:
         token = base64.b64encode(userpass).decode("ascii")
         body = json.dumps({"jsonrpc": "1.0", "id": 1, "method": method, "params": params}, separators=(",", ":")).encode("utf-8")
         connection = http.client.HTTPConnection(self._endpoint.host, self._endpoint.port, timeout=self._timeout)
+        response = None
         try:
             connection.request(
                 "POST", "/", body=body,
@@ -111,7 +113,7 @@ class LocalReadOnlyRpc:
             if len(raw) > _MAX_RESPONSE_BYTES:
                 raise LocalRpcError("WAM_RPC_RESPONSE_LIMIT")
             try:
-                reply = json.loads(raw)
+                reply = decode_rpc_json(raw)
             except (ValueError, UnicodeDecodeError, RecursionError):
                 raise LocalRpcError("WAM_RPC_INVALID_RESPONSE") from None
             if (
@@ -128,4 +130,6 @@ class LocalReadOnlyRpc:
         except (OSError, TimeoutError, http.client.HTTPException):
             raise LocalRpcError("WAM_RPC_TRANSPORT_ERROR") from None
         finally:
+            if response is not None:
+                response.close()
             connection.close()

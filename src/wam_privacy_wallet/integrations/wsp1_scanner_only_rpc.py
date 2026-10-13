@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 
 from .regtest_scanner_wire import _ScannerOnlyWire, RegtestScannerWireError
+from .wam_transaction_shape import validate_wam_transaction, WamTransactionShapeError
 from wam_privacy_wallet.node.attestation import RegtestIdentityError
 from wam_privacy_wallet.node.core_profile import CoreProfileError, VerifiedCoreProfile
 from wam_privacy_wallet.node.endpoint import LocalRegtestEndpoint
@@ -126,6 +127,17 @@ class Wsp1ScannerOnlyRpc:
             if (any(type(h) is not str or _HASH.fullmatch(h) is None for h in txids)
                     or len(set(txids)) != len(txids)):
                 raise WspScannerRpcError("WSP_SCAN_REPLY_DENIED")
+            height = result.get("height")
+            if (type(height) is not int or not 0 <= height <= _MAX_HEIGHT
+                    or (height > 0 and (type(result.get("previousblockhash")) is not str
+                        or _HASH.fullmatch(result["previousblockhash"]) is None))):
+                raise WspScannerRpcError("WSP_SCAN_REPLY_DENIED")
+            try:
+                for index, tx in enumerate(result["tx"]):
+                    if validate_wam_transaction(tx, require_prevouts=True) != (index == 0):
+                        raise WspScannerRpcError("WSP_SCAN_REPLY_DENIED")
+            except WamTransactionShapeError:
+                raise WspScannerRpcError("WSP_SCAN_REPLY_DENIED") from None
         elif method == "getrawmempool":
             if (type(result) is not list or len(result) > _MAX_MEMPOOL_TX
                     or any(type(h) is not str or _HASH.fullmatch(h) is None
@@ -138,6 +150,10 @@ class Wsp1ScannerOnlyRpc:
                     or not 1 <= len(result["vin"]) <= _MAX_TX_INPUTS
                     or not 1 <= len(result["vout"]) <= _MAX_TX_OUTPUTS):
                 raise WspScannerRpcError("WSP_SCAN_REPLY_DENIED")
+            try:
+                validate_wam_transaction(result, require_prevouts=False)
+            except WamTransactionShapeError:
+                raise WspScannerRpcError("WSP_SCAN_REPLY_DENIED") from None
 
     def call(self, method: str, params: list[object] | None = None) -> object:
         """Bounded local HTTP only; rejects writes before any network request."""

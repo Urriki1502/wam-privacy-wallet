@@ -32,7 +32,7 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
         return patch.dict(MINIMUM_CASES, {self.pattern: 1})
 
     def test_manifest_preserves_original_eight_and_self_test(self):
-        self.assertEqual(len(MANDATORY_SUITES), 84)
+        self.assertEqual(len(MANDATORY_SUITES), 85)
         self.assertEqual(len(set(MANDATORY_SUITES)), len(MANDATORY_SUITES))
         self.assertIn("test_ci_contract_gate.py", MANDATORY_SUITES)
         self.assertIn("test_regtest_gateway.py", MANDATORY_SUITES)
@@ -148,7 +148,7 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
             "test_core_profile.py": 9,
             "test_core_source_pin.py": 14,
             "test_node_contract.py": 7,
-            "test_read_rpc.py": 14,
+            "test_read_rpc.py": 16,
             "test_real_regtest_harness.py": 13,
             "test_regtest_cookie_descriptor.py": 14,
             "test_two_node_private_workspace.py": 13,
@@ -210,7 +210,8 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
             "test_architecture_v1_traceability.py": 8,
             "test_wsp1_pinned_surface.py": 6,
             "test_wsp1_full_source_closure.py": 12,
-            "test_wsp1_scanner_only_rpc.py": 21,
+            "test_wsp1_scanner_only_rpc.py": 25,
+            "test_wam_transaction_shape.py": 22,
             "test_app_scanner_session_workflow.py": 14,
             "test_app_wsp_scan_coordinator.py": 15,
             "test_scan_only_account_session.py": 14,
