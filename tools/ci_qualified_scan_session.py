@@ -6,6 +6,7 @@ Known public scan scalar 1 / spend public key 2 are created ONLY in this test.
 from __future__ import annotations
 
 import argparse
+import json
 from dataclasses import fields
 from http.server import ThreadingHTTPServer
 from pathlib import Path
@@ -157,6 +158,17 @@ def run(root: Path) -> None:
             assert not session.history(user_consented=True, offset=1).records
             passed.append("ACTUAL_PRIVATE_SQLITE_HISTORY")
 
+            from wam_privacy_wallet.application.selected_history_export import LocalHistoryExport
+            pending = LocalHistoryExport(page, selected_txids=(PAYTX,),
+                                         fields=("credit_atoms",), user_consented=True)
+            preview = pending.preview(user_consented=True)
+            exported = json.loads(pending.export(approved_sha256=preview.approval_sha256,
+                                                  user_consented=True))
+            assert exported["rows"] == [{"txid": PAYTX, "credit_atoms": 200_000}]
+            assert exported["proof_verified"] is False and exported["spend_authorized"] is False
+            assert "scan_secret" not in preview.payload.decode() and "tweak" not in preview.payload.decode()
+            passed.append("ACTUAL_WSP_HISTORY_SELECTED_EXPORT_NO_AUTHORITY")
+
             session.save_checkpoint(directory, password, user_consented=True)
             from wam_privacy_wallet.application.encrypted_checkpoint_archive import (
                 load_encrypted_checkpoint, store_encrypted_checkpoint,
@@ -194,6 +206,20 @@ def run(root: Path) -> None:
                         and "200000" not in label and "NO VERIFIED CORE" in label)
                 assert "NO WALLET LOADED" in window.authority_status.text()
                 assert not window.controller.lifecycle.state.wallet_operational
+                window.consent.setChecked(True)
+                window.node_ack.setChecked(True)
+                window.navigation.setCurrentRow(3)
+                window.history_ack.setChecked(True)
+                from wam_privacy_wallet.application.qt_native_private_workflow import PrivateQtHistoryRow, PrivateQtWorkflowEvidence
+                rows = tuple(PrivateQtHistoryRow(r.txid, r.height, r.confirmations,
+                                               r.credit_atoms, r.debit_atoms) for r in page.records)
+                window._private_completed(window.controller.lifecycle.state.revision,
+                                          PrivateQtWorkflowEvidence("history", page.tip_height, rows))
+                approved = window.prepare_selected_history_export((PAYTX,), ("height",), user_consented=True)
+                content = window.export_selected_history(approved.approval_sha256, user_consented=True)
+                assert json.loads(content)["rows"] == [{"txid": PAYTX, "height": 2}]
+                assert not window.controller.lifecycle.state.wallet_operational
+                passed.append("ACTUAL_WSP_HISTORY_QT_SELECTED_EXPORT")
                 window.controller.cancel()
                 assert window.scan_review_status.text() == "NO WSP-1 SCAN REVIEW"
             finally:
@@ -287,7 +313,9 @@ def run(root: Path) -> None:
         "ACTUAL_PARTIAL_BATCH_PROGRESS_WITHOUT_STALE_BALANCE",
         "ACTUAL_INCREMENTAL_PUBLIC_PAYMENT_DETECTED",
         "ACTUAL_PRIVATE_SQLITE_HISTORY",
+        "ACTUAL_WSP_HISTORY_SELECTED_EXPORT_NO_AUTHORITY",
         "ACTUAL_AESGCM_RESTORE_REATTEST",
+        "ACTUAL_WSP_HISTORY_QT_SELECTED_EXPORT",
         "ACTUAL_WSP_STORE_TO_REGTEST_QT_READONLY",
         "ACTUAL_REPLAY_NOT_DUPLICATED",
         "ACTUAL_MEMPOOL_STORE_PROJECTION",
@@ -301,7 +329,7 @@ def run(root: Path) -> None:
     ]
     if passed != expected:
         raise RuntimeError("ACTUAL_SESSION_CASE_COUNT_DENIED")
-    print("PINNED_RETAINED_APP_SESSION_OK 17/17; synthetic peer only; operational Core/WSP gates held")
+    print("PINNED_RETAINED_APP_SESSION_OK 19/19; synthetic peer only; operational Core/WSP gates held")
 
 
 def main() -> int:

@@ -14,7 +14,12 @@ from PySide6.QtWidgets import (
 )
 
 from wam_privacy_wallet.application.regtest_lifecycle import BLOCKERS, RegtestLifecycleError
-from wam_privacy_wallet.application.qualified_scan_session import ScanSnapshot
+from wam_privacy_wallet.application.qualified_scan_session import (
+    ScanSnapshot, PrivateHistoryPage, PrivateHistoryRow,
+)
+from wam_privacy_wallet.application.selected_history_export import (
+    LocalHistoryExport, LocalHistoryExportError,
+)
 from wam_privacy_wallet.node.gui_two_node_readonly import LiveNodeGuiEvidence
 from wam_privacy_wallet.application.qt_native_wsp_bridge import QtNativeScanEvidence
 from wam_privacy_wallet.application.qt_native_private_workflow import (
@@ -39,6 +44,9 @@ VIEWS = (
 class RegtestWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._history_export_page = None
+        self._history_export = None
+        self._history_export_revision = None
         self.setWindowTitle("WAM Privacy Wallet — REGTEST qualification")
         self.resize(1100, 720)
         self.controller = RegtestWorkerController(self)
@@ -166,6 +174,7 @@ class RegtestWindow(QMainWindow):
                 layout.addWidget(self.history_button)
                 self.private_history_status = QPlainTextEdit()
                 self.private_history_status.setReadOnly(True)
+                self._clear_history_export()
                 self.private_history_status.setPlainText("NO PRIVATE TRANSACTION HISTORY")
                 layout.addWidget(self.private_history_status)
             if name == "Backup / Recovery":
@@ -279,8 +288,53 @@ class RegtestWindow(QMainWindow):
         except (RegtestLifecycleError, ValueError):
             self.scan_review_status.setText("QT_NATIVE_WSP_SCAN_DENIED")
 
+    def _clear_history_export(self):
+        if self._history_export is not None:
+            self._history_export.cancel()
+        self._history_export = None
+        self._history_export_page = None
+        self._history_export_revision = None
+
+    def _history_export_gate(self, user_consented):
+        state = self.controller.lifecycle.state
+        if (user_consented is not True or self._closing or self.controller.busy
+                or state.mode != "REGTEST" or state.phase in ("CLOSED", "CANCELLED")
+                or state.revision != self._history_export_revision
+                or self.navigation.currentRow() != 3
+                or not self.consent.isChecked() or not self.node_ack.isChecked()
+                or not self.history_ack.isChecked()):
+            self._clear_history_export()
+            raise LocalHistoryExportError("APP_LOCAL_HISTORY_EXPORT_DENIED")
+
+    def prepare_selected_history_export(self, selected_txids, fields, *, user_consented):
+        """Local private preview API only; no save/network/signing operation."""
+        try:
+            self._history_export_gate(user_consented)
+            if self._history_export is not None:
+                self._history_export.cancel()
+            self._history_export = LocalHistoryExport(self._history_export_page,
+                selected_txids=selected_txids, fields=fields, user_consented=True)
+            return self._history_export.preview(user_consented=True)
+        except Exception:
+            self._clear_history_export()
+            raise LocalHistoryExportError("APP_LOCAL_HISTORY_EXPORT_DENIED") from None
+
+    def export_selected_history(self, approved_sha256, *, user_consented):
+        """Return exact approved local bytes once; no reusable authorization."""
+        try:
+            self._history_export_gate(user_consented)
+            if self._history_export is None:
+                raise ValueError
+            return self._history_export.export(approved_sha256=approved_sha256,
+                                               user_consented=True)
+        except Exception:
+            raise LocalHistoryExportError("APP_LOCAL_HISTORY_EXPORT_DENIED") from None
+        finally:
+            self._clear_history_export()
+
     def _hide_private_history(self, _index):
         # Never carry private txids/amounts into another GUI page.
+        self._clear_history_export()
         self.private_history_status.setPlainText("NO PRIVATE TRANSACTION HISTORY")
         self.history_ack.setChecked(False)
         self.receive_status.setPlainText("NO PRIVATE RECEIVE CODE")
@@ -289,6 +343,7 @@ class RegtestWindow(QMainWindow):
         self.balance_ack.setChecked(False)
 
     def _private_action(self, operation):
+        self._clear_history_export()
         self.private_history_status.setPlainText("NO PRIVATE TRANSACTION HISTORY")
         self.backup_status.setText("NO BACKUP / RECOVERY OPERATION")
         self.receive_status.setPlainText("NO PRIVATE RECEIVE CODE")
@@ -330,6 +385,7 @@ class RegtestWindow(QMainWindow):
             )
         except (ValueError, RegtestLifecycleError):
             if operation == "history":
+                self._clear_history_export()
                 self.private_history_status.setPlainText("QT_PRIVATE_WORK_DENIED")
             elif operation == "receive":
                 self.receive_status.setPlainText("QT_PRIVATE_WORK_DENIED")
@@ -372,6 +428,7 @@ class RegtestWindow(QMainWindow):
             if checked != receipt:
                 raise ValueError
         except Exception:
+            self._clear_history_export()
             self.private_history_status.setPlainText("NO PRIVATE TRANSACTION HISTORY")
             self.backup_status.setText("NO BACKUP / RECOVERY OPERATION")
             self.receive_status.setPlainText("NO PRIVATE RECEIVE CODE")
@@ -388,6 +445,11 @@ class RegtestWindow(QMainWindow):
                 "NOT SPENDABLE · NO VERIFIED CORE"
             )
         elif receipt.operation == "history":
+            self._clear_history_export()
+            self._history_export_page = PrivateHistoryPage(tuple(
+                PrivateHistoryRow(x.txid, x.height, x.confirmations, x.credit_atoms, x.debit_atoms)
+                for x in receipt.rows), receipt.tip_height, 0)
+            self._history_export_revision = revision
             lines = [
                 "PRIVATE LOCAL WSP-1 HISTORY · UNQUALIFIED CORE · NO SIGNING"
             ]
@@ -412,6 +474,7 @@ class RegtestWindow(QMainWindow):
 
     def _private_failed(self, revision):
         if type(revision) is int and revision == self.controller.lifecycle.state.revision:
+            self._clear_history_export()
             self.private_history_status.setPlainText("QT_PRIVATE_WORK_DENIED")
             self.backup_status.setText("QT_PRIVATE_WORK_DENIED")
             self.receive_status.setPlainText("QT_PRIVATE_WORK_DENIED")
@@ -477,6 +540,8 @@ class RegtestWindow(QMainWindow):
             self.node_probe_status.setText("APP_REGTEST_NODE_PROBE_DENIED")
 
     def _refresh_controls(self):
+        if not (self.consent.isChecked() and self.node_ack.isChecked() and self.history_ack.isChecked()):
+            self._clear_history_export()
         state = self.controller.lifecycle.state
         available = not self._closing and state.phase != "CLOSED" and not self.controller.busy
         self.mode_button.setEnabled(available)
@@ -527,6 +592,7 @@ class RegtestWindow(QMainWindow):
         # This local lifecycle never loads a wallet or authorizes a backend.
         self.authority_status.setText("NO WALLET LOADED · SIGNER / BROADCAST BLOCKED")
         self.clear_scan_review()
+        self._clear_history_export()
         self.private_history_status.setPlainText("NO PRIVATE TRANSACTION HISTORY")
         self.backup_status.setText("NO BACKUP / RECOVERY OPERATION")
         self.receive_status.setPlainText("NO PRIVATE RECEIVE CODE")
@@ -593,6 +659,7 @@ class RegtestWindow(QMainWindow):
             self.lifecycle_status.setText("CLOSING · waiting for cooperative worker cleanup")
             QTimer.singleShot(25, self.close)
             return
+        self._clear_history_export()
         self.private_history_status.setPlainText("NO PRIVATE TRANSACTION HISTORY")
         self.backup_status.setText("NO BACKUP / RECOVERY OPERATION")
         self.receive_status.setPlainText("NO PRIVATE RECEIVE CODE")
