@@ -12,6 +12,7 @@ from PySide6.QtWidgets import QApplication
 
 from wam_privacy_wallet.application.regtest_lifecycle import inspect_local_readiness, RegtestLifecycleError
 from wam_privacy_wallet.application.qualified_scan_session import ScanSnapshot
+from wam_privacy_wallet.node.gui_two_node_readonly import LiveNodeGuiEvidence
 from wam_privacy_wallet.gui.regtest_window import RegtestWindow, VIEWS
 
 
@@ -222,6 +223,60 @@ class RegtestGuiTests(unittest.TestCase):
         for value in (True, -1, 5001, "0"):
             with self.assertRaises(RegtestLifecycleError):
                 self.window.controller.shutdown(wait_ms=value)
+
+    def node_inputs_ready(self):
+        self.selected()
+        self.window.node_ack.setChecked(True)
+        for key, value in (("a_user", "disposable_a"), ("b_user", "disposable_b"),
+                           ("a_password", "disposable-a-secret"),
+                           ("b_password", "disposable-b-secret")):
+            self.window.node_inputs[key].setText(value)
+
+    def test_two_node_gui_opt_in_and_no_secret_display(self):
+        self.assertFalse(self.window.node_probe_button.isEnabled())
+        self.node_inputs_ready()
+        self.assertTrue(self.window.node_probe_button.isEnabled())
+        with patch("wam_privacy_wallet.gui.regtest_worker.inspect_existing_two_nodes",
+                   return_value=LiveNodeGuiEvidence(12)) as probe:
+            self.window.node_probe_button.click()
+            self.drain(lambda: not self.window.controller.busy)
+            probe.assert_called_once()
+        self.assertIn("reported tip 12", self.window.node_probe_status.text())
+        self.assertIn("NO VERIFIED CORE", self.window.node_probe_status.text())
+        self.assertNotIn("disposable", self.window.node_probe_status.text())
+        self.assertEqual(self.window.node_inputs["a_password"].text(), "")
+        self.assertEqual(self.window.node_inputs["b_password"].text(), "")
+        self.assertFalse(self.window.controller.lifecycle.state.wallet_operational)
+        self.assertFalse(self.window.node_probe_button.isEnabled())
+
+    def test_two_node_cancel_ignores_late_rpc_evidence(self):
+        entered, release = Event(), Event()
+        def slow_probe(**kwargs):
+            entered.set()
+            release.wait(3)
+            return LiveNodeGuiEvidence(12)
+        self.node_inputs_ready()
+        with patch("wam_privacy_wallet.gui.regtest_worker.inspect_existing_two_nodes",
+                   side_effect=slow_probe):
+            self.window.node_probe_button.click()
+            self.assertTrue(entered.wait(2))
+            self.window.cancel_button.click()
+            release.set()
+            self.drain(lambda: not self.window.controller.busy)
+        self.assertEqual(self.window.node_probe_status.text(),
+                         "NO NODE CONNECTION INSPECTION")
+
+    def test_node_probe_refuses_invalid_ports_and_credentials_before_network(self):
+        self.node_inputs_ready()
+        self.window.node_ports["b_rpc"].setValue(29554)
+        self.assertFalse(self.window.node_probe_button.isEnabled())
+        self.window.node_ports["b_rpc"].setValue(29556)
+        self.window.node_inputs["b_password"].clear()
+        self.assertFalse(self.window.node_probe_button.isEnabled())
+        self.window.node_inputs["b_password"].setText("disposable-b")
+        self.assertTrue(self.window.node_probe_button.isEnabled())
+        self.window.node_ack.setChecked(False)
+        self.assertFalse(self.window.node_probe_button.isEnabled())
 
     def test_startup_and_inspection_do_not_connect_or_launch_core(self):
         self.selected()
