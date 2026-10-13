@@ -21,6 +21,9 @@ from .encrypted_checkpoint_archive import _well_formed
 from wam_privacy_wallet.node.attestation import WAM_REGTEST_GENESIS
 
 _DOMAIN = b"WAM-PRIVACY-WALLET/CHECKPOINT-METADATA/V2\x00"
+# Exact pinned Store.export_checkpoint emits schema 3. A different declared
+# schema needs source/format requalification, not a caller-selected fallback.
+_PINNED_CHECKPOINT_SCHEMA = 3
 _KEYS = frozenset(("metadata_schema", "checkpoint_schema", "key_epoch", "genesis",
                    "manifest", "mac"))
 
@@ -62,7 +65,7 @@ def _expectation(value: object) -> CheckpointExpectation:
     if (type(value) is not CheckpointExpectation
             or not _hex64(value.scope_digest)
             or type(value.checkpoint_schema) is not int
-            or not 1 <= value.checkpoint_schema <= 2**31 - 1
+            or value.checkpoint_schema != _PINNED_CHECKPOINT_SCHEMA
             or type(value.key_epoch) is not int
             or not 1 <= value.key_epoch <= 2**63 - 1):
         raise CheckpointMetadataError("CHECKPOINT_METADATA_BINDING_DENIED")
@@ -77,6 +80,12 @@ def _key(value: object) -> bytes:
     if type(value) is not bytes or len(value) != 32:
         raise CheckpointMetadataError("CHECKPOINT_METADATA_KEY_DENIED")
     return value
+
+
+def validate_checkpoint_binding(expected: CheckpointExpectation, key: bytes) -> None:
+    """Reject unsupported source/schema/key selection before persistence I/O."""
+    _expectation(expected)
+    _key(key)
 
 
 def _manifest(value: object, ciphertext: bytes,

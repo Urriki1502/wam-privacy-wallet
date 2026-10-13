@@ -347,12 +347,15 @@ def read_authenticated_regtest_generation(
     """
     if allow_unanchored_synthetic is not True:
         raise VersionedCheckpointError("SNAPSHOT_TRUSTED_ANCHOR_REQUIRED")
-    from .checkpoint_metadata_auth import CheckpointExpectation, verify_checkpoint_metadata
+    from .checkpoint_metadata_auth import (
+        CheckpointExpectation, verify_checkpoint_metadata, validate_checkpoint_binding,
+    )
+    expected = CheckpointExpectation(scope_digest, generation, checkpoint_schema, key_epoch)
+    validate_checkpoint_binding(expected, metadata_key)
     manifest, envelope, metadata = _load_generation(directory, generation, authenticated=True)
     authenticated = verify_checkpoint_metadata(
         metadata, envelope, key=metadata_key,
-        expected=CheckpointExpectation(scope_digest, generation,
-                                       checkpoint_schema, key_epoch),
+        expected=expected,
     )
     if authenticated != manifest:
         raise VersionedCheckpointError("SNAPSHOT_AUTHENTICATED_MANIFEST_DENIED")

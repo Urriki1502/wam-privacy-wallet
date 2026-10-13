@@ -22,7 +22,7 @@ class CheckpointMetadataAuthTests(unittest.TestCase):
         temp = TemporaryDirectory(prefix='wsp-metadata-auth-')
         self.addCleanup(temp.cleanup)
         self.root = Path(temp.name)
-        self.expected = a.CheckpointExpectation(SCOPE, 1, 1, 1)
+        self.expected = a.CheckpointExpectation(SCOPE, 1, 3, 1)
         self.manifest = j._generation_manifest(1, CIPHER, scope_digest=SCOPE,
             tip_height=2, tip_hash='b'*64, predecessor_digest='0'*64)
         self.raw = a.authenticate_checkpoint_metadata(self.manifest, CIPHER,
@@ -34,13 +34,13 @@ class CheckpointMetadataAuthTests(unittest.TestCase):
 
     def write(self, **kw):
         opts = dict(scope_digest=SCOPE, tip_height=2, tip_hash='b'*64,
-            predecessor_digest='0'*64, checkpoint_schema=1, key_epoch=1,
+            predecessor_digest='0'*64, checkpoint_schema=3, key_epoch=1,
             metadata_key=KEY)
         opts.update(kw)
         return j.write_authenticated_regtest_generation(self.root, 1, CIPHER, **opts)
 
     def read(self, **kw):
-        opts = dict(scope_digest=SCOPE, checkpoint_schema=1, key_epoch=1,
+        opts = dict(scope_digest=SCOPE, checkpoint_schema=3, key_epoch=1,
             metadata_key=KEY, allow_unanchored_synthetic=True)
         opts.update(kw)
         return j.read_authenticated_regtest_generation(self.root, 1, **opts)
@@ -72,20 +72,20 @@ class CheckpointMetadataAuthTests(unittest.TestCase):
 
     def test_account_identity_mismatch_denied(self):
         with self.assertRaises(a.CheckpointMetadataError):
-            self.verify(expected=a.CheckpointExpectation('c'*64,1,1,1))
+            self.verify(expected=a.CheckpointExpectation('c'*64,1,3,1))
 
     def test_stale_generation_denied_under_selected_expectation(self):
         with self.assertRaises(a.CheckpointMetadataError):
-            self.verify(expected=a.CheckpointExpectation(SCOPE,2,1,1))
+            self.verify(expected=a.CheckpointExpectation(SCOPE,2,3,1))
 
     def test_schema_mismatch_and_rotation_epoch_denied(self):
         for expected in (a.CheckpointExpectation(SCOPE,1,2,1),
-                         a.CheckpointExpectation(SCOPE,1,1,2)):
+                         a.CheckpointExpectation(SCOPE,1,3,2)):
             with self.assertRaises(a.CheckpointMetadataError):
                 self.verify(expected=expected)
 
     def test_explicit_key_rotation_no_old_key_fallback(self):
-        next_expected=a.CheckpointExpectation(SCOPE,1,1,2)
+        next_expected=a.CheckpointExpectation(SCOPE,1,3,2)
         raw=a.authenticate_checkpoint_metadata(self.manifest,CIPHER,
             key=b'N'*32,expected=next_expected)
         self.assertEqual(self.verify(raw,key=b'N'*32,expected=next_expected),self.manifest)
@@ -95,7 +95,7 @@ class CheckpointMetadataAuthTests(unittest.TestCase):
             self.verify(expected=next_expected)
 
     def test_boolean_and_overflow_bindings_denied(self):
-        for fields in ((True,1,1),(1,True,1),(1,1,True),(0,1,1),(2**63,1,1),(1,0,1),(1,1,0)):
+        for fields in ((True,3,1),(1,True,1),(1,3,True),(0,3,1),(2**63,3,1),(1,0,1),(1,3,0)):
             with self.subTest(fields=fields), self.assertRaises(a.CheckpointMetadataError):
                 self.verify(expected=a.CheckpointExpectation(SCOPE,*fields))
 
@@ -126,6 +126,21 @@ class CheckpointMetadataAuthTests(unittest.TestCase):
         with patch.object(j,'_open_dir',side_effect=AssertionError('must not read')):
             with self.assertRaisesRegex(j.VersionedCheckpointError,'TRUSTED_ANCHOR_REQUIRED'):
                 self.read(allow_unanchored_synthetic=False)
+
+    def test_pinned_source_accepts_only_current_checkpoint_schema_before_write(self):
+        with patch.object(j,'_persist_generation',side_effect=AssertionError('must not write')):
+            for schema in (1,2,4,999,True):
+                with self.subTest(schema=schema),self.assertRaises(a.CheckpointMetadataError):
+                    self.write(checkpoint_schema=schema)
+        self.assertEqual(a._PINNED_CHECKPOINT_SCHEMA,3)
+
+    def test_invalid_binding_or_key_denied_before_disk_read(self):
+        with patch.object(j,'_load_generation',side_effect=AssertionError('must not read')):
+            for opts in ({'checkpoint_schema':4},{'checkpoint_schema':1},
+                         {'scope_digest':'not-a-scope'},{'key_epoch':0},
+                         {'metadata_key':b'not-a-valid-key'}):
+                with self.subTest(opts=opts),self.assertRaises(a.CheckpointMetadataError):
+                    self.read(**opts)
 
     def test_expectation_repr_hides_scope(self):
         self.assertNotIn(SCOPE,repr(self.expected))
@@ -216,8 +231,8 @@ class CheckpointMetadataAuthTests(unittest.TestCase):
                     with self.assertRaises(j.VersionedCheckpointError):
                         j.write_authenticated_regtest_generation(folder,1,CIPHER,
                             scope_digest=SCOPE,tip_height=2,tip_hash='b'*64,
-                            predecessor_digest='0'*64,checkpoint_schema=1,key_epoch=1,metadata_key=KEY)
+                            predecessor_digest='0'*64,checkpoint_schema=3,key_epoch=1,metadata_key=KEY)
                 with self.assertRaisesRegex(j.VersionedCheckpointError,'TRUSTED_ANCHOR_REQUIRED'):
                     j.read_authenticated_regtest_generation(folder,1,scope_digest=SCOPE,
-                        checkpoint_schema=1,key_epoch=1,metadata_key=KEY)
+                        checkpoint_schema=3,key_epoch=1,metadata_key=KEY)
         self.assertEqual(self.read(),old)

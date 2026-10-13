@@ -16,6 +16,14 @@ not securely zeroized. The upstream WSP library remains solely responsible for
 AES-GCM authentication/decryption and validating the actual enclosed DB schema;
 metadata schema is only a separately authenticated declaration.
 
+The exact pinned WSP Store exports checkpoint schema **3**. The MAC boundary
+accepts only this source/schema pair; unknown positive versions and legacy
+schema declarations require separate source/format requalification. Protected
+reads still deny first. Explicit unanchored reads validate scope, generation,
+schema, epoch and key shape before any disk read. Journal manifest schema 1,
+outer MAC metadata schema 2 and upstream checkpoint schema 3 are distinct.
+This does not decrypt the checkpoint or replace upstream schema validation.
+
 Metadata is fsynced before the completion marker. Readers and writers acquire
 nonblocking native inter-process directory locks. All path components are
 opened with O_NOFOLLOW and directory descriptors; symlinked ancestors and `..`
@@ -35,7 +43,7 @@ SQLite counters do not establish freshness.** #148/#151 stay OPEN until a
 qualified independent challenge-bound monotonic CAS anchor is implemented.
 Anchor-ahead recovery must STOP for reviewed disaster recovery; never downgrade.
 
-25 adversarial tests cover real HMAC with public fixture ciphertext, identity
+27 adversarial tests cover real HMAC with public fixture ciphertext, identity
 substitution, explicit key rotation/old-epoch denial, local marker rewriting,
 fsync faults, torn writes, legacy refusal and actual Linux process locking.
 The existing native pinned-WSP CI also exports real schema-3 ciphertext,
