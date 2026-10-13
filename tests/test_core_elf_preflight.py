@@ -20,18 +20,18 @@ _PH = struct.Struct("<IIQQQQQQ")
 _INTERP = b"/lib64/ld-linux-x86-64.so.2\x00"
 
 
-def _binary(*, machine=62, byteorder=1, etype=2, phnum=2,
-            interp=_INTERP, load_flags=5, stack_exec=False):
+def _binary(*, machine=62, byteorder=1, etype=2, phnum=3,
+            interp=_INTERP, load_flags=5, stack_exec=False, stack_flags=6):
     buf = bytearray(512)
     buf[:16] = b"\x7fELF" + bytes([2, byteorder, 1]) + bytes(9)
     buf[16:64] = _HEADER.pack(
         etype, machine, 1, 0x401000, 64, 0, 0, 64, 56, phnum, 0, 0, 0,
     )
     buf[64:120] = _PH.pack(1, load_flags, 0, 0x400000, 0, 512, 512, 0x1000)
-    buf[120:176] = _PH.pack(3, 4, 256, 0, 0, len(interp), len(interp), 1)
-    buf[256:256 + len(interp)] = interp
-    if stack_exec:
-        buf[120:176] = _PH.pack(0x6474E551, 7, 0, 0, 0, 0, 0, 0)
+    buf[120:176] = _PH.pack(3, 4, 384, 0, 0, len(interp), len(interp), 1)
+    buf[384:384 + len(interp)] = interp
+    buf[176:232] = _PH.pack(0x6474E551, 7 if stack_exec else stack_flags,
+                          0, 0, 0, 0, 0, 0)
     return bytes(buf)
 
 
@@ -171,6 +171,37 @@ class SealedElfStaticTests(unittest.TestCase):
             self._unsupported()
             return
         with _kernel_fd(_binary(stack_exec=True)) as fd:
+            with self.assertRaisesRegex(elf.SealedElfError, "^CORE_ELF_EXECUTABLE_STACK_DENIED$"):
+                elf.inspect_sealed_linux_elf(fd)
+
+    def test_missing_stack_header_is_unknown_not_nx(self):
+        if not self._linux():
+            self._unsupported(); return
+        with _kernel_fd(_binary(phnum=2)) as fd:
+            with self.assertRaisesRegex(elf.SealedElfError, "^CORE_ELF_STACK_HEADER_REQUIRED$"):
+                elf.inspect_sealed_linux_elf(fd)
+
+    def test_stack_requires_exact_read_write_without_unknown_bits(self):
+        if not self._linux():
+            self._unsupported(); return
+        for flags in (0, 2, 4, 8, 14, 0x80000006):
+            with self.subTest(flags=flags), _kernel_fd(_binary(stack_flags=flags)) as fd:
+                with self.assertRaisesRegex(elf.SealedElfError, "^CORE_ELF_STACK_MODE_DENIED$"):
+                    elf.inspect_sealed_linux_elf(fd)
+
+    def test_duplicate_stack_headers_even_identical_are_ambiguous(self):
+        if not self._linux():
+            self._unsupported(); return
+        raw=bytearray(_binary(phnum=4))
+        raw[232:288]=raw[176:232]
+        with _kernel_fd(bytes(raw)) as fd:
+            with self.assertRaisesRegex(elf.SealedElfError, "^CORE_ELF_STACK_DUPLICATE_DENIED$"):
+                elf.inspect_sealed_linux_elf(fd)
+
+    def test_exec_stack_denied_with_unknown_flags_too(self):
+        if not self._linux():
+            self._unsupported(); return
+        with _kernel_fd(_binary(stack_flags=0x80000007)) as fd:
             with self.assertRaisesRegex(elf.SealedElfError, "^CORE_ELF_EXECUTABLE_STACK_DENIED$"):
                 elf.inspect_sealed_linux_elf(fd)
 

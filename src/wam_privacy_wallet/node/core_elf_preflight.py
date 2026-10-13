@@ -110,12 +110,19 @@ def inspect_sealed_linux_elf(fd: int) -> SealedElfObservation:
                 if stack_headers > 1:
                     raise SealedElfError("CORE_ELF_STACK_DUPLICATE_DENIED")
                 exec_stack = bool(flags & 0x1)
+                if not exec_stack and flags != 0x6:
+                    # Match the inert successor archive policy: one explicit
+                    # RW (non-X) stack. Missing/unknown flag semantics cannot
+                    # be reported as a non-executable-stack observation.
+                    raise SealedElfError("CORE_ELF_STACK_MODE_DENIED")
         if load == 0:
             raise SealedElfError("CORE_ELF_NO_LOAD_DENIED")
         if dynamic > 1:
             raise SealedElfError("CORE_ELF_DYNAMIC_DENIED")
         if exec_stack:
             raise SealedElfError("CORE_ELF_EXECUTABLE_STACK_DENIED")
+        if stack_headers != 1:
+            raise SealedElfError("CORE_ELF_STACK_HEADER_REQUIRED")
         return SealedElfObservation(
             binary_class="ELF64_LE", architecture="x86_64",
             elf_type="ET_EXEC" if etype == 2 else "ET_DYN",
