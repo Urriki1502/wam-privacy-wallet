@@ -59,23 +59,23 @@
     {
       "id": "payjoin",
       "label": "Wallet Privacy & PayJoin",
-      "status": "MODEL_ONLY",
-      "repository": "Urriki1502/wam-privacy",
-      "path": "prototypes/payjoin_safety/validator.py"
+      "status": "OFFLINE_REVIEW_INTEGRATED",
+      "repository": "Urriki1502/wam-privacy-wallet",
+      "path": "src/wam_privacy_wallet/application/payjoin_proposal_review.py"
     },
     {
       "id": "disclosure",
       "label": "Selective Disclosure",
-      "status": "NOT_INTEGRATED",
+      "status": "LOCAL_EXPORT_REVIEW_ONLY",
       "repository": "Urriki1502/wam-privacy-wallet",
-      "path": "docs/ARCHITECTURE.md"
+      "path": "src/wam_privacy_wallet/application/selected_history_export.py"
     },
     {
       "id": "network",
       "label": "Network Privacy Policy",
-      "status": "MODEL_ONLY",
-      "repository": "Urriki1502/wam-privacy",
-      "path": "prototypes/network_privacy/policy.py"
+      "status": "OFFLINE_REVIEW_INTEGRATED",
+      "repository": "Urriki1502/wam-privacy-wallet",
+      "path": "src/wam_privacy_wallet/application/network_plan_review.py"
     },
     {
       "id": "rpc",
@@ -93,7 +93,7 @@
     },
     {
       "id": "assurance",
-      "label": "WAM Security — Independent Assurance",
+      "label": "WAM Security \u2014 Independent Assurance",
       "status": "EXTERNAL_REVIEW_GATED",
       "repository": "Urriki1502/wam-security",
       "path": "README.md"

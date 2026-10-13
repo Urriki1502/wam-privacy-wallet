@@ -44,3 +44,20 @@
 - Offline fixtures, synthetic regtest identities and passing tests are insufficient evidence for real-wallet security.
 
 Update this threat model as components gain implementation and evidence. Each new feature PR must identify which threats it mitigates and which are still unaddressed.
+
+## Privacy review foundation mitigations and residual risks
+
+- PayJoin review derives normalized fields from exact pinned PSBTv2 parsing,
+  preserves sender UTXO scripts and protected outputs, and checks receiver
+  final-witness encoding before public verification. This does not authenticate
+  sender ownership or chain inclusion of caller-supplied witness UTXOs.
+- Application network review denies all fallback paths and endpoint aliases.
+  Recognizing a private route does not establish its availability, routing or
+  first-hop anonymity; no actual private transport is qualified.
+- Selected-history export minimizes fields and binds one-use local approval to
+  exact immutable bytes. GUI revision/consent changes invalidate pending export.
+  History remains an unqualified observation; same-process DTO forgery and a
+  compromised UI cannot be turned into a trustworthy proof. Already previewed
+  or copied data cannot be retracted, and Python memory is not securely erased.
+- CORE-003 viewing research is excluded. Export has no wallet/seed/key API,
+  filesystem write, network, payment, signing or broadcast capability.

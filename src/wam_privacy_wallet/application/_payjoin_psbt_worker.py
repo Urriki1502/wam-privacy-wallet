@@ -68,6 +68,8 @@ def review_pair(payload: bytes, root: Path) -> PayjoinPsbtReview:
                     raise ValueError
                 signature = r.blob(65)
                 r.finish()
+                if len(signature) != 64 and not (len(signature) == 65 and signature[-1] == 1):
+                    raise ValueError  # DEFAULT is encoded by 64 bytes only
                 # Existing pinned public verification, no sign/finalize call.
                 after._verify_signature(i, signature)
             proposed_inputs.append(TxInput(*point, value,

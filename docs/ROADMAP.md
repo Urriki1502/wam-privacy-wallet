@@ -36,3 +36,13 @@ No WAM Core consensus changes, shielded/Halo2 activation or inflation-unverifiab
 ## How to contribute
 
 See [CONTRIBUTING](../CONTRIBUTING.md). Propose the smallest independently testable change. Clearly state current coverage, unmet dependencies, security boundaries and limitations. Avoid auto-merging frozen or Draft PRs.
+
+## Privacy application review checkpoint — 2026-10-13
+
+Exact PSBTv2 PayJoin review, strict network-plan evaluation and selected local
+history export APIs are implemented behind non-authorizing application gates.
+[Evidence and remaining acceptance tasks](PRIVACY_INTEGRATION_2026_10_13.md)
+separate implementation, testing, integration and operational acceptance.
+Next internal work is sender ownership binding and trusted selection/save UX;
+actual private-route/runtime evidence and real Core acceptance remain separate.
+No shielded research, signer, broadcast or mainnet activation is included.

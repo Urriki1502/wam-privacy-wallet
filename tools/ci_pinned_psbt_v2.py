@@ -139,6 +139,13 @@ def main():
         def test_changed_version_denied(self): self.denied(*pair(version=3))
         def test_receiver_invalid_witness_denied(self):
             a,b=pair(); b=PSBT(b.tx,b.utxos,input_extra=({}, {b"\x08":b"\x01\x40"+bytes(64)})); self.denied(a,b)
+        def test_explicit_default_sighash_byte_is_noncanonical_and_denied(self):
+            a,b=pair()
+            final=b.input_extra[1][b"\x08"]
+            # Reuse a valid 64-byte signature; appending explicit DEFAULT=0
+            # verifies mathematically but is invalid BIP341 witness encoding.
+            invalid=b"\x01"+blob(final[2:]+b"\x00")
+            self.denied(a,PSBT(b.tx,b.utxos,input_extra=({}, {b"\x08":invalid})))
         def test_receiver_missing_witness_denied(self):
             a,b=pair(); self.denied(a,PSBT(b.tx,b.utxos))
         def test_protected_output_swap_invalidates_signature_and_denies(self):
@@ -191,7 +198,7 @@ def main():
     suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(ActualPinnedPayjoinTests))
     if args.gui:
         suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(ActualParserGuiTests))
-    expected = 33 if args.gui else 31
+    expected = 34 if args.gui else 32
     if suite.countTestCases()!=expected: raise SystemExit('NATIVE_PSBT_DISCOVERY_DENIED')
     result=unittest.TextTestRunner(verbosity=2).run(suite)
     if not result.wasSuccessful() or result.skipped or result.expectedFailures or result.unexpectedSuccesses:
