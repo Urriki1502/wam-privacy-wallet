@@ -12,6 +12,8 @@ on:
       - 'tools/ci_regtest_manual_intent_native.py'
       - 'tools/ci_regtest_signed_psbt_review_native.py'
       - 'tools/ci_wsp_offline_signer_tty.py'
+      - 'tools/wsp_offline_signer_seccomp.py'
+      - 'tools/ci_wsp_offline_signer_seccomp_probe.py'
       - 'src/wam_privacy_wallet/application/offline_signed_psbt_review.py'
       - 'tools/review_regtest_signed_psbt.py'
       - 'tests/test_offline_signed_psbt_review.py'
@@ -88,10 +90,10 @@ jobs:
           python -m tools.wsp1_full_source_closure --source-root "$GITHUB_WORKSPACE/wsp-source" > /dev/null
           echo "WSP1_PINNED_SOURCE_AND_IMPORT_CLOSURE_VERIFIED"
 
-      - name: Install Linux Qt runtime libraries (match verified Wallet GUI CI)
+      - name: Install Linux Qt and kernel seccomp userspace library (no skip)
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libegl1 libopengl0 libxkbcommon-x11-0
+          sudo apt-get install -y --no-install-recommends libegl1 libopengl0 libxkbcommon-x11-0 libseccomp2
 
       - name: Install only pinned experimental WSP-1 scanner runtime dependencies
         run: |
@@ -112,7 +114,7 @@ jobs:
           PYTHONUNBUFFERED: '1'
         run: python -B -m tools.ci_regtest_manual_intent_native --source-root "$GITHUB_WORKSPACE/wsp-source"
 
-      - name: Real WSP signer crypto → independent PSBT review (DISPOSABLE SYNTHETIC CHAIN, NO Core)
+      - name: Kernel-seccomp network/exec-denied WSP signer CLI + signed PSBT review (SYNTHETIC CHAIN, NO Core)
         env:
           PYTHONPATH: src
           PYTHONUNBUFFERED: '1'

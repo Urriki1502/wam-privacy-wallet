@@ -1,8 +1,9 @@
 """CI ONLY: execute actual pinned upstream offline signer as a separate TTY process.
 
 This runs only with a disposable encrypted regtest keyring and synthetic-chain
-CI intent. Neither an application runtime entrypoint nor an OS network
-sandbox. All TTY output stays PRIVATE and is never printed to CI logs.
+CI intent. The Linux signer child now applies kernel seccomp denial to
+network/process creation syscalls before loading upstream WSP code.
+No full OS filesystem isolation. PTY output is never printed to CI logs.
 """
 from __future__ import annotations
 
@@ -52,8 +53,8 @@ def run_offline_signer_tty(
     }
     try:
         child = subprocess.Popen(
-            [sys.executable, "-B", "-m", "wam_sp.offline_signer",
-             "--keys", str(keys), "--request", str(request),
+            [sys.executable, "-B", "-m", "tools.wsp_offline_signer_seccomp",
+             "--signer", "--keys", str(keys), "--request", str(request),
              "--output", str(output)],
             stdin=slave, stdout=slave, stderr=slave,
             close_fds=True, env=env, start_new_session=True,
