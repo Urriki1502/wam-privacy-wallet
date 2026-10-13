@@ -90,6 +90,6 @@ def scan_existing_regtest(
             try:
                 session.close()
             except Exception:
-                # Never claim successful session cleanup on an ambiguous failure.
-                # No secret-bearing object is returned by this function.
-                pass
+                # A scanner close failure leaves SQLite/file custody ambiguous.
+                # Never return a success receipt after an unqualified close.
+                raise LiveRegtestScanError("LIVE_SCAN_CLOSE_DENIED") from None
