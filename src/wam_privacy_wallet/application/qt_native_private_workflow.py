@@ -24,7 +24,7 @@ class QtPrivateWorkflowError(ValueError):
 
 
 _OPERATIONS = frozenset(("history", "checkpoint", "restore"))
-_TXID = re.compile(r"[0-9a-f]{64}\\Z")
+_TXID = re.compile(r"[0-9a-f]{64}\Z")
 
 
 @dataclass(frozen=True, slots=True, repr=False)
