@@ -102,6 +102,7 @@ MINIMUM_CASES = {
     "test_snapshot_lineage_preflight.py": 14,
     "test_checkpoint_metadata_auth.py": 27,
     "test_core_next_release_audit.py": 21,
+    "test_regtest_runtime_no_synthetic_fallback.py": 8,
     "test_core_help_example_parity.py": 28,
 }
 MANDATORY_SUITES = tuple(MINIMUM_CASES)
