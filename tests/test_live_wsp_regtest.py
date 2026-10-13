@@ -19,6 +19,9 @@ class LiveRegtestContractTests(unittest.TestCase):
                             {"acknowledge_unverified_binary": False},
                             {"max_blocks": 17}, {"history_limit": True},
                             {"history_limit": 101},
+                            {"receive_account_index": True},
+                            {"receive_account_index": 16},
+                            {"show_observed_balance": 1},
                             {"save_checkpoint": True, "restore_checkpoint": True}):
                 with self.subTest(changed=changed):
                     values = dict(kwargs)
@@ -39,3 +42,5 @@ class LiveRegtestContractTests(unittest.TestCase):
         self.assertIn("restore_checkpoint", params)
         self.assertIn("history_limit", params)
         self.assertIn("save_checkpoint", params)
+        self.assertIn("receive_account_index", params)
+        self.assertIn("show_observed_balance", params)
