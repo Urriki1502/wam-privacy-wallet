@@ -25,6 +25,7 @@ import threading
 from typing import Callable
 
 from .encrypted_scan_backup import load_encrypted_scan_backup
+from .encrypted_checkpoint_archive import load_encrypted_checkpoint, store_encrypted_checkpoint
 from .retained_scan_session import _check_existing_db
 from .wsp_scan_coordinator import WspScanSessionSummary, run_consented_wsp_scan
 from wam_privacy_wallet.integrations.wsp1_scanner_only_rpc import Wsp1ScannerOnlyRpc
@@ -119,6 +120,40 @@ class ScanSnapshot:
                 raise QualifiedScanError("APP_QUALIFIED_SCAN_SNAPSHOT_DENIED")
         if not self.mempool_observed and self.mempool_transactions_processed != 0:
             raise QualifiedScanError("APP_QUALIFIED_SCAN_SNAPSHOT_DENIED")
+
+
+@dataclass(frozen=True, slots=True, repr=False)
+class PrivateHistoryRow:
+    """Actual WSP SQLite history; txid must remain local/private."""
+    txid: str
+    height: int
+    confirmations: int
+    credit_atoms: int
+    debit_atoms: int
+
+    def __post_init__(self) -> None:
+        if (type(self.txid) is not str or re.fullmatch("[0-9a-f]{64}", self.txid) is None
+                or any(type(v) is not int for v in (self.height, self.confirmations,
+                       self.credit_atoms, self.debit_atoms))
+                or not 1 <= self.height <= 100_000_000
+                or not 1 <= self.confirmations <= 100_000_000
+                or not 0 <= self.credit_atoms <= 22_000_000 * 100_000_000
+                or not 0 <= self.debit_atoms <= 22_000_000 * 100_000_000
+                or (self.credit_atoms == 0 and self.debit_atoms == 0)):
+            raise QualifiedScanError("APP_QUALIFIED_SCAN_HISTORY_DENIED")
+
+
+@dataclass(frozen=True, slots=True, repr=False)
+class PrivateHistoryPage:
+    """No Core attestation and no spend authority; NEVER a telemetry DTO."""
+    records: tuple[PrivateHistoryRow, ...]
+    tip_height: int
+    offset: int
+    source_commit: str = field(default=PINNED_COMMIT, init=False)
+    wallet_operational: bool = field(default=False, init=False)
+    signer_enabled: bool = field(default=False, init=False)
+    broadcast_allowed: bool = field(default=False, init=False)
+    mainnet_allowed: bool = field(default=False, init=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -228,6 +263,29 @@ class SourceQualifiedScanRuntime:
             if type(error) is QualifiedScanError:
                 raise error from None
             raise QualifiedScanError("APP_QUALIFIED_SCAN_OPEN_DENIED") from None
+
+    def restore(self, private_dir: Path, password: bytes, *,
+                user_consented: bool, scope: str = _SCOPE) -> QualifiedScanSession:
+        """Restore pinned AES-GCM checkpoint into a fresh empty WSP Store.
+
+        Never marks restored chain data current; requires a NEW actual RPC sync.
+        External trusted anti-rollback is NOT qualified (#148/#151).
+        """
+        _scope(user_consented, scope)
+        session = self.open(private_dir, password, user_consented=True, scope=scope)
+        try:
+            ciphertext = load_encrypted_checkpoint(private_dir)
+            with session._scanner._lease():
+                session._scanner.store.restore_checkpoint(ciphertext, password)
+            if session._scanner.ready or session._scanner.mempool_ready:
+                raise ValueError("RESTORED_AUTHORITY")
+            return session
+        except Exception:
+            try:
+                session.close()
+            except Exception:
+                pass
+            raise QualifiedScanError("APP_QUALIFIED_SCAN_RESTORE_DENIED") from None
 
 
 _SESSION_TOKEN = object()
@@ -367,6 +425,73 @@ class QualifiedScanSession:
             return result
         except Exception:
             self._failure("APP_QUALIFIED_SCAN_NOT_CURRENT")
+        finally:
+            self._lock.release()
+
+
+    def history(self, *, user_consented: bool, limit: int = 50,
+                offset: int = 0) -> PrivateHistoryPage:
+        """Real source-pinned SQLite history under native scanner lease."""
+        _scope(user_consented, _SCOPE)
+        if (type(limit) is not int or not 1 <= limit <= 100
+                or type(offset) is not int or not 0 <= offset <= 100_000):
+            raise QualifiedScanError("APP_QUALIFIED_SCAN_HISTORY_INPUT_DENIED")
+        self._enter()
+        try:
+            if not self._scanned:
+                self._failure("APP_QUALIFIED_SCAN_NOT_CURRENT")
+            scanner = self._scanner
+            with scanner._lease(), scanner.store.transaction():
+                scanner.assert_current()
+                tip = scanner.store.tip()[0]
+                records = scanner.store.db.execute(
+                    "SELECT txid,height,credit,debit FROM history "
+                    "ORDER BY height DESC,txid DESC LIMIT ? OFFSET ?",
+                    (limit, offset),
+                ).fetchall()
+                page = PrivateHistoryPage(tuple(
+                    PrivateHistoryRow(r["txid"], r["height"],
+                                      tip - r["height"] + 1, r["credit"], r["debit"])
+                    for r in records
+                ), tip, offset)
+                scanner.assert_current()
+            if self._cancel.is_set():
+                self._failure("APP_QUALIFIED_SCAN_CANCELLED")
+            return page
+        except QualifiedScanError as error:
+            self._failure(str(error))
+        except Exception:
+            self._failure("APP_QUALIFIED_SCAN_HISTORY_DENIED")
+        finally:
+            self._lock.release()
+
+    def save_checkpoint(self, private_dir: Path, password: bytes, *,
+                        user_consented: bool) -> None:
+        """Actual WSP-1 Store.export_checkpoint AES-GCM + create-once archive."""
+        _scope(user_consented, _SCOPE)
+        if (type(private_dir) is not type(Path()) or not private_dir.is_absolute()
+                or type(password) is not bytes or not 12 <= len(password) <= 1024):
+            raise QualifiedScanError("APP_QUALIFIED_SCAN_CHECKPOINT_INPUT_DENIED")
+        self._enter()
+        try:
+            if not self._scanned:
+                self._failure("APP_QUALIFIED_SCAN_NOT_CURRENT")
+            scanner = self._scanner
+            if private_dir != scanner.store.path.parent:
+                self._failure("APP_QUALIFIED_SCAN_CHECKPOINT_PATH_DENIED")
+            with scanner._lease():
+                scanner.assert_current()
+                ciphertext = scanner.checkpoint(password)
+                scanner.assert_current()
+                if self._cancel.is_set():
+                    self._failure("APP_QUALIFIED_SCAN_CANCELLED")
+                store_encrypted_checkpoint(private_dir, ciphertext)
+            if self._cancel.is_set():
+                self._failure("APP_QUALIFIED_SCAN_CANCELLED")
+        except QualifiedScanError as error:
+            self._failure(str(error))
+        except Exception:
+            self._failure("APP_QUALIFIED_SCAN_CHECKPOINT_DENIED")
         finally:
             self._lock.release()
 

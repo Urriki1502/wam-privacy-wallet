@@ -147,6 +147,34 @@ def run(root: Path) -> None:
             assert receipt.history_count == 1 and receipt.tip_height == 2
             passed.append("ACTUAL_INCREMENTAL_PUBLIC_PAYMENT_DETECTED")
 
+            page = session.history(user_consented=True, limit=1)
+            assert len(page.records) == 1 and page.records[0].txid == PAYTX
+            assert page.records[0].height == 2 and page.records[0].confirmations == 1
+            assert page.records[0].credit_atoms == 200_000
+            assert page.records[0].debit_atoms == 0 and page.tip_height == 2
+            assert not (page.wallet_operational or page.signer_enabled
+                        or page.broadcast_allowed or page.mainnet_allowed)
+            assert not session.history(user_consented=True, offset=1).records
+            passed.append("ACTUAL_PRIVATE_SQLITE_HISTORY")
+
+            session.save_checkpoint(directory, password, user_consented=True)
+            from wam_privacy_wallet.application.encrypted_checkpoint_archive import (
+                load_encrypted_checkpoint, store_encrypted_checkpoint,
+            )
+            encrypted = load_encrypted_checkpoint(directory)
+            restored_dir = directory / "fresh-restore"
+            restored_dir.mkdir(mode=0o700)
+            provision_encrypted_scan_backup(restored_dir, envelope)
+            store_encrypted_checkpoint(restored_dir, encrypted)
+            recovered = runtime.restore(restored_dir, password, user_consented=True)
+            try:
+                assert not recovered._scanner.ready and not recovered._scanned
+                assert recovered.scan(rpc(), user_consented=True).blocks_processed == 0
+                assert recovered.history(user_consented=True, limit=1).records == page.records
+            finally:
+                recovered.close()
+            passed.append("ACTUAL_AESGCM_RESTORE_REATTEST")
+
             # Real upstream WSP SQLite projection reaches the actual REGTEST Qt
             # workspace through an explicit non-authorizing review interface.
             from PySide6.QtCore import QCoreApplication, QEvent
@@ -258,6 +286,8 @@ def run(root: Path) -> None:
         "ACTUAL_INITIAL_SCAN_STORE_PROJECTION",
         "ACTUAL_PARTIAL_BATCH_PROGRESS_WITHOUT_STALE_BALANCE",
         "ACTUAL_INCREMENTAL_PUBLIC_PAYMENT_DETECTED",
+        "ACTUAL_PRIVATE_SQLITE_HISTORY",
+        "ACTUAL_AESGCM_RESTORE_REATTEST",
         "ACTUAL_WSP_STORE_TO_REGTEST_QT_READONLY",
         "ACTUAL_REPLAY_NOT_DUPLICATED",
         "ACTUAL_MEMPOOL_STORE_PROJECTION",
@@ -271,7 +301,7 @@ def run(root: Path) -> None:
     ]
     if passed != expected:
         raise RuntimeError("ACTUAL_SESSION_CASE_COUNT_DENIED")
-    print("PINNED_RETAINED_APP_SESSION_OK 15/15; synthetic peer only; operational Core/WSP gates held")
+    print("PINNED_RETAINED_APP_SESSION_OK 17/17; synthetic peer only; operational Core/WSP gates held")
 
 
 def main() -> int:
