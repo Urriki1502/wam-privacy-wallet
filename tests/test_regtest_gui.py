@@ -16,6 +16,9 @@ from wam_privacy_wallet.application.regtest_lifecycle import inspect_local_readi
 from wam_privacy_wallet.application.qualified_scan_session import ScanSnapshot
 from wam_privacy_wallet.node.gui_two_node_readonly import LiveNodeGuiEvidence
 from wam_privacy_wallet.application.qt_native_wsp_bridge import QtNativeScanEvidence
+from wam_privacy_wallet.application.qt_native_private_workflow import (
+    PrivateQtWorkflowEvidence, PrivateQtHistoryRow,
+)
 from wam_privacy_wallet.gui.regtest_window import RegtestWindow, VIEWS
 
 
@@ -330,6 +333,101 @@ class RegtestGuiTests(unittest.TestCase):
         self.assertNotIn("disposable", self.window.scan_review_status.text())
         self.assertEqual(self.window.scan_inputs["passphrase"].text(), "")
         self.assertFalse(self.window.controller.lifecycle.state.wallet_operational)
+
+    def fill_private_workflow_inputs(self):
+        self.node_inputs_ready()
+        for key, value in (("source", str(Path.cwd().resolve())),
+                           ("private", str(Path.cwd().resolve())),
+                           ("passphrase", "disposable-PASS-123")):
+            self.window.scan_inputs[key].setText(value)
+
+    def test_transaction_history_explicit_approval_redacts_other_pages(self):
+        if sys.platform != "linux":
+            return
+        self.fill_private_workflow_inputs()
+        self.window.navigation.setCurrentRow(3)
+        self.assertFalse(self.window.history_button.isEnabled())
+        self.window.history_ack.setChecked(True)
+        self.assertTrue(self.window.history_button.isEnabled())
+        row = PrivateQtHistoryRow("a" * 64, 10, 2, 500, 0)
+        proof = PrivateQtWorkflowEvidence("history", 11, (row,))
+        with patch("wam_privacy_wallet.gui.regtest_worker.run_private_wsp_workflow",
+                   return_value=proof) as worker:
+            self.window.history_button.click()
+            self.drain(lambda: not self.window.controller.busy)
+            worker.assert_called_once()
+        self.assertIn("a" * 64, self.window.private_history_status.toPlainText())
+        self.assertNotIn("a" * 64, self.window.scan_review_status.text())
+        self.assertNotIn("a" * 64, self.window.backup_status.text())
+        self.assertEqual(self.window.scan_inputs["passphrase"].text(), "")
+        self.window.navigation.setCurrentRow(0)
+        self.assertNotIn("a" * 64, self.window.private_history_status.toPlainText())
+        self.assertFalse(self.window.history_ack.isChecked())
+        self.assertFalse(self.window.controller.lifecycle.state.wallet_operational)
+
+    def test_private_checkpoint_and_restore_only_show_status(self):
+        if sys.platform != "linux":
+            return
+        for operation in ("checkpoint", "restore"):
+            self.fill_private_workflow_inputs()
+            self.window.navigation.setCurrentRow(6)
+            self.window.backup_ack.setChecked(True)
+            button = (self.window.checkpoint_button
+                      if operation == "checkpoint" else self.window.restore_button)
+            self.assertTrue(button.isEnabled())
+            with patch("wam_privacy_wallet.gui.regtest_worker.run_private_wsp_workflow",
+                       return_value=PrivateQtWorkflowEvidence(operation, 14)) as backend:
+                button.click()
+                self.drain(lambda: not self.window.controller.busy)
+                self.assertEqual(backend.call_args.kwargs["operation"], operation)
+            self.assertIn("CHECKPOINT", self.window.backup_status.text())
+            self.assertIn("NO VERIFIED CORE", self.window.backup_status.text())
+            self.assertNotIn("disposable", self.window.backup_status.text())
+            self.assertEqual(self.window.scan_inputs["passphrase"].text(), "")
+
+    def test_private_workflow_cancel_suppresses_late_txids(self):
+        if sys.platform != "linux":
+            return
+        entered, release = Event(), Event()
+        self.fill_private_workflow_inputs()
+        self.window.navigation.setCurrentRow(3)
+        self.window.history_ack.setChecked(True)
+        def slow(**kwargs):
+            entered.set()
+            release.wait(3)
+            return PrivateQtWorkflowEvidence(
+                "history", 5, (PrivateQtHistoryRow("b" * 64, 4, 2, 8, 0),)
+            )
+        with patch("wam_privacy_wallet.gui.regtest_worker.run_private_wsp_workflow",
+                   side_effect=slow):
+            self.window.history_button.click()
+            self.assertTrue(entered.wait(2))
+            self.window.cancel_button.click()
+            release.set()
+            self.drain(lambda: not self.window.controller.busy)
+        self.assertNotIn("b" * 64, self.window.private_history_status.toPlainText())
+
+    def test_private_history_navigation_midflight_never_leaks(self):
+        if sys.platform != "linux":
+            return
+        entered, release = Event(), Event()
+        self.fill_private_workflow_inputs()
+        self.window.navigation.setCurrentRow(3)
+        self.window.history_ack.setChecked(True)
+        def slow(**kwargs):
+            entered.set()
+            release.wait(3)
+            return PrivateQtWorkflowEvidence(
+                "history", 5, (PrivateQtHistoryRow("c" * 64, 4, 2, 8, 0),)
+            )
+        with patch("wam_privacy_wallet.gui.regtest_worker.run_private_wsp_workflow",
+                   side_effect=slow):
+            self.window.history_button.click()
+            self.assertTrue(entered.wait(2))
+            self.window.navigation.setCurrentRow(8)
+            release.set()
+            self.drain(lambda: not self.window.controller.busy)
+        self.assertNotIn("c" * 64, self.window.private_history_status.toPlainText())
 
     def test_startup_and_inspection_do_not_connect_or_launch_core(self):
         self.selected()
