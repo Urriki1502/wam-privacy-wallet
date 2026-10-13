@@ -46,7 +46,7 @@ def _digest_private_regular(path: Path) -> str:
             raise ValueError
         before = path.lstat()
         if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1
-                or before.st_size < 24 or before.st_size > 32 * 1024 * 1024
+                or before.st_size < 52 or before.st_size > 32 * 1024 * 1024 + 52
                 or (os.name == "posix" and (stat.S_IMODE(before.st_mode) != 0o600
                     or before.st_uid != os.geteuid()))):
             raise ValueError
@@ -61,6 +61,8 @@ def _digest_private_regular(path: Path) -> str:
             while remaining:
                 chunk = source.read(min(1024 * 1024, remaining))
                 if not chunk:
+                    raise ValueError
+                if remaining == before.st_size and not chunk.startswith(b"WAMSP02\x00"):
                     raise ValueError
                 digest.update(chunk)
                 remaining -= len(chunk)

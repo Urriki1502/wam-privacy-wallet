@@ -18,8 +18,8 @@ class OfflineSignerHandoffTests(unittest.TestCase):
         self.key = self.dir / "keys.enc"
         self.request = self.dir / "request.enc"
         self.out = self.dir / "signed.psbt"
-        self.key.write_bytes(b"DISPOSABLE_OFFLINE_ENCRYPTED_KEYRING_BYTES")
-        self.request.write_bytes(b"DISPOSABLE_OFFLINE_ENCRYPTED_INTENT_REQUEST")
+        self.key.write_bytes(b"WAMSP02\x00" + b"K" * 64)
+        self.request.write_bytes(b"WAMSP02\x00" + b"I" * 64)
         self.key.chmod(0o600)
         self.request.chmod(0o600)
 
@@ -66,6 +66,15 @@ class OfflineSignerHandoffTests(unittest.TestCase):
                 self.key, self.request, self.out,
                 source_root=self.dir, user_consented=True,
             )
+
+    def test_malformed_envelope_magic_denied(self):
+        import sys
+        if sys.platform != "linux":
+            return
+        self.request.write_bytes(b"NOTWSP00" + b"X" * 64)
+        with self.assertRaisesRegex(SignerHandoffError,
+                                    "^SIGNER_PRIVATE_FILE_DENIED$"):
+            self.inspect()
 
     def test_symlinks_permissive_keys_and_existing_output_denied(self):
         import sys
