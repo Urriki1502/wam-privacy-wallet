@@ -8,18 +8,19 @@ from __future__ import annotations
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
-    QCheckBox, QHBoxLayout, QLabel, QListWidget, QMainWindow, QPushButton,
-    QStackedWidget, QVBoxLayout, QWidget,
+    QCheckBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QListWidget,
+    QMainWindow, QPushButton, QSpinBox, QStackedWidget, QVBoxLayout, QWidget,
 )
 
 from wam_privacy_wallet.application.regtest_lifecycle import BLOCKERS, RegtestLifecycleError
 from wam_privacy_wallet.application.qualified_scan_session import ScanSnapshot
+from wam_privacy_wallet.node.gui_two_node_readonly import LiveNodeGuiEvidence
 from wam_privacy_wallet.integrations.wsp1_source_review import PINNED_COMMIT
 from .regtest_worker import RegtestWorkerController
 
 VIEWS = (
     ("Dashboard", "No wallet is loaded. Select REGTEST and inspect local gates."),
-    ("Node Connection", "BLOCKED: authenticated Core image, loader, configuration and isolated two-node approval are required (#82/#86/#153/#9)."),
+    ("Node Connection", "REVIEW_ONLY: inspect two existing localhost REGTEST nodes. Core image, loader, configuration and genuine two-node E2E remain BLOCKED (#82/#86/#153/#9)."),
     ("Receive", "BLOCKED: scan-only account provisioning and WSP review must be approved before displaying a user receive address."),
     ("Transactions", "BLOCKED: no genuine Core payment history is available."),
     ("Balance / UTXO", "BLOCKED: balance and ownership are unqualified. No amount is fabricated."),
@@ -66,6 +67,46 @@ class RegtestWindow(QMainWindow):
             description = QLabel(message)
             description.setWordWrap(True)
             layout.addWidget(description)
+            if name == "Node Connection":
+                form = QFormLayout()
+                self.node_ports = {}
+                for label, key, initial in (
+                    ("Node A RPC port", "a_rpc", 29554),
+                    ("Node A P2P port", "a_p2p", 29555),
+                    ("Node B RPC port", "b_rpc", 29556),
+                    ("Node B P2P port", "b_p2p", 29557),
+                ):
+                    control = QSpinBox()
+                    control.setRange(1024, 65535)
+                    control.setValue(initial)
+                    self.node_ports[key] = control
+                    form.addRow(label, control)
+                    control.valueChanged.connect(self._refresh_controls)
+                self.node_inputs = {}
+                for label, key, secret in (
+                    ("Node A RPC username", "a_user", False),
+                    ("Node A RPC password", "a_password", True),
+                    ("Node B RPC username", "b_user", False),
+                    ("Node B RPC password", "b_password", True),
+                ):
+                    control = QLineEdit()
+                    if secret:
+                        control.setEchoMode(QLineEdit.EchoMode.Password)
+                    control.textChanged.connect(self._refresh_controls)
+                    self.node_inputs[key] = control
+                    form.addRow(label, control)
+                layout.addLayout(form)
+                self.node_ack = QCheckBox(
+                    "I acknowledge these node binaries are NOT authenticated"
+                )
+                self.node_ack.toggled.connect(self._refresh_controls)
+                layout.addWidget(self.node_ack)
+                self.node_probe_button = QPushButton("Probe two existing REGTEST nodes")
+                self.node_probe_button.clicked.connect(self._probe_nodes)
+                layout.addWidget(self.node_probe_button)
+                self.node_probe_status = QLabel("NO NODE CONNECTION INSPECTION")
+                self.node_probe_status.setWordWrap(True)
+                layout.addWidget(self.node_probe_status)
             layout.addStretch()
             self.pages.addWidget(page)
         body.addWidget(self.navigation, 1)
@@ -83,6 +124,8 @@ class RegtestWindow(QMainWindow):
         self.consent.toggled.connect(self._refresh_controls)
         self.controller.state_changed.connect(self._render)
         self.controller.idle.connect(self._refresh_controls)
+        self.controller.node_probe_completed.connect(self._node_probed)
+        self.controller.node_probe_failed.connect(self._node_failed)
         self._render(self.controller.lifecycle.state)
 
     def _select(self):
@@ -97,6 +140,58 @@ class RegtestWindow(QMainWindow):
         except RegtestLifecycleError:
             self.lifecycle_status.setText("APP_REGTEST_CONSENT_OR_STATE_DENIED")
 
+    def _probe_nodes(self):
+        state = self.controller.lifecycle.state
+        try:
+            self.node_probe_status.setText("INSPECTING · READ-ONLY · UNTRUSTED CORE")
+            a_password = self.node_inputs["a_password"].text()
+            b_password = self.node_inputs["b_password"].text()
+            # Clear UI widgets before starting worker; neither credential is
+            # logged, stored on disk or put into a public GUI status receipt.
+            self.node_inputs["a_password"].clear()
+            self.node_inputs["b_password"].clear()
+            self.controller.inspect_nodes(
+                node_a_rpc=self.node_ports["a_rpc"].value(),
+                node_a_p2p=self.node_ports["a_p2p"].value(),
+                node_a_user=self.node_inputs["a_user"].text(),
+                node_a_password=a_password,
+                node_b_rpc=self.node_ports["b_rpc"].value(),
+                node_b_p2p=self.node_ports["b_p2p"].value(),
+                node_b_user=self.node_inputs["b_user"].text(),
+                node_b_password=b_password,
+                consent=self.consent.isChecked(),
+                unverified_core_ack=self.node_ack.isChecked(),
+            )
+        except (ValueError, RegtestLifecycleError):
+            self.node_probe_status.setText("APP_REGTEST_NODE_PROBE_DENIED")
+
+    def _node_probed(self, revision, receipt):
+        state = self.controller.lifecycle.state
+        try:
+            if (self._closing or state.mode != "REGTEST"
+                    or state.phase in ("CLOSED", "CANCELLED")
+                    or not self.consent.isChecked() or
+                    not self.node_ack.isChecked()
+                    or type(revision) is not int or
+                    state.revision != revision or
+                    type(receipt) is not LiveNodeGuiEvidence):
+                raise ValueError
+            checked = LiveNodeGuiEvidence(receipt.tip_height)
+            if checked != receipt:
+                raise ValueError
+        except Exception:
+            self.node_probe_status.setText("NO NODE CONNECTION INSPECTION")
+            return
+        self.node_probe_status.setText(
+            "UNTRUSTED TWO-NODE REGTEST · RPC/P2P localhost observed · "
+            f"reported tip {receipt.tip_height} · 1 peer/node · "
+            "NO VERIFIED CORE · NO WALLET LOADED · NO SIGNER / BROADCAST"
+        )
+
+    def _node_failed(self, revision):
+        if type(revision) is int and revision == self.controller.lifecycle.state.revision:
+            self.node_probe_status.setText("APP_REGTEST_NODE_PROBE_DENIED")
+
     def _refresh_controls(self):
         state = self.controller.lifecycle.state
         available = not self._closing and state.phase != "CLOSED" and not self.controller.busy
@@ -104,12 +199,21 @@ class RegtestWindow(QMainWindow):
         self.consent.setEnabled(available)
         self.inspect_button.setEnabled(available and state.mode == "REGTEST" and self.consent.isChecked())
         self.cancel_button.setEnabled(self.controller.busy and not self._closing)
+        ports = [v.value() for v in self.node_ports.values()]
+        self.node_probe_button.setEnabled(
+            available and state.mode == "REGTEST"
+            and self.consent.isChecked() and self.node_ack.isChecked()
+            and len(set(ports)) == 4
+            and all(self.node_inputs[key].text()
+                    for key in ("a_user", "a_password", "b_user", "b_password"))
+        )
 
     def _render(self, state):
         self.lifecycle_status.setText(f"{state.mode} · {state.phase} · {state.readiness}")
         # This local lifecycle never loads a wallet or authorizes a backend.
         self.authority_status.setText("NO WALLET LOADED · SIGNER / BROADCAST BLOCKED")
         self.clear_scan_review()
+        self.node_probe_status.setText("NO NODE CONNECTION INSPECTION")
         self._refresh_controls()
 
     def clear_scan_review(self):
