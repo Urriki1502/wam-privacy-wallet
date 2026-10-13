@@ -195,7 +195,7 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
             "test_regtest_scanner_wire.py": 20,
             "test_core_artifact_staging.py": 20,
             "test_core_candidate_bridge.py": 14,
-            "test_core_signed_release.py": 20,
+            "test_core_signed_release.py": 24,
             "test_core_archive_inventory.py": 23,
             "test_verify_core_release_offline.py": 12,
             "test_probe_existing_regtest.py": 13,

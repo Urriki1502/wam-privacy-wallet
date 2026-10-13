@@ -111,6 +111,38 @@ class CoreSignedReleaseTests(unittest.TestCase):
             ):
                 _gpg_primary_fingerprint(listing)
 
+    def test_only_fingerprint_checked_ephemeral_public_keyring_is_used(self):
+        with patch.object(mod, "_run_gpg", side_effect=self.valid_results()) as calls:
+            self.verify_fixture()
+        args = [call.args[2] for call in calls.call_args_list]
+        self.assertIn("show-only", args[0])
+        self.assertIn("--dearmor", args[1])
+        self.assertNotIn("--import", args[1])
+        keyring = Path(args[1][args[1].index("--output") + 1])
+        self.assertEqual(keyring.name, "release-public.gpg")
+        self.assertEqual(keyring.parent, calls.call_args_list[1].args[1])
+        self.assertIn("--no-default-keyring", args[2])
+        self.assertEqual(args[2][args[2].index("--keyring") + 1], str(keyring))
+
+    def test_failed_public_key_decoding_never_reaches_signature_or_archive(self):
+        with patch.object(mod, "_run_gpg", side_effect=[self.valid_results()[0], (1, "")]) as calls:
+            with self.assertRaisesRegex(CoreReleaseSignatureError, "^CORE_RELEASE_SIGNER_DENIED$"):
+                self.verify_fixture(archive=self.root / "missing")
+        self.assertEqual(calls.call_count, 2)
+
+    def test_wrong_primary_key_never_creates_or_uses_keyring(self):
+        with patch.object(mod, "_run_gpg", return_value=(0, "pub:...\nfpr:::::::::" + WRONG + ":\n")) as calls:
+            with self.assertRaisesRegex(CoreReleaseSignatureError, "^CORE_RELEASE_SIGNER_DENIED$"):
+                self.verify_fixture()
+        self.assertEqual(calls.call_count, 1)
+
+    def test_signature_nonzero_exit_refused_even_with_valid_status_text(self):
+        results = self.valid_results()
+        results[2] = (1, results[2][1])
+        with patch.object(mod, "_run_gpg", side_effect=results):
+            with self.assertRaisesRegex(CoreReleaseSignatureError, "^CORE_RELEASE_SIGNATURE_DENIED$"):
+                self.verify_fixture()
+
     def test_correct_primary_key_allows_legitimate_subkey_fingerprint(self):
         listing = (
             "pub:...\nfpr:::::::::" + FP + ":\n"
@@ -281,6 +313,8 @@ class CoreSignedReleaseTests(unittest.TestCase):
             mod._run_gpg(self.gpg, home, ("--version",))
             call = proc.call_args
             self.assertFalse(call.kwargs["shell"])
+            self.assertIn("--no-autostart", call.args[0])
+            self.assertIn("--no-auto-key-retrieve", call.args[0])
             self.assertEqual(call.kwargs["env"]["GNUPGHOME"], str(home))
             self.assertNotIn("LD_PRELOAD", call.kwargs["env"])
             self.assertNotIn("WAM_RPC_PASSWORD", call.kwargs["env"])

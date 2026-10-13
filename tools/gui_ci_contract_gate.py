@@ -314,6 +314,8 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_signed_release.CoreSignedReleaseTests.test_unsigned_checksums_are_never_acceptance_evidence",
     "test_core_signed_release.CoreSignedReleaseTests.test_post_signature_archive_digest_mismatch_denied",
     "test_core_signed_release.CoreSignedReleaseTests.test_gpg_invocation_never_uses_shell_or_user_gnupghome",
+    "test_core_signed_release.CoreSignedReleaseTests.test_only_fingerprint_checked_ephemeral_public_keyring_is_used",
+    "test_core_signed_release.CoreSignedReleaseTests.test_failed_public_key_decoding_never_reaches_signature_or_archive",
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_linux_tar_contains_readonly_node_hash_and_counts",
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_reject_tar_symlink_and_hardlink",
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_reject_zip_unix_symlink",
@@ -322,7 +324,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 1470
+FULL_MIN_CASES = 1474
 
 
 def _cases(suite: unittest.TestSuite):
