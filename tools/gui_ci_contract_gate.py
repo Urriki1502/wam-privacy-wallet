@@ -79,6 +79,16 @@ GUI_TEST_IDS = frozenset({
 })
 # Security-critical original non-GUI identities; additive to original suite floors.
 CRITICAL_NON_GUI_IDS = frozenset({
+    "test_regtest_gui.RegtestGuiTests.test_real_local_readiness_runs_on_worker_and_delivers_on_gui_thread",
+    "test_regtest_gui.RegtestGuiTests.test_cancellation_ignores_late_result_and_keeps_ui_responsive",
+    "test_regtest_gui.RegtestGuiTests.test_close_waits_cooperatively_without_terminating_worker",
+    "test_regtest_gui.RegtestGuiTests.test_backend_error_redacted_and_retry_uses_real_policy",
+    "test_regtest_gui.RegtestGuiTests.test_startup_and_inspection_do_not_connect_or_launch_core",
+    "test_regtest_gui.RegtestGuiTests.test_required_nine_views_have_actual_blocked_status",
+    "test_regtest_gui.RegtestGuiTests.test_denied_consent_does_not_create_worker_or_call_policy",
+    "test_regtest_gui.RegtestGuiTests.test_mode_selection_and_explicit_consent_enable_only_local_inspection",
+    "test_regtest_gui.RegtestGuiTests.test_busy_worker_cannot_start_second_job",
+    "test_regtest_gui.RegtestGuiTests.test_shutdown_input_denied",
     "test_security_assurance_review.SecurityAssuranceReviewTests.test_denied_consent_before_source_lookup_or_io",
     "test_security_assurance_review.SecurityAssuranceReviewTests.test_missing_dependency_is_fail_closed_without_fallback",
     "test_selective_disclosure_review.DisclosureReviewTests.test_no_consent_or_wrong_scope_denied_before_files_or_child",
@@ -297,7 +307,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 1081
+FULL_MIN_CASES = 1296
 
 
 def _cases(suite: unittest.TestSuite):
