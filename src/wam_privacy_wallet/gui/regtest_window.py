@@ -6,6 +6,7 @@ Only mode selection, local policy inspection, cancel and close are actionable.
 """
 from __future__ import annotations
 
+import sys
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
     QCheckBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QListWidget,
@@ -15,6 +16,7 @@ from PySide6.QtWidgets import (
 from wam_privacy_wallet.application.regtest_lifecycle import BLOCKERS, RegtestLifecycleError
 from wam_privacy_wallet.application.qualified_scan_session import ScanSnapshot
 from wam_privacy_wallet.node.gui_two_node_readonly import LiveNodeGuiEvidence
+from wam_privacy_wallet.application.qt_native_wsp_bridge import QtNativeScanEvidence
 from wam_privacy_wallet.integrations.wsp1_source_review import PINNED_COMMIT
 from .regtest_worker import RegtestWorkerController
 
@@ -107,6 +109,25 @@ class RegtestWindow(QMainWindow):
                 self.node_probe_status = QLabel("NO NODE CONNECTION INSPECTION")
                 self.node_probe_status.setWordWrap(True)
                 layout.addWidget(self.node_probe_status)
+                form_scan = QFormLayout()
+                self.scan_inputs = {}
+                for label, key, secret in (
+                    ("Pinned WSP-1 source checkout (absolute)", "source", False),
+                    ("Disposable scan-only directory (absolute)", "private", False),
+                    ("Scan-only backup passphrase", "passphrase", True),
+                ):
+                    control = QLineEdit()
+                    if secret:
+                        control.setEchoMode(QLineEdit.EchoMode.Password)
+                    control.textChanged.connect(self._refresh_controls)
+                    self.scan_inputs[key] = control
+                    form_scan.addRow(label, control)
+                layout.addLayout(form_scan)
+                self.scan_button = QPushButton(
+                    "Scan existing 2-node WSP-1 (Linux x64 only, max 16 blocks)"
+                )
+                self.scan_button.clicked.connect(self._scan_existing)
+                layout.addWidget(self.scan_button)
             layout.addStretch()
             self.pages.addWidget(page)
         body.addWidget(self.navigation, 1)
@@ -126,6 +147,8 @@ class RegtestWindow(QMainWindow):
         self.controller.idle.connect(self._refresh_controls)
         self.controller.node_probe_completed.connect(self._node_probed)
         self.controller.node_probe_failed.connect(self._node_failed)
+        self.controller.scan_completed.connect(self._scan_completed)
+        self.controller.scan_failed.connect(self._scan_failed)
         self._render(self.controller.lifecycle.state)
 
     def _select(self):
@@ -164,6 +187,65 @@ class RegtestWindow(QMainWindow):
             )
         except (ValueError, RegtestLifecycleError):
             self.node_probe_status.setText("APP_REGTEST_NODE_PROBE_DENIED")
+
+    def _scan_existing(self):
+        self.clear_scan_review()
+        try:
+            a_password = self.node_inputs["a_password"].text()
+            b_password = self.node_inputs["b_password"].text()
+            scan_passphrase = self.scan_inputs["passphrase"].text()
+            self.node_inputs["a_password"].clear()
+            self.node_inputs["b_password"].clear()
+            self.scan_inputs["passphrase"].clear()
+            self.controller.scan_existing(
+                source_root=self.scan_inputs["source"].text(),
+                private_dir=self.scan_inputs["private"].text(),
+                scan_password=scan_passphrase,
+                node_a_rpc=self.node_ports["a_rpc"].value(),
+                node_a_p2p=self.node_ports["a_p2p"].value(),
+                node_a_user=self.node_inputs["a_user"].text(),
+                node_a_password=a_password,
+                node_b_rpc=self.node_ports["b_rpc"].value(),
+                node_b_p2p=self.node_ports["b_p2p"].value(),
+                node_b_user=self.node_inputs["b_user"].text(),
+                node_b_password=b_password,
+                consent=self.consent.isChecked(),
+                unverified_core_ack=self.node_ack.isChecked(),
+            )
+        except (RegtestLifecycleError, ValueError):
+            self.scan_review_status.setText("QT_NATIVE_WSP_SCAN_DENIED")
+
+    def _scan_completed(self, revision, receipt):
+        state = self.controller.lifecycle.state
+        try:
+            if (self._closing or state.mode != "REGTEST" or
+                    state.phase in ("CLOSED", "CANCELLED") or
+                    not self.consent.isChecked() or not self.node_ack.isChecked() or
+                    type(revision) is not int or state.revision != revision or
+                    type(receipt) is not QtNativeScanEvidence):
+                raise ValueError
+            checked = QtNativeScanEvidence(
+                receipt.tip_height, receipt.chain_current,
+                receipt.blocks_processed, receipt.transactions_processed,
+                receipt.observed_utxos,
+            )
+            if checked != receipt:
+                raise ValueError
+        except Exception:
+            self.clear_scan_review()
+            return
+        count = (f"{receipt.observed_utxos} UNQUALIFIED"
+                 if receipt.chain_current else "UNAVAILABLE: SCAN INCOMPLETE")
+        self.scan_review_status.setText(
+            "REAL LOCAL WSP-1 · TWO-NODE REPORTED CHAIN · "
+            "NO VERIFIED CORE / WALLET / SIGNER / BROADCAST · "
+            f"height {receipt.tip_height} · blocks {receipt.blocks_processed} · "
+            f"tx {receipt.transactions_processed} · observed UTXOs {count}"
+        )
+
+    def _scan_failed(self, revision):
+        if type(revision) is int and revision == self.controller.lifecycle.state.revision:
+            self.scan_review_status.setText("QT_NATIVE_WSP_SCAN_DENIED")
 
     def _node_probed(self, revision, receipt):
         state = self.controller.lifecycle.state
@@ -206,6 +288,15 @@ class RegtestWindow(QMainWindow):
             and len(set(ports)) == 4
             and all(self.node_inputs[key].text()
                     for key in ("a_user", "a_password", "b_user", "b_password"))
+        )
+        self.scan_button.setEnabled(
+            available and sys.platform == "linux" and state.mode == "REGTEST"
+            and state.phase != "CANCELLED"
+            and self.consent.isChecked() and self.node_ack.isChecked()
+            and len(set(ports)) == 4
+            and all(self.node_inputs[key].text()
+                    for key in ("a_user","a_password","b_user","b_password"))
+            and all(self.scan_inputs[key].text() for key in ("source","private","passphrase"))
         )
 
     def _render(self, state):

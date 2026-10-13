@@ -1,5 +1,7 @@
 """Actual Qt-thread/lifecycle tests. No operational node or fabricated wallet."""
 import os
+import sys
+from pathlib import Path
 import time
 import unittest
 from threading import Event, get_ident
@@ -13,6 +15,7 @@ from PySide6.QtWidgets import QApplication
 from wam_privacy_wallet.application.regtest_lifecycle import inspect_local_readiness, RegtestLifecycleError
 from wam_privacy_wallet.application.qualified_scan_session import ScanSnapshot
 from wam_privacy_wallet.node.gui_two_node_readonly import LiveNodeGuiEvidence
+from wam_privacy_wallet.application.qt_native_wsp_bridge import QtNativeScanEvidence
 from wam_privacy_wallet.gui.regtest_window import RegtestWindow, VIEWS
 
 
@@ -277,6 +280,56 @@ class RegtestGuiTests(unittest.TestCase):
         self.assertTrue(self.window.node_probe_button.isEnabled())
         self.window.node_ack.setChecked(False)
         self.assertFalse(self.window.node_probe_button.isEnabled())
+
+    def test_native_scanner_has_no_automatic_activation(self):
+        self.selected()
+        self.window.node_ack.setChecked(True)
+        self.assertFalse(self.window.scan_button.isEnabled())
+        with patch("wam_privacy_wallet.gui.regtest_worker.run_existing_two_node_scan") as backend:
+            self.window.navigation.setCurrentRow(1)
+            backend.assert_not_called()
+
+    def test_native_scanner_worker_cancellation_suppresses_late_result(self):
+        if sys.platform != "linux":
+            self.assertFalse(self.window.scan_button.isEnabled())
+            return
+        from threading import Event as ThreadEvent
+        entered, release = ThreadEvent(), ThreadEvent()
+        self.node_inputs_ready()
+        for key, value in (("source", str(Path.cwd().resolve())),
+                           ("private", str(Path.cwd().resolve())),
+                           ("passphrase", "disposable-ONLY-password")):
+            self.window.scan_inputs[key].setText(value)
+        self.assertTrue(self.window.scan_button.isEnabled())
+        def slow(**kwargs):
+            entered.set()
+            release.wait(3)
+            return QtNativeScanEvidence(12, True, 1, 1, 1)
+        with patch("wam_privacy_wallet.gui.regtest_worker.run_existing_two_node_scan", side_effect=slow):
+            self.window.scan_button.click()
+            self.assertTrue(entered.wait(2))
+            self.window.cancel_button.click()
+            release.set()
+            self.drain(lambda: not self.window.controller.busy)
+        self.assertEqual(self.window.scan_review_status.text(), "NO WSP-1 SCAN REVIEW")
+
+    def test_native_scanner_ui_scalar_evidence_never_exposes_amount(self):
+        if sys.platform != "linux":
+            return
+        self.node_inputs_ready()
+        for key, value in (("source", str(Path.cwd().resolve())),
+                           ("private", str(Path.cwd().resolve())),
+                           ("passphrase", "disposable-ONLY-password")):
+            self.window.scan_inputs[key].setText(value)
+        with patch("wam_privacy_wallet.gui.regtest_worker.run_existing_two_node_scan",
+                   return_value=QtNativeScanEvidence(12, True, 1, 1, 3)):
+            self.window.scan_button.click()
+            self.drain(lambda: not self.window.controller.busy)
+        self.assertIn("observed UTXOs 3 UNQUALIFIED", self.window.scan_review_status.text())
+        self.assertIn("NO VERIFIED CORE", self.window.scan_review_status.text())
+        self.assertNotIn("disposable", self.window.scan_review_status.text())
+        self.assertEqual(self.window.scan_inputs["passphrase"].text(), "")
+        self.assertFalse(self.window.controller.lifecycle.state.wallet_operational)
 
     def test_startup_and_inspection_do_not_connect_or_launch_core(self):
         self.selected()

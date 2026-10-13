@@ -7,6 +7,7 @@ peer can lie about process identity: all returned values remain UNTRUSTED.
 from __future__ import annotations
 
 from pathlib import Path
+from collections.abc import Callable
 
 from wam_privacy_wallet.application.qualified_scan_session import (
     SourceQualifiedScanRuntime,
@@ -36,6 +37,7 @@ def scan_existing_regtest(
     restore_checkpoint: bool = False,
     receive_account_index: int | None = None,
     show_observed_balance: bool = False,
+    cancelled: Callable[[], bool] | None = None,
 ) -> dict[str, object]:
     """Execute genuine pinned WSP Scanner.sync against an existing RPC socket.
 
@@ -55,7 +57,8 @@ def scan_existing_regtest(
             or (receive_account_index is not None and (
                 type(receive_account_index) is not int
                 or not 0 <= receive_account_index < 16))
-            or type(show_observed_balance) is not bool):
+            or type(show_observed_balance) is not bool
+            or (cancelled is not None and not callable(cancelled))):
         raise LiveRegtestScanError("LIVE_SCAN_CONSENT_OR_SCOPE_DENIED")
     if (type(source_root) is not type(Path()) or not source_root.is_absolute()
             or type(private_dir) is not type(Path()) or not private_dir.is_absolute()
@@ -64,6 +67,8 @@ def scan_existing_regtest(
         raise LiveRegtestScanError("LIVE_SCAN_INPUT_DENIED")
     session = None
     try:
+        if cancelled is not None and cancelled():
+            raise LiveRegtestScanError("LIVE_SCAN_CANCELLED")
         gateway = LocalRegtestIdentityGateway(endpoint, rpc_auth, timeout=3)
         before = gateway.probe_core_profile()
         runtime = SourceQualifiedScanRuntime(source_root, user_consented=True)
@@ -71,7 +76,12 @@ def scan_existing_regtest(
                    if restore_checkpoint else
                    runtime.open(private_dir, scan_password, user_consented=True))
         rpc = Wsp1ScannerOnlyRpc(endpoint, rpc_auth, timeout=3)
-        snapshot = session.scan(rpc, user_consented=True, max_blocks=max_blocks)
+        scan_args = {"cancelled": cancelled} if cancelled is not None else {}
+        snapshot = session.scan(
+            rpc, user_consented=True, max_blocks=max_blocks, **scan_args,
+        )
+        if cancelled is not None and cancelled():
+            raise LiveRegtestScanError("LIVE_SCAN_CANCELLED")
         after = gateway.probe_core_profile()
         if before != after or session.closed:
             raise LiveRegtestScanError("LIVE_SCAN_PEER_MOVED_DENIED")
@@ -90,6 +100,8 @@ def scan_existing_regtest(
         # checkpoint operations: no private output from a drifting live chain.
         if gateway.probe_core_profile() != before:
             raise LiveRegtestScanError("LIVE_SCAN_PEER_MOVED_DENIED")
+        if cancelled is not None and cancelled():
+            raise LiveRegtestScanError("LIVE_SCAN_CANCELLED")
         if (snapshot.core_authenticated or snapshot.wallet_operational
                 or snapshot.balance_qualified or snapshot.signer_enabled
                 or snapshot.broadcast_allowed or snapshot.mainnet_allowed):

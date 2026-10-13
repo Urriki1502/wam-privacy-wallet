@@ -7,6 +7,7 @@ localhost RPC replies do not authenticate WAM binaries or process isolation.
 from __future__ import annotations
 
 from pathlib import Path
+from collections.abc import Callable
 
 from wam_privacy_wallet.application.live_regtest_scanner import scan_existing_regtest
 from wam_privacy_wallet.node.attestation import ChainIdentity
@@ -41,6 +42,7 @@ def scan_two_existing_regtest_nodes(
     save_checkpoint: bool = False, restore_checkpoint: bool = False,
     receive_account_index: int | None = None,
     show_observed_balance: bool = False,
+    cancelled: Callable[[], bool] | None = None,
 ) -> dict[str, object]:
     """Bracket actual Scanner.sync with independent read-only P2P/chain probes.
 
@@ -74,9 +76,12 @@ def scan_two_existing_regtest_nodes(
             or (receive_account_index is not None and (
                 type(receive_account_index) is not int
                 or not 0 <= receive_account_index < 16))
-            or type(show_observed_balance) is not bool):
+            or type(show_observed_balance) is not bool
+            or (cancelled is not None and not callable(cancelled))):
         raise TwoNodeWspSessionError("TWO_NODE_WSP_SCOPE_DENIED")
     try:
+        if cancelled is not None and cancelled():
+            raise TwoNodeWspSessionError("TWO_NODE_WSP_CANCELLED")
         topology = TwoNodeP2PReadOnlyAudit(
             node_a, auth_a, node_b, auth_b,
             node_a_p2p_port=node_a_p2p_port,
@@ -91,6 +96,8 @@ def scan_two_existing_regtest_nodes(
         first_b = gateway_b.probe_core_profile()
         if not same_reported_chain(first_a.identity, first_b.identity):
             raise TwoNodeWspSessionError("TWO_NODE_WSP_CHAIN_DIVERGED")
+        if cancelled is not None and cancelled():
+            raise TwoNodeWspSessionError("TWO_NODE_WSP_CANCELLED")
         scan = scan_existing_regtest(
             source_root, private_dir, scan_password,
             endpoint=node_a, rpc_auth=auth_a,
@@ -100,7 +107,10 @@ def scan_two_existing_regtest_nodes(
             restore_checkpoint=restore_checkpoint,
             receive_account_index=receive_account_index,
             show_observed_balance=show_observed_balance,
+            **({"cancelled": cancelled} if cancelled is not None else {}),
         )
+        if cancelled is not None and cancelled():
+            raise TwoNodeWspSessionError("TWO_NODE_WSP_CANCELLED")
         if (type(scan) is not dict
                 or scan.get("status") != "REAL_LOOPBACK_WSP_SCAN_UNQUALIFIED_CORE"
                 or scan.get("core_binary_authenticated") is not False
@@ -138,6 +148,8 @@ def scan_two_existing_regtest_nodes(
                 scan["chain_current"] is not True
                 or scan["tip_height"] != second_a.identity.height):
             raise TwoNodeWspSessionError("TWO_NODE_WSP_INCOMPLETE_DENIED")
+        if cancelled is not None and cancelled():
+            raise TwoNodeWspSessionError("TWO_NODE_WSP_CANCELLED")
         scan["status"] = "REAL_TWO_NODE_WSP_SCAN_UNQUALIFIED_BINARIES"
         scan["two_node_p2p_observed"] = True
         scan["two_node_reported_chain_agrees"] = True
