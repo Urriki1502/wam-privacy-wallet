@@ -79,6 +79,10 @@ GUI_TEST_IDS = frozenset({
 })
 # Security-critical original non-GUI identities; additive to original suite floors.
 CRITICAL_NON_GUI_IDS = frozenset({
+    "test_regtest_gui.RegtestGuiTests.test_scan_review_requires_regtest_mode_and_explicit_consent",
+    "test_regtest_gui.RegtestGuiTests.test_actual_shape_is_readonly_without_amounts_or_wallet_authority",
+    "test_regtest_gui.RegtestGuiTests.test_partial_scan_never_displays_cached_balance_and_revision_clears",
+    "test_regtest_gui.RegtestGuiTests.test_forged_scan_authority_and_mutated_counts_clear_stale_receipt",
     "test_regtest_gui.RegtestGuiTests.test_real_local_readiness_runs_on_worker_and_delivers_on_gui_thread",
     "test_regtest_gui.RegtestGuiTests.test_cancellation_ignores_late_result_and_keeps_ui_responsive",
     "test_regtest_gui.RegtestGuiTests.test_close_waits_cooperatively_without_terminating_worker",
@@ -307,7 +311,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 1314
+FULL_MIN_CASES = 1318
 
 
 def _cases(suite: unittest.TestSuite):

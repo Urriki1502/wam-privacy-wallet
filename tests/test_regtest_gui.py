@@ -11,6 +11,7 @@ from PySide6.QtCore import QCoreApplication, QEvent
 from PySide6.QtWidgets import QApplication
 
 from wam_privacy_wallet.application.regtest_lifecycle import inspect_local_readiness, RegtestLifecycleError
+from wam_privacy_wallet.application.qualified_scan_session import ScanSnapshot
 from wam_privacy_wallet.gui.regtest_window import RegtestWindow, VIEWS
 
 
@@ -42,6 +43,63 @@ class RegtestGuiTests(unittest.TestCase):
     def selected(self):
         self.window.mode_button.click()
         self.window.consent.setChecked(True)
+
+    def review_receipt(self, **changes):
+        inputs = dict(tip_height=2, confirmed_utxo_count=1,
+                      unqualified_confirmed_atoms=200000, history_count=1,
+                      mempool_observed=False, mempool_utxo_count=None,
+                      unqualified_mempool_atoms=None, mempool_spend_count=None,
+                      blocks_processed=1, transactions_processed=2)
+        inputs.update(changes)
+        return ScanSnapshot(**inputs)
+
+    def test_scan_review_requires_regtest_mode_and_explicit_consent(self):
+        proof = self.review_receipt()
+        with self.assertRaisesRegex(RegtestLifecycleError,
+                                    "^APP_REGTEST_SCAN_REVIEW_DENIED$"):
+            self.window.present_untrusted_scan_receipt(proof, user_consented=True)
+        self.selected()
+        with self.assertRaisesRegex(RegtestLifecycleError,
+                                    "^APP_REGTEST_SCAN_REVIEW_DENIED$"):
+            self.window.present_untrusted_scan_receipt(proof, user_consented=False)
+        self.assertEqual(self.window.scan_review_status.text(), "NO WSP-1 SCAN REVIEW")
+
+    def test_actual_shape_is_readonly_without_amounts_or_wallet_authority(self):
+        self.selected()
+        self.window.present_untrusted_scan_receipt(self.review_receipt(), user_consented=True)
+        text = self.window.scan_review_status.text()
+        self.assertIn("REVIEW_ONLY_UNTRUSTED", text)
+        self.assertIn("reported tip 2", text)
+        self.assertIn("observed UTXOs 1 UNQUALIFIED", text)
+        self.assertNotIn("200000", text)
+        self.assertIn("NO WALLET LOADED", self.window.authority_status.text())
+        self.assertFalse(self.window.controller.lifecycle.state.wallet_operational)
+
+    def test_partial_scan_never_displays_cached_balance_and_revision_clears(self):
+        self.selected()
+        partial = self.review_receipt(chain_current=False, confirmed_utxo_count=None,
+                                      unqualified_confirmed_atoms=None, history_count=None)
+        self.window.present_untrusted_scan_receipt(partial, user_consented=True)
+        self.assertIn("UNAVAILABLE (INCOMPLETE SCAN)",
+                      self.window.scan_review_status.text())
+        self.assertNotIn("200000", self.window.scan_review_status.text())
+        self.window.controller.select_regtest()
+        self.assertEqual(self.window.scan_review_status.text(), "NO WSP-1 SCAN REVIEW")
+
+    def test_forged_scan_authority_and_mutated_counts_clear_stale_receipt(self):
+        self.selected()
+        good = self.review_receipt()
+        self.window.present_untrusted_scan_receipt(good, user_consented=True)
+        object.__setattr__(good, "wallet_operational", True)
+        with self.assertRaisesRegex(RegtestLifecycleError,
+                                    "^APP_REGTEST_SCAN_REVIEW_DENIED$"):
+            self.window.present_untrusted_scan_receipt(good, user_consented=True)
+        self.assertEqual(self.window.scan_review_status.text(), "NO WSP-1 SCAN REVIEW")
+        malformed = self.review_receipt()
+        object.__setattr__(malformed, "confirmed_utxo_count", True)
+        with self.assertRaises(RegtestLifecycleError):
+            self.window.present_untrusted_scan_receipt(malformed, user_consented=True)
+        self.assertEqual(self.window.scan_review_status.text(), "NO WSP-1 SCAN REVIEW")
 
     def test_required_nine_views_have_actual_blocked_status(self):
         self.assertEqual(self.window.pages.count(), 9)

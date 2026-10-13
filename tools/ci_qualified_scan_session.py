@@ -147,6 +147,31 @@ def run(root: Path) -> None:
             assert receipt.history_count == 1 and receipt.tip_height == 2
             passed.append("ACTUAL_INCREMENTAL_PUBLIC_PAYMENT_DETECTED")
 
+            # Real upstream WSP SQLite projection reaches the actual REGTEST Qt
+            # workspace through an explicit non-authorizing review interface.
+            from PySide6.QtCore import QCoreApplication, QEvent
+            from PySide6.QtWidgets import QApplication
+            from wam_privacy_wallet.gui.regtest_window import RegtestWindow
+            qt_app = QApplication.instance() or QApplication([])
+            window = RegtestWindow()
+            try:
+                window.controller.select_regtest()
+                window.present_untrusted_scan_receipt(receipt, user_consented=True)
+                label = window.scan_review_status.text()
+                assert ("REVIEW_ONLY_UNTRUSTED" in label and "reported tip 2" in label
+                        and "observed UTXOs 1 UNQUALIFIED" in label
+                        and "200000" not in label and "NO VERIFIED CORE" in label)
+                assert "NO WALLET LOADED" in window.authority_status.text()
+                assert not window.controller.lifecycle.state.wallet_operational
+                window.controller.cancel()
+                assert window.scan_review_status.text() == "NO WSP-1 SCAN REVIEW"
+            finally:
+                window.close()
+                window.deleteLater()
+                QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+                QCoreApplication.processEvents()
+            passed.append("ACTUAL_WSP_STORE_TO_REGTEST_QT_READONLY")
+
             repeat = session.scan(rpc(), user_consented=True)
             assert repeat.blocks_processed == 0 and repeat.confirmed_utxo_count == 1
             assert session.snapshot(user_consented=True).unqualified_confirmed_atoms == 200_000
@@ -230,6 +255,7 @@ def run(root: Path) -> None:
         "ACTUAL_INITIAL_SCAN_STORE_PROJECTION",
         "ACTUAL_PARTIAL_BATCH_PROGRESS_WITHOUT_STALE_BALANCE",
         "ACTUAL_INCREMENTAL_PUBLIC_PAYMENT_DETECTED",
+        "ACTUAL_WSP_STORE_TO_REGTEST_QT_READONLY",
         "ACTUAL_REPLAY_NOT_DUPLICATED",
         "ACTUAL_MEMPOOL_STORE_PROJECTION",
         "ACTUAL_RECEIPT_NO_SECRET_OR_AUTHORITY",
@@ -242,7 +268,7 @@ def run(root: Path) -> None:
     ]
     if passed != expected:
         raise RuntimeError("ACTUAL_SESSION_CASE_COUNT_DENIED")
-    print("PINNED_RETAINED_APP_SESSION_OK 14/14; synthetic peer only; operational Core/WSP gates held")
+    print("PINNED_RETAINED_APP_SESSION_OK 15/15; synthetic peer only; operational Core/WSP gates held")
 
 
 def main() -> int:
