@@ -113,6 +113,80 @@ class NativeQtPrivateWorkflowTests(unittest.TestCase):
                 self.assertTrue(callable(opts["cancelled"]))
                 self.assertNotIn("mock_peer", opts)
 
+    def test_receive_balance_explicit_single_projection(self):
+        if sys.platform != "linux":
+            return
+        code = "wamrtsp1" + "q" * 105
+        for action in ("receive", "balance"):
+            receipt = self.source_receipt(action)
+            if action == "receive":
+                receipt["unqualified_receive_code"] = code
+            else:
+                receipt["unqualified_confirmed_atoms"] = 950_000
+            with patch.object(m, "scan_two_existing_regtest_nodes",
+                              return_value=receipt) as backend:
+                value = m.run_private_wsp_workflow(
+                    **dict(self.args, operation=action)
+                )
+            if action == "receive":
+                self.assertEqual(value.receive_code, code)
+                self.assertIsNone(value.observed_atoms)
+                self.assertEqual(backend.call_args.kwargs["receive_account_index"], 0)
+            else:
+                self.assertEqual(value.observed_atoms, 950_000)
+                self.assertIsNone(value.receive_code)
+                self.assertIs(backend.call_args.kwargs["show_observed_balance"], True)
+            self.assertFalse(value.wallet_operational)
+            self.assertFalse(value.signing_allowed)
+            self.assertNotIn(code, repr(value))
+
+    def test_private_dto_rejects_mixed_projection_and_false_authority(self):
+        """Untrusted GUI caller cannot transform observed atoms into spend rights."""
+        valid_receive = "wamrtsp1" + "q" * 105
+        good = m.PrivateQtWorkflowEvidence(
+            "receive", 7, receive_code=valid_receive,
+        )
+        self.assertNotIn(valid_receive, repr(good))
+        self.assertFalse(good.wallet_operational)
+        for values in (
+            dict(operation="receive", tip_height=7,
+                 receive_code=valid_receive, observed_atoms=1),
+            dict(operation="balance", tip_height=7,
+                 observed_atoms=True),
+            dict(operation="balance", tip_height=7,
+                 observed_atoms=-1),
+            dict(operation="balance", tip_height=7,
+                 observed_atoms=5, signing_allowed=True),
+            dict(operation="history", tip_height=7,
+                 receive_code=valid_receive),
+        ):
+            with self.subTest(values=values):
+                with self.assertRaises(m.QtPrivateWorkflowError):
+                    m.PrivateQtWorkflowEvidence(**values)
+
+    def test_receive_balance_mixed_and_forged_receipts_denied(self):
+        if sys.platform != "linux":
+            return
+        for action, mutation in (
+            ("receive", {"unqualified_confirmed_atoms": 700}),
+            ("receive", {"unqualified_receive_code": "INVALID"}),
+            ("receive", {"wallet_operational": True}),
+            ("balance", {"unqualified_receive_code": "unwanted"}),
+            ("balance", {"unqualified_confirmed_atoms": -1}),
+            ("balance", {"unqualified_confirmed_atoms": True}),
+        ):
+            receipt = self.source_receipt(action)
+            if action == "receive":
+                receipt["unqualified_receive_code"] = "wamrtsp1" + "q" * 105
+            else:
+                receipt["unqualified_confirmed_atoms"] = 950_000
+            receipt.update(mutation)
+            with self.subTest(action=action, mutation=mutation), patch.object(
+                m, "scan_two_existing_regtest_nodes", return_value=receipt
+            ):
+                with self.assertRaises(m.QtPrivateWorkflowError):
+                    m.run_private_wsp_workflow(**dict(self.args, operation=action))
+
     def test_forged_authority_and_forged_checkpoint_denied(self):
         if sys.platform != "linux":
             return

@@ -131,6 +131,30 @@ class RegtestWindow(QMainWindow):
                 )
                 self.scan_button.clicked.connect(self._scan_existing)
                 layout.addWidget(self.scan_button)
+            if name == "Receive":
+                self.receive_ack = QCheckBox(
+                    "I consent to view a LOCAL disposable WSP receive code (not a verified wallet)"
+                )
+                self.receive_ack.toggled.connect(self._refresh_controls)
+                layout.addWidget(self.receive_ack)
+                self.receive_button = QPushButton("Show REGTEST WSP receive code")
+                self.receive_button.clicked.connect(lambda: self._private_action("receive"))
+                layout.addWidget(self.receive_button)
+                self.receive_status = QPlainTextEdit()
+                self.receive_status.setReadOnly(True)
+                self.receive_status.setPlainText("NO PRIVATE RECEIVE CODE")
+                layout.addWidget(self.receive_status)
+            if name == "Balance / UTXO":
+                self.balance_ack = QCheckBox(
+                    "I consent to view UNQUALIFIED observed atoms, not spendable balance"
+                )
+                self.balance_ack.toggled.connect(self._refresh_controls)
+                layout.addWidget(self.balance_ack)
+                self.balance_button = QPushButton("Read observed REGTEST atoms")
+                self.balance_button.clicked.connect(lambda: self._private_action("balance"))
+                layout.addWidget(self.balance_button)
+                self.balance_status = QLabel("NO OBSERVED BALANCE")
+                layout.addWidget(self.balance_status)
             if name == "Transactions":
                 self.history_ack = QCheckBox(
                     "I explicitly consent to display PRIVATE local REGTEST transaction IDs and amounts"
@@ -259,13 +283,23 @@ class RegtestWindow(QMainWindow):
         # Never carry private txids/amounts into another GUI page.
         self.private_history_status.setPlainText("NO PRIVATE TRANSACTION HISTORY")
         self.history_ack.setChecked(False)
+        self.receive_status.setPlainText("NO PRIVATE RECEIVE CODE")
+        self.receive_ack.setChecked(False)
+        self.balance_status.setText("NO OBSERVED BALANCE")
+        self.balance_ack.setChecked(False)
 
     def _private_action(self, operation):
         self.private_history_status.setPlainText("NO PRIVATE TRANSACTION HISTORY")
         self.backup_status.setText("NO BACKUP / RECOVERY OPERATION")
+        self.receive_status.setPlainText("NO PRIVATE RECEIVE CODE")
+        self.balance_status.setText("NO OBSERVED BALANCE")
         try:
             page = self.navigation.currentRow()
-            ack = ((operation == "history" and page == 3
+            ack = ((operation == "receive" and page == 2
+                    and self.receive_ack.isChecked()) or
+                   (operation == "balance" and page == 4
+                    and self.balance_ack.isChecked()) or
+                   (operation == "history" and page == 3
                     and self.history_ack.isChecked()) or
                    (operation in ("checkpoint", "restore") and page == 6
                     and self.backup_ack.isChecked()))
@@ -297,6 +331,10 @@ class RegtestWindow(QMainWindow):
         except (ValueError, RegtestLifecycleError):
             if operation == "history":
                 self.private_history_status.setPlainText("QT_PRIVATE_WORK_DENIED")
+            elif operation == "receive":
+                self.receive_status.setPlainText("QT_PRIVATE_WORK_DENIED")
+            elif operation == "balance":
+                self.balance_status.setText("QT_PRIVATE_WORK_DENIED")
             else:
                 self.backup_status.setText("QT_PRIVATE_WORK_DENIED")
 
@@ -309,10 +347,16 @@ class RegtestWindow(QMainWindow):
                     or state.phase in ("CLOSED", "CANCELLED")
                     or not self.consent.isChecked() or not self.node_ack.isChecked()
                     or type(receipt) is not PrivateQtWorkflowEvidence
-                    or ((receipt.operation == "history" and
+                    or ((receipt.operation == "receive" and
+                         (self.navigation.currentRow() != 2
+                          or not self.receive_ack.isChecked()))
+                        or (receipt.operation == "balance" and
+                            (self.navigation.currentRow() != 4
+                             or not self.balance_ack.isChecked()))
+                        or (receipt.operation == "history" and
                          (self.navigation.currentRow() != 3
                           or not self.history_ack.isChecked()))
-                        or (receipt.operation != "history" and
+                        or (receipt.operation in ("checkpoint", "restore") and
                             (self.navigation.currentRow() != 6
                              or not self.backup_ack.isChecked())))):
                 raise ValueError
@@ -321,15 +365,29 @@ class RegtestWindow(QMainWindow):
                 x.credit_atoms, x.debit_atoms
             ) for x in receipt.rows)
             checked = PrivateQtWorkflowEvidence(
-                receipt.operation, receipt.tip_height, rows
+                receipt.operation, receipt.tip_height, rows,
+                receive_code=receipt.receive_code,
+                observed_atoms=receipt.observed_atoms,
             )
             if checked != receipt:
                 raise ValueError
         except Exception:
             self.private_history_status.setPlainText("NO PRIVATE TRANSACTION HISTORY")
             self.backup_status.setText("NO BACKUP / RECOVERY OPERATION")
+            self.receive_status.setPlainText("NO PRIVATE RECEIVE CODE")
+            self.balance_status.setText("NO OBSERVED BALANCE")
             return
-        if receipt.operation == "history":
+        if receipt.operation == "receive":
+            self.receive_status.setPlainText(
+                "LOCAL DISPOSABLE REGTEST WSP CODE · UNVERIFIED CORE\n"
+                + receipt.receive_code
+            )
+        elif receipt.operation == "balance":
+            self.balance_status.setText(
+                f"OBSERVED {receipt.observed_atoms} atoms · UNQUALIFIED · "
+                "NOT SPENDABLE · NO VERIFIED CORE"
+            )
+        elif receipt.operation == "history":
             lines = [
                 "PRIVATE LOCAL WSP-1 HISTORY · UNQUALIFIED CORE · NO SIGNING"
             ]
@@ -356,6 +414,8 @@ class RegtestWindow(QMainWindow):
         if type(revision) is int and revision == self.controller.lifecycle.state.revision:
             self.private_history_status.setPlainText("QT_PRIVATE_WORK_DENIED")
             self.backup_status.setText("QT_PRIVATE_WORK_DENIED")
+            self.receive_status.setPlainText("QT_PRIVATE_WORK_DENIED")
+            self.balance_status.setText("QT_PRIVATE_WORK_DENIED")
 
     def _scan_completed(self, revision, receipt):
         state = self.controller.lifecycle.state
@@ -441,6 +501,14 @@ class RegtestWindow(QMainWindow):
             and all(self.scan_inputs[key].text() for key in ("source","private","passphrase"))
         )
         private_ready = self.scan_button.isEnabled()
+        self.receive_button.setEnabled(
+            private_ready and self.receive_ack.isChecked()
+            and self.navigation.currentRow() == 2
+        )
+        self.balance_button.setEnabled(
+            private_ready and self.balance_ack.isChecked()
+            and self.navigation.currentRow() == 4
+        )
         self.history_button.setEnabled(
             private_ready and self.history_ack.isChecked()
             and self.navigation.currentRow() == 3
@@ -461,6 +529,8 @@ class RegtestWindow(QMainWindow):
         self.clear_scan_review()
         self.private_history_status.setPlainText("NO PRIVATE TRANSACTION HISTORY")
         self.backup_status.setText("NO BACKUP / RECOVERY OPERATION")
+        self.receive_status.setPlainText("NO PRIVATE RECEIVE CODE")
+        self.balance_status.setText("NO OBSERVED BALANCE")
         self.node_probe_status.setText("NO NODE CONNECTION INSPECTION")
         self._refresh_controls()
 
@@ -525,4 +595,6 @@ class RegtestWindow(QMainWindow):
             return
         self.private_history_status.setPlainText("NO PRIVATE TRANSACTION HISTORY")
         self.backup_status.setText("NO BACKUP / RECOVERY OPERATION")
+        self.receive_status.setPlainText("NO PRIVATE RECEIVE CODE")
+        self.balance_status.setText("NO OBSERVED BALANCE")
         event.accept()

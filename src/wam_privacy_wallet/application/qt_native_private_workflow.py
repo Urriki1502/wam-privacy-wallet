@@ -23,7 +23,8 @@ class QtPrivateWorkflowError(ValueError):
     """Redacted native workflow failure without customer txids or credentials."""
 
 
-_OPERATIONS = frozenset(("history", "checkpoint", "restore"))
+_OPERATIONS = frozenset(("history", "checkpoint", "restore", "receive", "balance"))
+_RECEIVE = re.compile(r"wamrtsp1[023456789acdefghjklmnpqrstuvwxyz]{100,130}\Z")
 _TXID = re.compile(r"[0-9a-f]{64}\Z")
 
 
@@ -53,6 +54,8 @@ class PrivateQtWorkflowEvidence:
     operation: str
     tip_height: int
     rows: tuple[PrivateQtHistoryRow, ...] = ()
+    receive_code: str | None = None
+    observed_atoms: int | None = None
     status: str = "REAL_WSP_TWO_NODE_PRIVATE_UNQUALIFIED"
     core_authenticated: bool = False
     wallet_operational: bool = False
@@ -68,6 +71,14 @@ class PrivateQtWorkflowEvidence:
                 or any(type(row) is not PrivateQtHistoryRow
                        for row in self.rows)
                 or (self.operation != "history" and self.rows)
+                or (self.operation == "receive" and (
+                    type(self.receive_code) is not str
+                    or _RECEIVE.fullmatch(self.receive_code) is None))
+                or (self.operation != "receive" and self.receive_code is not None)
+                or (self.operation == "balance" and (
+                    type(self.observed_atoms) is not int
+                    or not 0 <= self.observed_atoms <= 2**63 - 1))
+                or (self.operation != "balance" and self.observed_atoms is not None)
                 or self.status != "REAL_WSP_TWO_NODE_PRIVATE_UNQUALIFIED"
                 or any(getattr(self, x) is not False for x in (
                     "core_authenticated", "wallet_operational",
@@ -111,6 +122,8 @@ def run_private_wsp_workflow(*, operation: str,
             history_limit=20 if operation == "history" else None,
             save_checkpoint=operation == "checkpoint",
             restore_checkpoint=operation == "restore",
+            receive_account_index=0 if operation == "receive" else None,
+            show_observed_balance=operation == "balance",
             cancelled=cancelled.is_set,
         )
         if cancelled.is_set():
@@ -125,8 +138,8 @@ def run_private_wsp_workflow(*, operation: str,
                     "core_binary_authenticated", "independent_core_processes_verified",
                     "real_two_node_regtest_qualified", "wallet_operational",
                     "signer_enabled", "broadcast_allowed", "mainnet_allowed"))
-                or "unqualified_receive_code" in receipt
-                or "unqualified_confirmed_atoms" in receipt
+                or ("unqualified_receive_code" in receipt) != (operation == "receive")
+                or ("unqualified_confirmed_atoms" in receipt) != (operation == "balance")
                 or receipt.get("checkpoint_created") is not (operation == "checkpoint")
                 or receipt.get("checkpoint_restored_then_reattested") is not (
                     operation == "restore")
@@ -149,6 +162,10 @@ def run_private_wsp_workflow(*, operation: str,
             ))
         evidence = PrivateQtWorkflowEvidence(
             operation, receipt["tip_height"], tuple(rows),
+            receive_code=(receipt["unqualified_receive_code"]
+                          if operation == "receive" else None),
+            observed_atoms=(receipt["unqualified_confirmed_atoms"]
+                            if operation == "balance" else None),
         )
         if cancelled.is_set():
             raise QtPrivateWorkflowError("QT_PRIVATE_CANCELLED")
