@@ -84,6 +84,9 @@ def _store_encrypted_intent(folder: Path, ciphertext: bytes) -> str:
                     error = True
             try:
                 os.fsync(dir_fd)
+            except OSError:
+                error = True
+            try:
                 os.close(dir_fd)
             except OSError:
                 error = True
@@ -148,7 +151,13 @@ def create_manual_regtest_intent(
             # Upstream encrypts intent for the separate TTY-only offline signer.
             # The reservation remains LOCKED after this point if anything fails
             # ambiguously: never retry the same UTXOs automatically.
-            ciphertext = encode_request(proposal, intent_password)
+            try:
+                ciphertext = encode_request(proposal, intent_password)
+            except Exception:
+                # No ciphertext was exposed, so a DRAFT reservation may
+                # safely be rolled back. Never release a published request.
+                wallet.release_draft(proposal.token)
+                raise
             digest = _store_encrypted_intent(output_dir, ciphertext)
             wallet.mark_signed(proposal.token)
             scanner.assert_current()
