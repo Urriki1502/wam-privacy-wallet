@@ -53,6 +53,7 @@ MINIMUM_CASES = {
     "test_payjoin_proposal_review.py": 20,
     "test_security_assurance_review.py": 12,
     "test_selective_disclosure_review.py": 12,
+    "test_selected_history_export.py": 14,
     "test_app_coin_selection_review.py": 22,
     "test_psbt_v2_review.py": 16,
     "test_psbt_v2_worker_boundary.py": 10,

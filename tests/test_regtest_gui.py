@@ -479,3 +479,43 @@ class RegtestGuiTests(unittest.TestCase):
             self.drain(lambda: not self.window.controller.busy)
             network.assert_not_called()
             process.assert_not_called()
+
+    def _disclosure_history(self):
+        self.window.controller.select_regtest()
+        self.window.consent.setChecked(True)
+        self.window.node_ack.setChecked(True)
+        self.window.navigation.setCurrentRow(3)
+        self.window.history_ack.setChecked(True)
+        proof=PrivateQtWorkflowEvidence('history',11,(PrivateQtHistoryRow('a'*64,10,2,500,0),PrivateQtHistoryRow('b'*64,11,1,0,50)))
+        self.window._private_completed(self.window.controller.lifecycle.state.revision,proof)
+
+    def test_selected_history_export_ui_application_and_exact_scope(self):
+        import json
+        self._disclosure_history()
+        preview=self.window.prepare_selected_history_export(('a'*64,),('height',),user_consented=True)
+        data=self.window.export_selected_history(preview.approval_sha256,user_consented=True)
+        self.assertEqual(json.loads(data)['rows'],[dict(txid='a'*64,height=10)])
+        self.assertNotIn('b'*64,data.decode())
+        self.assertFalse(self.window.controller.lifecycle.state.wallet_operational)
+        with self.assertRaisesRegex(ValueError,'^APP_LOCAL_HISTORY_EXPORT_DENIED$'):
+            self.window.export_selected_history(preview.approval_sha256,user_consented=True)
+
+    def test_pending_disclosure_cancel_navigation_and_consent_clear(self):
+        for reason in ('navigate','withdraw','cancel','replace'):
+            self._disclosure_history()
+            preview=self.window.prepare_selected_history_export(('a'*64,),('height',),user_consented=True)
+            if reason=='navigate':self.window.navigation.setCurrentRow(0)
+            elif reason=='withdraw':self.window.history_ack.setChecked(False)
+            elif reason=='cancel':self.window.controller.cancel()
+            else:self.window._private_completed(self.window.controller.lifecycle.state.revision,PrivateQtWorkflowEvidence('history',11,()))
+            with self.assertRaisesRegex(ValueError,'^APP_LOCAL_HISTORY_EXPORT_DENIED$'):
+                self.window.export_selected_history(preview.approval_sha256,user_consented=True)
+
+    def test_disclosure_scope_expansion_and_wrong_approval_are_redacted(self):
+        self._disclosure_history()
+        with self.assertRaisesRegex(ValueError,'^APP_LOCAL_HISTORY_EXPORT_DENIED$'):
+            self.window.prepare_selected_history_export(('c'*64,),('seed',),user_consented=True)
+        self._disclosure_history()
+        self.window.prepare_selected_history_export(('a'*64,),('height',),user_consented=True)
+        with self.assertRaisesRegex(ValueError,'^APP_LOCAL_HISTORY_EXPORT_DENIED$'):
+            self.window.export_selected_history('0'*64,user_consented=True)
