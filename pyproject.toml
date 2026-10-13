@@ -9,6 +9,9 @@ description = "Cross-platform WAM Privacy Wallet (foundation scaffold only)"
 requires-python = ">=3.12"
 dependencies = []
 
+[project.scripts]
+wam-privacy-wallet = "wam_privacy_wallet.gui.app:main"
+
 [project.optional-dependencies]
 gui = ["PySide6>=6.8,<7"]
 assurance = ["wam-security @ git+https://github.com/Urriki1502/wam-security@c9b1ce872c2b0b65276883d4e210b6a2f7c96467"]
