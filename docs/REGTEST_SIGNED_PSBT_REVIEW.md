@@ -34,9 +34,11 @@ recipient metadata/amounts, and fee, allowing at most one explicit
 UNVERIFIED and must be reviewed by an operator separately. The returned
 receipt contains no recipient address, raw PSBT, spend secret or credential.
 
-**Important:** This is NOT a completed signer workflow E2E. CI tests only
-negative file/scope contracts; no signed regtest PSBT produced by an approved
-isolated signer has yet been verified. WAM Core executable/process identity
+**Important:** This is NOT a completed signer workflow E2E. Native CI includes
+an ephemeral disposable-Keyring/Schnorr/BIP352 positive cryptographic proof
+with real WSP-1 Signer code executed in the CI test process and a SYNTHETIC
+chain peer, plus a corrupted-signature rejection. It is **not an approved
+isolated signer process**, genuine WAM Core E2E or live/regtest broadcast. WAM Core executable/process identity
 #82/#86/#153, two-node E2E #9, recovery anchor #148/#151, upstream WSP
 approval PR #3 remain HOLD. No broadcast, signing from app, real funds,
 production release, mainnet or wallet authority.

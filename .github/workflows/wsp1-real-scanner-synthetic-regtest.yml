@@ -10,6 +10,10 @@ on:
       - 'tools/ci_wsp1_scanner_native_only.py'
       - 'tools/ci_qualified_scan_session.py'
       - 'tools/ci_regtest_manual_intent_native.py'
+      - 'tools/ci_regtest_signed_psbt_review_native.py'
+      - 'src/wam_privacy_wallet/application/offline_signed_psbt_review.py'
+      - 'tools/review_regtest_signed_psbt.py'
+      - 'tests/test_offline_signed_psbt_review.py'
       - 'src/wam_privacy_wallet/application/regtest_manual_intent.py'
       - 'tools/prepare_regtest_offline_intent.py'
       - 'tests/test_regtest_manual_intent.py'
@@ -106,6 +110,12 @@ jobs:
           PYTHONPATH: src
           PYTHONUNBUFFERED: '1'
         run: python -B -m tools.ci_regtest_manual_intent_native --source-root "$GITHUB_WORKSPACE/wsp-source"
+
+      - name: Real WSP signer crypto → independent PSBT review (DISPOSABLE SYNTHETIC CHAIN, NO Core)
+        env:
+          PYTHONPATH: src
+          PYTHONUNBUFFERED: '1'
+        run: python -B -m tools.ci_regtest_signed_psbt_review_native --source-root "$GITHUB_WORKSPACE/wsp-source"
 
       - name: Compile/test actual WSP-1 Scanner.sync against disposable loopback peer
         shell: bash
