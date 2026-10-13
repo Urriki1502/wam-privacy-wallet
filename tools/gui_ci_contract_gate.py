@@ -79,6 +79,9 @@ GUI_TEST_IDS = frozenset({
 })
 # Security-critical original non-GUI identities; additive to original suite floors.
 CRITICAL_NON_GUI_IDS = frozenset({
+    "test_wsp1_scanner_process_lock.NativeProcessLockBoundaryTests.test_32bit_denies_before_source_dependency_or_wsp_reads",
+    "test_wsp1_scanner_process_lock.NativeProcessLockBoundaryTests.test_preloaded_wsp_denies_before_source_or_native_dependency_reads",
+    "test_wsp1_scanner_process_lock.NativeProcessLockBoundaryTests.test_optimized_python_cannot_silently_disable_native_proof_assertions",
     "test_macos_private_directory.MacosPrivateDirectoryTests.test_wrong_platform_denied_before_disk_or_library_load",
     "test_macos_private_directory.MacosPrivateDirectoryTests.test_ancestor_symlink_refused_even_with_private_final_directory",
     "test_macos_private_directory.MacosPrivateDirectoryTests.test_native_access_acl_refused_even_when_mode_remains_0700",
@@ -337,7 +340,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
 # Add 25 macOS custody and 20 engineering lease cases without lowering prior floors.
-FULL_MIN_CASES = 1519
+FULL_MIN_CASES = 1527
 
 
 def _cases(suite: unittest.TestSuite):
