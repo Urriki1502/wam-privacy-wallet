@@ -41,7 +41,7 @@ class SuccessorIntakeTests(unittest.TestCase):
         self.key = self.root / "SIGNING-KEY.asc"
         self.sums = self.root / "SHA256SUMS"
         self.signature = self.root / "SHA256SUMS.asc"
-        self.gpg = Path("/usr/bin/gpg")
+        self.gpg = self.root / "trusted-gpg"  # absolute on every OS; never launched
         self.key.write_bytes(b"FICTIONAL_KEY_FOR_NEGATIVE_TEST_ONLY\n")
         self.signature.write_bytes(b"FICTIONAL_SIGNATURE_NO_REAL_AUTHENTICATION\n")
         self.make_archive()
