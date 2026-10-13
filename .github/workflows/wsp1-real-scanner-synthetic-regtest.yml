@@ -11,6 +11,7 @@ on:
       - 'tools/ci_qualified_scan_session.py'
       - 'tools/ci_regtest_manual_intent_native.py'
       - 'tools/ci_regtest_signed_psbt_review_native.py'
+      - 'tools/ci_wsp_offline_signer_tty.py'
       - 'src/wam_privacy_wallet/application/offline_signed_psbt_review.py'
       - 'tools/review_regtest_signed_psbt.py'
       - 'tests/test_offline_signed_psbt_review.py'
