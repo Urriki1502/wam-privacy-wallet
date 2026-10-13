@@ -156,7 +156,10 @@ def run(root: Path) -> None:
             window = RegtestWindow()
             try:
                 window.controller.select_regtest()
-                window.present_untrusted_scan_receipt(receipt, user_consented=True)
+                window.present_untrusted_scan_receipt(
+                    receipt, user_consented=True,
+                    expected_revision=window.controller.lifecycle.state.revision,
+                )
                 label = window.scan_review_status.text()
                 assert ("REVIEW_ONLY_UNTRUSTED" in label and "reported tip 2" in label
                         and "observed UTXOs 1 UNQUALIFIED" in label

@@ -116,7 +116,8 @@ class RegtestWindow(QMainWindow):
         """Erase prior scanner display whenever a GUI lifecycle revision changes."""
         self.scan_review_status.setText("NO WSP-1 SCAN REVIEW")
 
-    def present_untrusted_scan_receipt(self, receipt, *, user_consented: bool):
+    def present_untrusted_scan_receipt(self, receipt, *, user_consented: bool,
+                                       expected_revision: int):
         """Read-only Qt projection of scalar scanner evidence, never wallet state.
 
         This accepts a source-pinned DTO but cannot authenticate its origin.
@@ -125,7 +126,9 @@ class RegtestWindow(QMainWindow):
         self.clear_scan_review()
         state = self.controller.lifecycle.state
         if (user_consented is not True or state.mode != "REGTEST"
-                or state.phase in ("MODE_REQUIRED", "CHECKING", "CLOSED")
+                or state.phase not in ("REGTEST_SELECTED", "BLOCKED")
+                or type(expected_revision) is not int
+                or expected_revision != state.revision
                 or self._closing or self.controller.busy
                 or type(receipt) is not ScanSnapshot):
             raise RegtestLifecycleError("APP_REGTEST_SCAN_REVIEW_DENIED")
