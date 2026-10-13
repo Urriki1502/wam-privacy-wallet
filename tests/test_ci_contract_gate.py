@@ -32,7 +32,7 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
         return patch.dict(MINIMUM_CASES, {self.pattern: 1})
 
     def test_manifest_preserves_original_eight_and_self_test(self):
-        self.assertEqual(len(MANDATORY_SUITES), 87)
+        self.assertEqual(len(MANDATORY_SUITES), 88)
         self.assertEqual(len(set(MANDATORY_SUITES)), len(MANDATORY_SUITES))
         self.assertIn("test_ci_contract_gate.py", MANDATORY_SUITES)
         self.assertIn("test_regtest_gateway.py", MANDATORY_SUITES)
@@ -218,9 +218,10 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
             "test_app_wsp_scan_coordinator.py": 15,
             "test_scan_only_account_session.py": 14,
             "test_scan_preview_workflow.py": 15,
-            "test_encrypted_scan_backup.py": 23,
+            "test_encrypted_scan_backup.py": 25,
             "test_retained_scan_session.py": 18,
-            "test_encrypted_checkpoint_archive.py": 21,
+            "test_encrypted_checkpoint_archive.py": 23,
+            "test_private_checkpoint_directory.py": 12,
             "test_checkpoint_recovery_workflow.py": 18,
             "test_versioned_checkpoint_journal.py": 15,
             "test_snapshot_lineage_preflight.py": 14,

@@ -118,6 +118,31 @@ class ScanBackupVaultTests(unittest.TestCase):
         self.assertFalse((self.path / "scan-only.wsp.enc").exists())
 
     @linux_native
+    def test_symlink_in_ancestor_denies_write_without_touching_target(self):
+        real = self.path / 'real'
+        real.mkdir(mode=0o700)
+        private = real / 'private'
+        private.mkdir(mode=0o700)
+        alias = self.path / 'alias'
+        alias.symlink_to(real, target_is_directory=True)
+        with self.assertRaises(vault.EncryptedScanBackupError):
+            vault.provision_encrypted_scan_backup(alias / 'private', self.payload)
+        self.assertEqual(list(private.iterdir()), [])
+
+    @linux_native
+    def test_symlink_in_ancestor_denies_read_of_existing_valid_backup(self):
+        real = self.path / 'real'
+        real.mkdir(mode=0o700)
+        private = real / 'private'
+        private.mkdir(mode=0o700)
+        vault.provision_encrypted_scan_backup(private, self.payload)
+        alias = self.path / 'alias'
+        alias.symlink_to(real, target_is_directory=True)
+        with self.assertRaises(vault.EncryptedScanBackupError):
+            vault.load_encrypted_scan_backup(alias / 'private')
+        self.assertEqual(vault.load_encrypted_scan_backup(private), self.payload)
+
+    @linux_native
     def test_canonical_symlink_is_not_followed_for_read_or_write(self):
         victim = self.path / "victim"
         victim.write_bytes(b"DO NOT CHANGE")

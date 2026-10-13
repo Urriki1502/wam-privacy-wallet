@@ -21,6 +21,8 @@ import secrets
 import stat
 import sys
 
+from .private_checkpoint_directory import open_private_checkpoint_directory
+
 _ENVELOPE = "scan-only.wsp.enc"
 _MAX_ENVELOPE = 1_048_576
 _MIN_ENVELOPE = 52
@@ -36,23 +38,24 @@ def _directory(directory: Path) -> int:
             or not all(hasattr(os, f) for f in
                        ("O_DIRECTORY", "O_NOFOLLOW", "O_CLOEXEC"))):
         raise EncryptedScanBackupError("SCAN_BACKUP_PLATFORM_OR_PATH_DENIED")
+    fd = None
     try:
-        fd = os.open(
-            directory, os.O_RDONLY | os.O_DIRECTORY
-            | os.O_NOFOLLOW | os.O_CLOEXEC
-        )
+        fd = open_private_checkpoint_directory(directory)
         s = os.fstat(fd)
         if (not stat.S_ISDIR(s.st_mode)
                 or stat.S_IMODE(s.st_mode) != 0o700
                 or s.st_uid != os.geteuid()
                 or s.st_nlink < 2):
-            os.close(fd)
             raise EncryptedScanBackupError("SCAN_BACKUP_PRIVATE_DIR_DENIED")
-        return fd
+        result, fd = fd, None
+        return result
     except EncryptedScanBackupError:
         raise
     except Exception:
         raise EncryptedScanBackupError("SCAN_BACKUP_PRIVATE_DIR_DENIED") from None
+    finally:
+        if fd is not None:
+            os.close(fd)
 
 
 def _valid_payload(payload: object) -> bool:

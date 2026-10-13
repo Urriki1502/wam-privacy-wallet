@@ -21,6 +21,9 @@ except ImportError:  # Windows persistence remains unqualified.
     fcntl = None
 
 from wam_privacy_wallet.application.encrypted_checkpoint_archive import _well_formed
+from .private_checkpoint_directory import (
+    open_private_checkpoint_directory, validate_private_directory,
+)
 
 _SOURCE_PIN = "ac55f13423620252bdbf848c7e8a280c3b84721e"
 _ZERO = "0" * 64
@@ -42,11 +45,10 @@ def _hex64(x: object) -> bool:
 
 
 def _private_dir(fd: int) -> None:
-    st = os.fstat(fd)
-    if (not stat.S_ISDIR(st.st_mode)
-            or stat.S_IMODE(st.st_mode) != 0o700
-            or st.st_uid != os.geteuid()):
-        raise VersionedCheckpointError("SNAPSHOT_PRIVATE_DIRECTORY_DENIED")
+    try:
+        validate_private_directory(fd)
+    except Exception:
+        raise VersionedCheckpointError("SNAPSHOT_PRIVATE_DIRECTORY_DENIED") from None
 
 
 def _open_dir(base: Path) -> int:
@@ -57,28 +59,9 @@ def _open_dir(base: Path) -> int:
         raise VersionedCheckpointError("SNAPSHOT_PLATFORM_DENIED")
     if ".." in base.parts:
         raise VersionedCheckpointError("SNAPSHOT_PRIVATE_DIRECTORY_DENIED")
-    fd = None
     try:
-        # Resolve every ancestor through directory descriptors; O_NOFOLLOW on
-        # only the final component would still follow a symlinked parent.
-        flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
-        fd = os.open(base.anchor, flags)
-        for part in base.parts[1:]:
-            child = os.open(part, flags, dir_fd=fd)
-            os.close(fd)
-            fd = child
-        try:
-            _private_dir(fd)
-        except BaseException:
-            os.close(fd)
-            fd = None
-            raise
-        return fd
-    except VersionedCheckpointError:
-        raise
+        return open_private_checkpoint_directory(base)
     except Exception:
-        if fd is not None:
-            os.close(fd)
         raise VersionedCheckpointError("SNAPSHOT_PRIVATE_DIRECTORY_DENIED") from None
 
 
