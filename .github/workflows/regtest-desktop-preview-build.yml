@@ -1,0 +1,81 @@
+# Native GUI artifacts only; never publish release or launch WAM Core.
+name: REGTEST GUI native preview packages (NO Core EXEC)
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/regtest-desktop-preview-build.yml'
+      - 'tools/desktop_entry.py'
+      - 'tools/inspect_regtest_package.py'
+      - 'tests/test_regtest_preview_package.py'
+      - 'docs/REGTEST_DESKTOP_PACKAGING.md'
+      - 'src/wam_privacy_wallet/gui/**'
+      - 'pyproject.toml'
+permissions:
+  contents: read
+jobs:
+  package-gui:
+    name: Native preview / ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {platform: linux-x64, runner: ubuntu-24.04, arch: x64}
+          - {platform: windows-x64, runner: windows-2022, arch: x64}
+          - {platform: macos-x64, runner: macos-15-intel, arch: x64}
+          - {platform: macos-arm64, runner: macos-15, arch: arm64}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: ${{ matrix.arch }}
+      - name: Verify native 64-bit host architecture
+        env:
+          TARGET_ARCH: ${{ matrix.arch }}
+        run: python -c "import os,platform,struct; a=os.environ['TARGET_ARCH']; assert struct.calcsize('P')==8; assert (a=='x64' and platform.machine().lower() in ('x86_64','amd64')) or (a=='arm64' and platform.machine().lower() in ('arm64','aarch64'))"
+      - name: Install Linux Qt runtime dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libegl1 libopengl0 libxkbcommon-x11-0
+      - name: Install native Qt and frozen executable builder
+        run: python -m pip install --disable-pip-version-check "pyinstaller==6.16.0" ".[gui]"
+      - name: Run source and static package checks
+        run: |
+          python -m pip check
+          python -m compileall -q src tools/desktop_entry.py tools/inspect_regtest_package.py
+          python -m unittest discover -s tests -p test_regtest_preview_package.py -v
+      - name: Freeze actual REGTEST desktop GUI
+        run: python -m PyInstaller --noconfirm --clean --onedir --name WAM-Privacy-Wallet-REGTEST --paths src tools/desktop_entry.py
+      - name: Smoke-test frozen executable and create non-authorizing manifest
+        env:
+          QT_QPA_PLATFORM: offscreen
+          TARGET_PLATFORM: ${{ matrix.platform }}
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: python
+        run: |
+          import os, subprocess, sys
+          from pathlib import Path
+          name = 'WAM-Privacy-Wallet-REGTEST.exe' if os.name == 'nt' else 'WAM-Privacy-Wallet-REGTEST'
+          root = Path('dist/WAM-Privacy-Wallet-REGTEST')
+          binary = root / name
+          assert binary.is_file(), 'FROZEN_GUI_MISSING'
+          check = subprocess.run([str(binary.resolve()), '--help'], text=True, capture_output=True, timeout=30)
+          assert check.returncode == 0 and '--mode' in check.stdout and '--offline-review' in check.stdout, 'FROZEN_GUI_ENTRYPOINT_DENIED'
+          print('FROZEN_REGTEST_GUI_ENTRYPOINT_PASS_NO_CORE')
+          subprocess.run([sys.executable, '-m', 'tools.inspect_regtest_package',
+              '--package-dir', str(root), '--executable', str(binary),
+              '--platform', os.environ['TARGET_PLATFORM'], '--commit', os.environ['SOURCE_SHA'],
+              '--output', 'dist/REGTEST_GUI_PREVIEW_MANIFEST.json'], check=True)
+      - name: Upload unsigned native preview (CI artifact only)
+        uses: actions/upload-artifact@v4
+        with:
+          name: wam-regtest-gui-${{ matrix.platform }}
+          path: |
+            dist/WAM-Privacy-Wallet-REGTEST/
+            dist/REGTEST_GUI_PREVIEW_MANIFEST.json
+          retention-days: 7
+          if-no-files-found: error
