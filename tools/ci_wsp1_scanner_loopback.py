@@ -90,8 +90,14 @@ class LocalSyntheticCoreShape(BaseHTTPRequestHandler):
             reply = {"chain": "regtest", "pruned": False,
                      "blocks": state.height, "headers": state.height,
                      "bestblockhash": state.tip}
-        elif method == "getblock" and params == [state.tip, 3]:
-            if state.height == 2:
+        elif method == "getblock" and (
+                params == [state.tip, 3]
+                or (state.height == 2 and params == [FORK, 3])):
+            # Preserve historical height-1 data when a fresh retained scanner
+            # catches up in bounded batches after the synthetic tip advances.
+            # This test-only peer must behave like a real full node: block
+            # queries are not restricted to the best-block hash.
+            if state.height == 2 and params == [state.tip, 3]:
                 txs = [{
                     "txid": COINBASE2, "vin": [{"coinbase": "0202"}],
                     "vout": [{"n": 0, "value": 0.01,
@@ -103,7 +109,7 @@ class LocalSyntheticCoreShape(BaseHTTPRequestHandler):
                          "previousblockhash": FORK, "tx": txs}
             else:
                 reply = {
-                    "hash": state.tip, "height": 1,
+                    "hash": params[0], "height": 1,
                     "previousblockhash": WAM_REGTEST_GENESIS,
                     "tx": [{
                         "txid": COINBASE, "vin": [{"coinbase": "0101"}],
