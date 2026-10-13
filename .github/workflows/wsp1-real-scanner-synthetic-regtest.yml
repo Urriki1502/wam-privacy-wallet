@@ -8,6 +8,8 @@ on:
       - '.github/workflows/wsp1-real-scanner-synthetic-regtest.yml'
       - 'tools/ci_wsp1_scanner_loopback.py'
       - 'tools/ci_wsp1_scanner_native_only.py'
+      - 'tools/ci_wsp1_scanner_process_lock.py'
+      - 'tests/test_wsp1_scanner_process_lock.py'
       - 'tools/ci_qualified_scan_session.py'
       - 'src/wam_privacy_wallet/application/selected_history_export.py'
       - 'src/wam_privacy_wallet/gui/regtest_window.py'
@@ -206,6 +208,8 @@ jobs:
           print('ACTUAL_NON_LINUX_RETAINED_SESSION_PLATFORM_DENIAL_ONLY')
       - name: Actual public BIP352 scanner, SQLite, reorg and Qt proof (NO Core)
         run: python -B -m tools.ci_wsp1_scanner_native_only --source-root "${{ github.workspace }}/wsp-source"
+      - name: Actual native scanner inter-process lease, exit recovery and fresh attestation (NO Core)
+        run: python -B -m tools.ci_wsp1_scanner_process_lock --source-root "${{ github.workspace }}/wsp-source"
 
   win32-public-scanner-denial:
     name: Windows x86 WSP scanner UNQUALIFIED / denial only
