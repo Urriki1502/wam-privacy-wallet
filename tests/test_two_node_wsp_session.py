@@ -34,6 +34,9 @@ class TwoNodeWspScopeTests(unittest.TestCase):
             identity_a, ChainIdentity(self.b, WAM_REGTEST_GENESIS, 42, "b" * 64),
         ))
         self.assertFalse(subject.same_reported_chain(identity_a, identity_a))
+        self.assertFalse(subject.same_reported_chain(
+            identity_a, ChainIdentity(self.b, "c" * 64, 42, "a" * 64),
+        ))
 
     def test_all_scope_denials_before_network(self):
         variants = [
@@ -61,6 +64,79 @@ class TwoNodeWspScopeTests(unittest.TestCase):
                             **kwargs,
                         )
             audit.assert_not_called()
+
+    def test_chain_mutates_during_scan_never_returns_success(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        identity_a = ChainIdentity(self.a, WAM_REGTEST_GENESIS, 42, "a" * 64)
+        identity_b = ChainIdentity(self.b, WAM_REGTEST_GENESIS, 42, "a" * 64)
+        advanced_a = ChainIdentity(self.a, WAM_REGTEST_GENESIS, 43, "b" * 64)
+        gateway_a = Mock()
+        gateway_b = Mock()
+        gateway_a.probe_core_profile.side_effect = (
+            [SimpleNamespace(identity=identity_a),
+             SimpleNamespace(identity=advanced_a)])
+        gateway_b.probe_core_profile.side_effect = (
+            [SimpleNamespace(identity=identity_b),
+             SimpleNamespace(identity=identity_b)])
+        scan = {
+            "status": "REAL_LOOPBACK_WSP_SCAN_UNQUALIFIED_CORE",
+            "core_binary_authenticated": False,
+            "wallet_operational": False,
+            "signer_enabled": False,
+            "broadcast_allowed": False,
+            "mainnet_allowed": False,
+            "chain_current": True, "tip_height": 42,
+        }
+        with patch.object(subject, "TwoNodeP2PReadOnlyAudit") as topology, \
+             patch.object(subject, "LocalRegtestIdentityGateway") as gateways, \
+             patch.object(subject, "scan_existing_regtest", return_value=scan) as scanner:
+            gateways.side_effect = lambda endpoint, auth, timeout: (
+                gateway_a if endpoint == self.a else gateway_b
+            )
+            with self.assertRaisesRegex(
+                subject.TwoNodeWspSessionError, "^TWO_NODE_WSP_MOVED_DENIED$"
+            ):
+                subject.scan_two_existing_regtest_nodes(
+                    Path("/unused"), Path("/unused"), b"x" * 16, **self.args,
+                )
+            self.assertEqual(topology.return_value.audit.call_count, 2)
+            scanner.assert_called_once()
+
+    def test_forged_scanner_authority_receipt_is_refused(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        profile_a = SimpleNamespace(identity=ChainIdentity(
+            self.a, WAM_REGTEST_GENESIS, 42, "a" * 64,
+        ))
+        profile_b = SimpleNamespace(identity=ChainIdentity(
+            self.b, WAM_REGTEST_GENESIS, 42, "a" * 64,
+        ))
+        gateway_a = Mock()
+        gateway_b = Mock()
+        gateway_a.probe_core_profile.return_value = profile_a
+        gateway_b.probe_core_profile.return_value = profile_b
+        forged = {
+            "status": "REAL_LOOPBACK_WSP_SCAN_UNQUALIFIED_CORE",
+            "core_binary_authenticated": False,
+            "wallet_operational": True,
+            "signer_enabled": False,
+            "broadcast_allowed": False,
+            "mainnet_allowed": False,
+            "chain_current": True, "tip_height": 42,
+        }
+        with patch.object(subject, "TwoNodeP2PReadOnlyAudit"), \
+             patch.object(subject, "LocalRegtestIdentityGateway") as gateways, \
+             patch.object(subject, "scan_existing_regtest", return_value=forged):
+            gateways.side_effect = lambda endpoint, auth, timeout: (
+                gateway_a if endpoint == self.a else gateway_b
+            )
+            with self.assertRaisesRegex(
+                subject.TwoNodeWspSessionError, "^TWO_NODE_WSP_RECEIPT_DENIED$"
+            ):
+                subject.scan_two_existing_regtest_nodes(
+                    Path("/unused"), Path("/unused"), b"x" * 16, **self.args,
+                )
 
     def test_no_signer_core_launcher_or_fake_peer_in_operator_contract(self):
         import inspect
