@@ -62,6 +62,28 @@ def inspect_official_regtest_readiness(*, archive: str, gpg: str) -> dict[str, o
     # Even a future ELF clean pass cannot authorize launch without signed
     # DEV approval, proven fd->exec binding, loader/DSO trust and isolated E2E.
     return {
+        "evidence_schema": 1,
+        "core_release": "v0.1.11",
+        "evidence_scope": "AUTHENTICATED_ARCHIVE_STATIC_ONLY_NO_CORE_EXEC",
+        "acceptance_gates": [
+            {"id": "signed_archive_member", "status": "PASS",
+             "reason": "PINNED_GPG_ARCHIVE_AND_MEMBER_REHASHED"},
+            {"id": "elf_stack_policy", "status": "FAIL" if reason else "PASS",
+             "reason": reason or "STATIC_ELF_ONLY_NOT_LAUNCH_AUTHORITY"},
+            {"id": "executed_process_identity", "status": "BLOCKED",
+             "reason": "CORE_EXECUTION_REVIEW_REQUIRED"},
+            {"id": "same_build_help_config", "status": "BLOCKED",
+             "reason": "SAME_BUILD_HELP_CONFIG_NOT_QUALIFIED"},
+            {"id": "external_checkpoint_anchor", "status": "BLOCKED",
+             "reason": "INDEPENDENT_MONOTONIC_ANCHOR_UNQUALIFIED"},
+        ],
+        "core_scenarios": [
+            {"id": scenario, "status": "NOT RUN",
+             "reason": "SECURE_CORE_PROCESS_PREREQUISITES_BLOCKED"}
+            for scenario in ("startup_shutdown_cleanup", "readonly_rpc_compatibility",
+                             "payment_observation", "reorg", "restart",
+                             "checkpoint_restore", "rescan")
+        ],
         "status": "OFFICIAL_WAM_CORE_REGTEST_BLOCKED_NO_EXEC",
         "signed_official_member_sha256": verified_hash,
         "signed_official_member_byte_count": size,

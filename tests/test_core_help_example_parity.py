@@ -20,6 +20,74 @@ _CONF = b"# WAM daemon sample\n#server=0\n#rpcbind=127.0.0.1\n#regtest=1\n#rpcpa
 
 
 class CoreHelpExampleParityTests(unittest.TestCase):
+    def _two_node_fixture(self):
+        from wam_privacy_wallet.node.two_node_topology import plan_two_node_topology
+        from wam_privacy_wallet.node.two_node_schema import build_structured_two_node_v1
+        plan=plan_two_node_topology((31001,31002,32001,32002))
+        names=sorted({o.key for n in build_structured_two_node_v1(plan).nodes for o in n.options})
+        return plan, b"Fixture help ONLY:\n"+b"".join(
+            b"  -"+name.encode()+b"=<value>\n" for name in names)
+
+    def test_two_node_names_covered_without_core_authority(self):
+        plan,help_text=self._two_node_fixture()
+        r=audit.inspect_two_node_help_coverage(help_text,plan)
+        self.assertEqual(r.schema_version,1)
+        self.assertGreater(r.configured_option_count,10)
+        for key in ('option_value_semantics_verified','same_executed_image_proven',
+                    'signed_provenance_verified','help_parity_verified',
+                    'core_execution_allowed','real_regtest_qualified',
+                    'signer_enabled','broadcast_allowed','mainnet_allowed'):
+            self.assertIs(getattr(r,key),False)
+
+    def test_cli_two_node_option_coverage_is_explicit_and_non_authorizing(self):
+        _,help_text=self._two_node_fixture()
+        names=audit._help_options(help_text.decode())
+        example=''.join('#'+name+'=\n' for name in sorted(names)).encode()
+        with TemporaryDirectory() as root:
+            help_file=Path(root)/'help.txt'; conf_file=Path(root)/'wam.conf'
+            help_file.write_bytes(help_text);conf_file.write_bytes(example)
+            with patch('sys.stdout',new_callable=io.StringIO) as output:
+                code=cli.main(['--captured-help',str(help_file),'--example-conf',str(conf_file),
+                               '--two-node-ports','31001','31002','32001','32002'])
+            self.assertEqual(code,0)
+            evidence=json.loads(output.getvalue())['two_node_help_coverage']
+            self.assertFalse(evidence['same_executed_image_proven'])
+            self.assertFalse(evidence['core_execution_allowed'])
+
+    def test_missing_plan_option_is_refused_not_invented(self):
+        plan,help_text=self._two_node_fixture()
+        help_text=help_text.replace(b'  -natpmp=<value>\n',b'')
+        with self.assertRaisesRegex(audit.CoreHelpExampleError,'TWO_NODE_UNSUPPORTED_OPTION'):
+            audit.inspect_two_node_help_coverage(help_text,plan)
+
+    def test_two_node_ambiguous_help_duplicate_denied(self):
+        plan,help_text=self._two_node_fixture()
+        with self.assertRaisesRegex(audit.CoreHelpExampleError,'HELP_DUPLICATE_DENIED'):
+            audit.inspect_two_node_help_coverage(help_text+b'  -server=<value>\n',plan)
+
+    def test_two_node_forged_loopback_policy_denied(self):
+        from dataclasses import replace
+        plan,help_text=self._two_node_fixture()
+        forged=replace(plan,nodes=(replace(plan.nodes[0],rpc_host='0.0.0.0'),plan.nodes[1]))
+        with self.assertRaisesRegex(audit.CoreHelpExampleError,'TWO_NODE_PLAN_DENIED'):
+            audit.inspect_two_node_help_coverage(help_text,forged)
+
+    def test_two_node_configuration_pair_digest_deterministic_and_port_bound(self):
+        from wam_privacy_wallet.node.two_node_topology import plan_two_node_topology
+        plan,help_text=self._two_node_fixture()
+        a=audit.inspect_two_node_help_coverage(help_text,plan)
+        self.assertEqual(a,audit.inspect_two_node_help_coverage(help_text,plan))
+        b=audit.inspect_two_node_help_coverage(help_text,plan_two_node_topology((33001,33002,34001,34002)))
+        self.assertNotEqual(a.configuration_pair_sha256,b.configuration_pair_sha256)
+
+    def test_two_node_plan_cannot_forge_execution_or_scanner_enablement(self):
+        from dataclasses import replace
+        plan,help_text=self._two_node_fixture()
+        for field in ('real_regtest_qualified','publisher_identity_verified',
+                      'scanner_enabled','signing_enabled','release_allowed'):
+            with self.subTest(field=field),self.assertRaises(audit.CoreHelpExampleError):
+                audit.inspect_two_node_help_coverage(help_text,replace(plan,**{field:True}))
+
     def deny(self, code, help_text=_HELP, example=_CONF):
         with self.assertRaisesRegex(audit.CoreHelpExampleError, "^"+code+"$"):
             audit.inspect_help_example_text(help_text, example)
