@@ -39,6 +39,8 @@ def scan_two_existing_regtest_nodes(
     user_consented: bool, acknowledge_unverified_binaries: bool,
     max_blocks: int = 16, history_limit: int | None = None,
     save_checkpoint: bool = False, restore_checkpoint: bool = False,
+    receive_account_index: int | None = None,
+    show_observed_balance: bool = False,
 ) -> dict[str, object]:
     """Bracket actual Scanner.sync with independent read-only P2P/chain probes.
 
@@ -68,7 +70,11 @@ def scan_two_existing_regtest_nodes(
                 (type(history_limit) is not int or not 1 <= history_limit <= 100))
             or type(save_checkpoint) is not bool
             or type(restore_checkpoint) is not bool
-            or (save_checkpoint and restore_checkpoint)):
+            or (save_checkpoint and restore_checkpoint)
+            or (receive_account_index is not None and (
+                type(receive_account_index) is not int
+                or not 0 <= receive_account_index < 16))
+            or type(show_observed_balance) is not bool):
         raise TwoNodeWspSessionError("TWO_NODE_WSP_SCOPE_DENIED")
     try:
         topology = TwoNodeP2PReadOnlyAudit(
@@ -92,6 +98,8 @@ def scan_two_existing_regtest_nodes(
             max_blocks=max_blocks, history_limit=history_limit,
             save_checkpoint=save_checkpoint,
             restore_checkpoint=restore_checkpoint,
+            receive_account_index=receive_account_index,
+            show_observed_balance=show_observed_balance,
         )
         if (type(scan) is not dict
                 or scan.get("status") != "REAL_LOOPBACK_WSP_SCAN_UNQUALIFIED_CORE"
@@ -99,7 +107,22 @@ def scan_two_existing_regtest_nodes(
                 or scan.get("wallet_operational") is not False
                 or scan.get("signer_enabled") is not False
                 or scan.get("broadcast_allowed") is not False
-                or scan.get("mainnet_allowed") is not False):
+                or scan.get("mainnet_allowed") is not False
+                or scan.get("real_two_node_regtest_qualified") is not False
+                or type(scan.get("chain_current")) is not bool
+                or type(scan.get("tip_height")) is not int
+                or not 0 <= scan["tip_height"] <= 100_000_000
+                or (receive_account_index is None and
+                    "unqualified_receive_code" in scan)
+                or (not show_observed_balance and
+                    "unqualified_confirmed_atoms" in scan)
+                or (receive_account_index is not None and (
+                    scan.get("chain_current") is not True
+                    or type(scan.get("unqualified_receive_code")) is not str))
+                or (show_observed_balance and (
+                    scan.get("chain_current") is not True
+                    or type(scan.get("unqualified_confirmed_atoms")) is not int
+                    or not 0 <= scan["unqualified_confirmed_atoms"] <= 2**63 - 1))):
             raise TwoNodeWspSessionError("TWO_NODE_WSP_RECEIPT_DENIED")
         second_a = gateway_a.probe_core_profile()
         second_b = gateway_b.probe_core_profile()
@@ -111,6 +134,10 @@ def scan_two_existing_regtest_nodes(
                 or (scan["chain_current"] and
                     scan["tip_height"] != second_a.identity.height)):
             raise TwoNodeWspSessionError("TWO_NODE_WSP_MOVED_DENIED")
+        if (receive_account_index is not None or show_observed_balance) and (
+                scan["chain_current"] is not True
+                or scan["tip_height"] != second_a.identity.height):
+            raise TwoNodeWspSessionError("TWO_NODE_WSP_INCOMPLETE_DENIED")
         scan["status"] = "REAL_TWO_NODE_WSP_SCAN_UNQUALIFIED_BINARIES"
         scan["two_node_p2p_observed"] = True
         scan["two_node_reported_chain_agrees"] = True
