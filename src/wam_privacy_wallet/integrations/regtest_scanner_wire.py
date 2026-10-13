@@ -10,9 +10,6 @@ isolation are independently established. This adapter has no enable switch.
 """
 from __future__ import annotations
 
-import base64
-import http.client
-import json
 import re
 
 from wam_privacy_wallet.integrations.scanner_response_contract import (
@@ -22,9 +19,8 @@ from wam_privacy_wallet.integrations.scanner_response_contract import (
 from wam_privacy_wallet.node.attestation import RegtestIdentityError
 from wam_privacy_wallet.node.core_profile import CoreProfileError
 from wam_privacy_wallet.node.endpoint import LocalRegtestEndpoint
-from wam_privacy_wallet.node.read_rpc import ExplicitRpcAuth, LocalReadOnlyRpc, LocalRpcError
+from wam_privacy_wallet.node.read_rpc import ExplicitRpcAuth, LocalReadOnlyRpc, LocalRpcError, _post_json_rpc
 from wam_privacy_wallet.node.regtest_gateway import LocalRegtestIdentityGateway
-from wam_privacy_wallet.node.rpc_json import decode_rpc_json
 
 _HASH = re.compile(r"[0-9a-f]{64}\Z", re.ASCII)
 _MAX_WIRE_BYTES = 8 * 1024 * 1024
@@ -76,53 +72,19 @@ class _ScannerOnlyWire:
         else:
             raise RegtestScannerWireError("SCAN_RPC_METHOD_DENIED")
 
-        token = base64.b64encode(
-            (self._auth.username + ":" + self._auth.password).encode("ascii")
-        ).decode("ascii")
-        wire = json.dumps(
-            {"jsonrpc": "1.0", "id": 1, "method": method, "params": params},
-            separators=(",", ":"), allow_nan=False,
-        ).encode("ascii")
-        conn = http.client.HTTPConnection(
-            self._endpoint.host, self._endpoint.port, timeout=self._timeout,
-        )
-        response = None
         try:
-            conn.request("POST", "/", wire, headers={
-                "Authorization": "Basic " + token,
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-                "Connection": "close",
-            })
-            response = conn.getresponse()
-            if response.status != 200:
-                raise RegtestScannerWireError("SCAN_RPC_HTTP_DENIED")
-            size = response.getheader("Content-Length")
-            if size is not None and (
-                len(size) > 9 or not size.isascii()
-                or not size.isdecimal() or int(size) > _MAX_WIRE_BYTES
-            ):
-                raise RegtestScannerWireError("SCAN_RPC_RESPONSE_LIMIT")
-            raw = response.read(_MAX_WIRE_BYTES + 1)
-            if len(raw) > _MAX_WIRE_BYTES:
-                raise RegtestScannerWireError("SCAN_RPC_RESPONSE_LIMIT")
-            try:
-                payload = decode_rpc_json(raw)
-            except (ValueError, UnicodeDecodeError, RecursionError):
-                raise RegtestScannerWireError("SCAN_RPC_REPLY_DENIED") from None
-            if (type(payload) is not dict or type(payload.get("id")) is not int
-                    or payload["id"] != 1 or "result" not in payload
-                    or "error" not in payload):
-                raise RegtestScannerWireError("SCAN_RPC_REPLY_DENIED")
-            if payload["error"] is not None:
-                raise RegtestScannerWireError("SCAN_RPC_REMOTE_ERROR")
-            return payload["result"]
-        except (OSError, TimeoutError, http.client.HTTPException):
-            raise RegtestScannerWireError("SCAN_RPC_TRANSPORT_DENIED") from None
-        finally:
-            if response is not None:
-                response.close()
-            conn.close()
+            return _post_json_rpc(self._endpoint, self._auth, self._timeout,
+                                  method, params, _MAX_WIRE_BYTES)
+        except LocalRpcError as error:
+            # Preserve the diagnostic boundary's existing redacted codes.
+            code = {
+                "WAM_RPC_HTTP_REJECTED": "SCAN_RPC_HTTP_DENIED",
+                "WAM_RPC_RESPONSE_LIMIT": "SCAN_RPC_RESPONSE_LIMIT",
+                "WAM_RPC_INVALID_RESPONSE": "SCAN_RPC_REPLY_DENIED",
+                "WAM_RPC_REMOTE_ERROR": "SCAN_RPC_REMOTE_ERROR",
+            }.get(str(error), "SCAN_RPC_TRANSPORT_DENIED")
+            raise RegtestScannerWireError(code) from None
+
 
 
 class RegtestScannerReadBridge:

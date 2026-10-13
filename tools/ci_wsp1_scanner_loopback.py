@@ -80,6 +80,17 @@ def _wam_coinbase_outputs():
     ]
 
 
+def _synthetic_filter(height):
+    import hashlib
+    double = lambda data: hashlib.sha256(hashlib.sha256(data).digest()).digest()
+    # Canonical format fixture; not a filter independently built from blocks.
+    encoded = bytes.fromhex("01000000")
+    header = bytes(32)
+    for _ in range(height + 1):
+        header = double(double(encoded) + header)
+    return {"filter": encoded.hex(), "header": header[::-1].hex()}
+
+
 class LocalSyntheticCoreShape(BaseHTTPRequestHandler):
     def do_POST(self):
         body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
@@ -100,6 +111,21 @@ class LocalSyntheticCoreShape(BaseHTTPRequestHandler):
             reply = {"chain": "regtest", "pruned": False,
                      "blocks": state.height, "headers": state.height,
                      "bestblockhash": state.tip}
+        elif method == "getindexinfo" and params == []:
+            reply = {name: {"synced": not getattr(state, "stale_indexes", False),
+                            "best_block_height": state.height}
+                     for name in ("txindex", "basic block filter index", "coinstatsindex")}
+        elif method == "getblockfilter" and len(params) == 2 and params[1] == "basic":
+            if params[0] == WAM_REGTEST_GENESIS:
+                reply = _synthetic_filter(0)
+            elif state.height == 2 and params[0] == FORK:
+                reply = _synthetic_filter(1)
+            elif params[0] == state.tip:
+                reply = _synthetic_filter(state.height)
+            else:
+                state.violations.append(method)
+                self.send_error(403)
+                return
         elif method == "getblock" and (
                 params == [state.tip, 3]
                 or (state.height == 2 and params == [FORK, 3])):

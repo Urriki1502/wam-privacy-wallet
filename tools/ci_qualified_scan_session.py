@@ -12,6 +12,7 @@ from http.server import ThreadingHTTPServer
 from pathlib import Path
 import shutil
 import sys
+import subprocess
 from tempfile import TemporaryDirectory
 import threading
 
@@ -187,6 +188,32 @@ def run(root: Path) -> None:
                 recovered.close()
             passed.append("ACTUAL_AESGCM_RESTORE_REATTEST")
 
+            # A fresh process exercises the actual real-only application seam.
+            # Fixed public test authentication + a synthetic peer: NO Core E2E.
+            live_dir = directory / "live-readiness-test"
+            live_dir.mkdir(mode=0o700)
+            provision_encrypted_scan_backup(live_dir, envelope)
+            worker_args = [sys.executable, "-B", "-m", "tools.ci_qualified_scan_session",
+                           "--source-root", str(root), "--live-readiness-worker",
+                           "--private-dir", str(live_dir),
+                           "--rpc-port", str(server.server_port)]
+            child = subprocess.run(worker_args, cwd=Path(__file__).resolve().parents[1],
+                                   capture_output=True, timeout=20, check=False)
+            assert child.returncode == 0 and child.stdout.strip() == b"LIVE_READINESS_SYNTHETIC_ONLY_PASS"
+            passed.append("ACTUAL_LIVE_INDEX_FILTER_SCANNER_SEAM")
+            db = live_dir / "scan-only-state.sqlite"
+            before_db = db.read_bytes()
+            before_methods = len(server.observed_methods)
+            server.stale_indexes = True
+            child = subprocess.run(worker_args, cwd=Path(__file__).resolve().parents[1],
+                                   capture_output=True, timeout=20, check=False)
+            server.stale_indexes = False
+            assert child.returncode == 2 and b"PASS" not in child.stdout
+            assert db.read_bytes() == before_db
+            assert "getindexinfo" in server.observed_methods[before_methods:]
+            assert "getblock" not in server.observed_methods[before_methods:]
+            passed.append("ACTUAL_STALE_INDEX_DENIAL_BEFORE_SCANNER")
+
             # Real upstream WSP SQLite projection reaches the actual REGTEST Qt
             # workspace through an explicit non-authorizing review interface.
             from PySide6.QtCore import QCoreApplication, QEvent
@@ -315,6 +342,8 @@ def run(root: Path) -> None:
         "ACTUAL_PRIVATE_SQLITE_HISTORY",
         "ACTUAL_WSP_HISTORY_SELECTED_EXPORT_NO_AUTHORITY",
         "ACTUAL_AESGCM_RESTORE_REATTEST",
+        "ACTUAL_LIVE_INDEX_FILTER_SCANNER_SEAM",
+        "ACTUAL_STALE_INDEX_DENIAL_BEFORE_SCANNER",
         "ACTUAL_WSP_HISTORY_QT_SELECTED_EXPORT",
         "ACTUAL_WSP_STORE_TO_REGTEST_QT_READONLY",
         "ACTUAL_REPLAY_NOT_DUPLICATED",
@@ -329,13 +358,39 @@ def run(root: Path) -> None:
     ]
     if passed != expected:
         raise RuntimeError("ACTUAL_SESSION_CASE_COUNT_DENIED")
-    print("PINNED_RETAINED_APP_SESSION_OK 19/19; synthetic peer only; operational Core/WSP gates held")
+    print("PINNED_RETAINED_APP_SESSION_OK 21/21; synthetic peer only; operational Core/WSP gates held")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source-root", required=True)
+    parser.add_argument("--live-readiness-worker", action="store_true")
+    parser.add_argument("--private-dir", type=Path)
+    parser.add_argument("--rpc-port", type=int)
     args = parser.parse_args()
+    if args.live_readiness_worker:
+        from wam_privacy_wallet.application.live_regtest_scanner import scan_existing_regtest
+        try:
+            sys.setprofile(_no_signer)
+            result = scan_existing_regtest(Path(args.source_root), args.private_dir,
+                b"PUBLIC_DISPOSABLE_REGTEST_TEST_PASSWORD",
+                endpoint=LocalRegtestEndpoint("127.0.0.1", args.rpc_port),
+                rpc_auth=ExplicitRpcAuth("synthetic", "NO_REAL_CREDENTIAL"),
+                user_consented=True, acknowledge_unverified_binary=True,
+                require_synchronized_indexes=True, max_blocks=2)
+            assert result["chain_current"] is True
+            assert result["core_binary_authenticated"] is False
+            assert result["wallet_operational"] is False
+            assert result["signer_enabled"] is False
+            assert result["broadcast_allowed"] is False
+            assert result["mainnet_allowed"] is False
+        except Exception:
+            print("LIVE_READINESS_SYNTHETIC_ONLY_DENIED", file=sys.stderr)
+            return 2
+        finally:
+            sys.setprofile(None)
+        print("LIVE_READINESS_SYNTHETIC_ONLY_PASS")
+        return 0
     try:
         run(Path(args.source_root))
     except Exception as error:

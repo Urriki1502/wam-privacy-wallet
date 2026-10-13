@@ -1,7 +1,8 @@
 """Bounded, read-only JSON-RPC transport for a user-owned loopback WAM node.
 
-No wallet, secrets-file parsing, scanner or transaction functions belong here.
-Only supported regtest identity RPCs may be invoked. Authentication is
+The public client exposes only supported regtest identity RPCs. Its internal
+HTTP helper is reused behind separately validated scanner/readiness surfaces;
+it supplies no RPC privileges, wallet or secrets-file parsing. Authentication is
 explicit; no environment proxies, URL redirects or DNS-based hosts are used.
 """
 
@@ -87,49 +88,62 @@ class LocalReadOnlyRpc:
         elif params:
             raise LocalRpcError("WAM_RPC_INVALID_PARAMS")
 
-        userpass = f"{self._auth.username}:{self._auth.password}".encode("ascii")
-        token = base64.b64encode(userpass).decode("ascii")
-        body = json.dumps({"jsonrpc": "1.0", "id": 1, "method": method, "params": params}, separators=(",", ":")).encode("utf-8")
-        connection = http.client.HTTPConnection(self._endpoint.host, self._endpoint.port, timeout=self._timeout)
-        response = None
-        try:
-            connection.request(
-                "POST", "/", body=body,
-                headers={
-                    "Authorization": "Basic " + token,
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                    "Connection": "close",
-                },
-            )
-            response = connection.getresponse()
-            if response.status != 200:
-                raise LocalRpcError("WAM_RPC_HTTP_REJECTED")
-            size = response.getheader("Content-Length")
-            if size is not None:
-                if len(size) > 7 or not size.isascii() or not size.isdecimal() or int(size) > _MAX_RESPONSE_BYTES:
-                    raise LocalRpcError("WAM_RPC_RESPONSE_LIMIT")
-            raw = response.read(_MAX_RESPONSE_BYTES + 1)
-            if len(raw) > _MAX_RESPONSE_BYTES:
+        return _post_json_rpc(self._endpoint, self._auth, self._timeout,
+                              method, params, _MAX_RESPONSE_BYTES)
+
+
+def _post_json_rpc(
+    endpoint: LocalRegtestEndpoint, auth: ExplicitRpcAuth, timeout: float,
+    method: str, params: list[object], response_limit: int,
+) -> object:
+    """Internal transport only: each caller MUST enforce its own fixed surface.
+
+    One bounded request, zero retries. Credentials, raw replies and exceptions
+    never escape. This helper grants no identity/scanner/qualification authority.
+    """
+    userpass = f"{auth.username}:{auth.password}".encode("ascii")
+    token = base64.b64encode(userpass).decode("ascii")
+    body = json.dumps({"jsonrpc": "1.0", "id": 1, "method": method, "params": params}, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    connection = http.client.HTTPConnection(endpoint.host, endpoint.port, timeout=timeout)
+    response = None
+    try:
+        connection.request(
+            "POST", "/", body=body,
+            headers={
+                "Authorization": "Basic " + token,
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "Connection": "close",
+            },
+        )
+        response = connection.getresponse()
+        if response.status != 200:
+            raise LocalRpcError("WAM_RPC_HTTP_REJECTED")
+        size = response.getheader("Content-Length")
+        if size is not None:
+            if len(size) > 9 or not size.isascii() or not size.isdecimal() or int(size) > response_limit:
                 raise LocalRpcError("WAM_RPC_RESPONSE_LIMIT")
-            try:
-                reply = decode_rpc_json(raw)
-            except (ValueError, UnicodeDecodeError, RecursionError):
-                raise LocalRpcError("WAM_RPC_INVALID_RESPONSE") from None
-            if (
-                type(reply) is not dict
-                or type(reply.get("id")) is not int
-                or reply["id"] != 1
-                or "result" not in reply
-                or "error" not in reply
-            ):
-                raise LocalRpcError("WAM_RPC_INVALID_RESPONSE")
-            if reply["error"] is not None:
-                raise LocalRpcError("WAM_RPC_REMOTE_ERROR")
-            return reply["result"]
-        except (OSError, TimeoutError, http.client.HTTPException):
-            raise LocalRpcError("WAM_RPC_TRANSPORT_ERROR") from None
-        finally:
-            if response is not None:
-                response.close()
-            connection.close()
+        raw = response.read(response_limit + 1)
+        if len(raw) > response_limit:
+            raise LocalRpcError("WAM_RPC_RESPONSE_LIMIT")
+        try:
+            reply = decode_rpc_json(raw)
+        except (ValueError, UnicodeDecodeError, RecursionError):
+            raise LocalRpcError("WAM_RPC_INVALID_RESPONSE") from None
+        if (
+            type(reply) is not dict
+            or type(reply.get("id")) is not int
+            or reply["id"] != 1
+            or "result" not in reply
+            or "error" not in reply
+        ):
+            raise LocalRpcError("WAM_RPC_INVALID_RESPONSE")
+        if reply["error"] is not None:
+            raise LocalRpcError("WAM_RPC_REMOTE_ERROR")
+        return reply["result"]
+    except (OSError, TimeoutError, http.client.HTTPException):
+        raise LocalRpcError("WAM_RPC_TRANSPORT_ERROR") from None
+    finally:
+        if response is not None:
+            response.close()
+        connection.close()

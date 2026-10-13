@@ -87,6 +87,8 @@ MINIMUM_CASES = {
     "test_wsp1_full_source_closure.py": 12,
     "test_wsp1_scanner_only_rpc.py": 25,
     "test_wam_transaction_shape.py": 22,
+    "test_basic_block_filter.py": 18,
+    "test_core_readiness_rpc.py": 21,
     "test_app_scanner_session_workflow.py": 14,
     "test_app_wsp_scan_coordinator.py": 15,
     "test_scan_only_account_session.py": 14,
