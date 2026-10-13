@@ -86,6 +86,10 @@ def scan_existing_regtest(
             if receive_account_index is not None else None)
         if save_checkpoint:
             session.save_checkpoint(private_dir, scan_password, user_consented=True)
+        # A second post-read identity check also brackets receive/history and
+        # checkpoint operations: no private output from a drifting live chain.
+        if gateway.probe_core_profile() != before:
+            raise LiveRegtestScanError("LIVE_SCAN_PEER_MOVED_DENIED")
         if (snapshot.core_authenticated or snapshot.wallet_operational
                 or snapshot.balance_qualified or snapshot.signer_enabled
                 or snapshot.broadcast_allowed or snapshot.mainnet_allowed):
