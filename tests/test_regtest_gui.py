@@ -429,6 +429,49 @@ class RegtestGuiTests(unittest.TestCase):
             self.drain(lambda: not self.window.controller.busy)
         self.assertNotIn("c" * 64, self.window.private_history_status.toPlainText())
 
+    def test_receive_code_explicit_consent_and_navigation_erasure(self):
+        if sys.platform != "linux":
+            return
+        self.fill_private_workflow_inputs()
+        self.window.navigation.setCurrentRow(2)
+        self.assertFalse(self.window.receive_button.isEnabled())
+        self.window.receive_ack.setChecked(True)
+        self.assertTrue(self.window.receive_button.isEnabled())
+        code = "wamrtsp1" + "q" * 105
+        with patch("wam_privacy_wallet.gui.regtest_worker.run_private_wsp_workflow",
+                   return_value=PrivateQtWorkflowEvidence(
+                       "receive", 8, receive_code=code
+                   )):
+            self.window.receive_button.click()
+            self.drain(lambda: not self.window.controller.busy)
+        self.assertIn(code, self.window.receive_status.toPlainText())
+        self.assertNotIn(code, self.window.scan_review_status.text())
+        self.assertNotIn(code, self.window.balance_status.text())
+        self.window.navigation.setCurrentRow(3)
+        self.assertNotIn(code, self.window.receive_status.toPlainText())
+        self.assertFalse(self.window.receive_ack.isChecked())
+        self.assertFalse(self.window.controller.lifecycle.state.wallet_operational)
+
+    def test_unqualified_balance_opt_in_never_grants_spend(self):
+        if sys.platform != "linux":
+            return
+        self.fill_private_workflow_inputs()
+        self.window.navigation.setCurrentRow(4)
+        self.assertFalse(self.window.balance_button.isEnabled())
+        self.window.balance_ack.setChecked(True)
+        self.assertTrue(self.window.balance_button.isEnabled())
+        with patch("wam_privacy_wallet.gui.regtest_worker.run_private_wsp_workflow",
+                   return_value=PrivateQtWorkflowEvidence(
+                       "balance", 8, observed_atoms=950_000
+                   )):
+            self.window.balance_button.click()
+            self.drain(lambda: not self.window.controller.busy)
+        self.assertIn("950000", self.window.balance_status.text().replace(",", ""))
+        self.assertIn("NOT SPENDABLE", self.window.balance_status.text())
+        self.assertFalse(self.window.controller.lifecycle.state.wallet_operational)
+        self.window.navigation.setCurrentRow(0)
+        self.assertEqual(self.window.balance_status.text(), "NO OBSERVED BALANCE")
+
     def test_startup_and_inspection_do_not_connect_or_launch_core(self):
         self.selected()
         with patch("socket.socket") as network, patch("subprocess.Popen") as process:

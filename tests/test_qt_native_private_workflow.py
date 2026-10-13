@@ -113,6 +113,56 @@ class NativeQtPrivateWorkflowTests(unittest.TestCase):
                 self.assertTrue(callable(opts["cancelled"]))
                 self.assertNotIn("mock_peer", opts)
 
+    def test_receive_balance_explicit_single_projection(self):
+        if sys.platform != "linux":
+            return
+        code = "wamrtsp1" + "q" * 105
+        for action in ("receive", "balance"):
+            receipt = self.source_receipt(action)
+            if action == "receive":
+                receipt["unqualified_receive_code"] = code
+            else:
+                receipt["unqualified_confirmed_atoms"] = 950_000
+            with patch.object(m, "scan_two_existing_regtest_nodes",
+                              return_value=receipt) as backend:
+                value = m.run_private_wsp_workflow(
+                    **dict(self.args, operation=action)
+                )
+            if action == "receive":
+                self.assertEqual(value.receive_code, code)
+                self.assertIsNone(value.observed_atoms)
+                self.assertEqual(backend.call_args.kwargs["receive_account_index"], 0)
+            else:
+                self.assertEqual(value.observed_atoms, 950_000)
+                self.assertIsNone(value.receive_code)
+                self.assertIs(backend.call_args.kwargs["show_observed_balance"], True)
+            self.assertFalse(value.wallet_operational)
+            self.assertFalse(value.signing_allowed)
+            self.assertNotIn(code, repr(value))
+
+    def test_receive_balance_mixed_and_forged_receipts_denied(self):
+        if sys.platform != "linux":
+            return
+        for action, mutation in (
+            ("receive", {"unqualified_confirmed_atoms": 700}),
+            ("receive", {"unqualified_receive_code": "INVALID"}),
+            ("receive", {"wallet_operational": True}),
+            ("balance", {"unqualified_receive_code": "unwanted"}),
+            ("balance", {"unqualified_confirmed_atoms": -1}),
+            ("balance", {"unqualified_confirmed_atoms": True}),
+        ):
+            receipt = self.source_receipt(action)
+            if action == "receive":
+                receipt["unqualified_receive_code"] = "wamrtsp1" + "q" * 105
+            else:
+                receipt["unqualified_confirmed_atoms"] = 950_000
+            receipt.update(mutation)
+            with self.subTest(action=action, mutation=mutation), patch.object(
+                m, "scan_two_existing_regtest_nodes", return_value=receipt
+            ):
+                with self.assertRaises(m.QtPrivateWorkflowError):
+                    m.run_private_wsp_workflow(**dict(self.args, operation=action))
+
     def test_forged_authority_and_forged_checkpoint_denied(self):
         if sys.platform != "linux":
             return
