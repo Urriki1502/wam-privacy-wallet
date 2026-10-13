@@ -41,6 +41,7 @@ from wam_privacy_wallet.application.encrypted_checkpoint_archive import (
 from wam_privacy_wallet.application.versioned_checkpoint_journal import (
     VersionedCheckpointError, write_unanchored_regtest_generation,
     read_unanchored_regtest_generation,
+    write_authenticated_regtest_generation, read_authenticated_regtest_generation,
 )
 from wam_privacy_wallet.application.snapshot_lineage_preflight import (
     SnapshotLineageError, inspect_untrusted_generation_lineage,
@@ -710,6 +711,44 @@ def _run(source_root: Path) -> None:
                         != hashlib.sha256(encrypted_checkpoint).hexdigest()):
                     raise RuntimeError("WSP_GENERATION_REAL_CRYPTO_FILE_MISMATCH")
                 print("WSP1_REAL_IMMUTABLE_GENERATION_CHECKPOINT_PASS")
+
+                # A separate random metadata key authenticates the manifest
+                # around unchanged real WSP ciphertext, never the WSP password.
+                # Pinned Store.export_checkpoint declares checkpoint schema 3.
+                with tempfile.TemporaryDirectory(dir=retained_dir) as auth_dir:
+                    auth_root = Path(auth_dir)
+                    metadata_key = os.urandom(32)
+                    write_authenticated_regtest_generation(
+                        auth_root, 1, encrypted_checkpoint, scope_digest=scoped,
+                        tip_height=2, tip_hash=PAYTIP, predecessor_digest="0"*64,
+                        checkpoint_schema=3, key_epoch=1, metadata_key=metadata_key,
+                    )
+                    try:
+                        read_authenticated_regtest_generation(
+                            auth_root, 1, scope_digest=scoped, checkpoint_schema=3,
+                            key_epoch=1, metadata_key=metadata_key,
+                        )
+                    except VersionedCheckpointError as denial:
+                        if str(denial) != "SNAPSHOT_TRUSTED_ANCHOR_REQUIRED":
+                            raise
+                    else:
+                        raise RuntimeError("WSP_METADATA_AUTH_GRANTED_FRESHNESS")
+                    _, mac_bound_ciphertext = read_authenticated_regtest_generation(
+                        auth_root, 1, scope_digest=scoped, checkpoint_schema=3,
+                        key_epoch=1, metadata_key=metadata_key,
+                        allow_unanchored_synthetic=True,
+                    )
+                    if mac_bound_ciphertext != encrypted_checkpoint:
+                        raise RuntimeError("WSP_METADATA_CIPHERTEXT_CHANGED")
+                    restored = Scanner(auth_root / "restored.sqlite", (account,))
+                    try:
+                        restored.store.restore_checkpoint(mac_bound_ciphertext, test_password)
+                        if restored.store.tip()[0] != 2:
+                            raise RuntimeError("WSP_METADATA_RESTORE_TIP_DENIED")
+                    finally:
+                        restored.close()
+                    del metadata_key
+                    print("WSP1_REAL_CHECKPOINT_HMAC_METADATA_RESTORE_PASS_NO_ANCHOR")
                 print("WSP1_UNANCHORED_GENERATION_RESTORE_DENIED_PASS")
                 second_digest = write_unanchored_regtest_generation(
                     retained_dir, 2, encrypted_checkpoint,
