@@ -13,6 +13,7 @@ from pathlib import Path
 import re
 import stat
 import sys
+from wam_privacy_wallet.integrations.wsp1_source_closure import verify_wsp1_full_source_closure
 
 _PIN = "ac55f13423620252bdbf848c7e8a280c3b84721e"
 _GUARD = re.compile(r"[0-9a-f]{40}\Z")
@@ -75,7 +76,7 @@ def _digest_private_regular(path: Path) -> str:
 
 
 def inspect_external_signer_request(
-    keyring: Path, request: Path, output: Path, *, upstream_commit: str,
+    keyring: Path, request: Path, output: Path, *, source_root: Path,
     user_consented: bool,
 ) -> SignerHandoff:
     """Qualify already encrypted artifacts for a *manual* offline process.
@@ -83,10 +84,16 @@ def inspect_external_signer_request(
     The caller never obtains a signer token or any private key. Output must
     not exist (upstream CLI writes create-once 0600) and must be distinct.
     """
-    if (user_consented is not True or type(upstream_commit) is not str
-            or _GUARD.fullmatch(upstream_commit) is None
-            or upstream_commit != _PIN):
+    if user_consented is not True:
         raise SignerHandoffError("SIGNER_SOURCE_OR_CONSENT_DENIED")
+    try:
+        proof = verify_wsp1_full_source_closure(source_root)
+        if (proof["pinned_commit"] != _PIN
+                or proof["status"] != "WSP1_FULL_SOURCE_CLOSURE_VERIFIED_NO_AUTHORITY"
+                or proof["signer_enabled"] is not False):
+            raise ValueError
+    except Exception:
+        raise SignerHandoffError("SIGNER_SOURCE_UNVERIFIED") from None
     if (type(keyring) is not type(Path()) or type(request) is not type(Path())
             or type(output) is not type(Path())
             or not all(path.is_absolute() for path in (keyring, request, output))
@@ -101,4 +108,4 @@ def inspect_external_signer_request(
     second = _digest_private_regular(request)
     if output.parent != keyring.parent or output.parent != request.parent:
         raise SignerHandoffError("SIGNER_OUTPUT_PARENT_DENIED")
-    return SignerHandoff(upstream_commit, first, second)
+    return SignerHandoff(_PIN, first, second)

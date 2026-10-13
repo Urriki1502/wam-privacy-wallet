@@ -1,5 +1,7 @@
 """Actual Linux file-descriptor input validation for a future offline signer CLI."""
 from pathlib import Path
+from unittest.mock import patch
+from wam_privacy_wallet.application import offline_signer_handoff as handoff
 from tempfile import TemporaryDirectory
 import unittest
 from wam_privacy_wallet.application.offline_signer_handoff import (
@@ -22,11 +24,19 @@ class OfflineSignerHandoffTests(unittest.TestCase):
         self.request.chmod(0o600)
 
     def inspect(self, **changes):
-        kwargs = dict(upstream_commit=PIN, user_consented=True)
+        kwargs = dict(source_root=self.dir, user_consented=True)
         kwargs.update(changes)
-        return inspect_external_signer_request(
-            self.key, self.request, self.out, **kwargs,
-        )
+        # Unit tests isolate private-file safety. The native integration
+        # workflow independently proves pinned Git source closure.
+        with patch.object(handoff, "verify_wsp1_full_source_closure",
+                          return_value={
+                              "pinned_commit": PIN,
+                              "status": "WSP1_FULL_SOURCE_CLOSURE_VERIFIED_NO_AUTHORITY",
+                              "signer_enabled": False,
+                          }):
+            return inspect_external_signer_request(
+                self.key, self.request, self.out, **kwargs,
+            )
 
     def test_no_signer_execution_or_authority(self):
         import sys
@@ -44,11 +54,18 @@ class OfflineSignerHandoffTests(unittest.TestCase):
         self.assertNotIn("DISPOSABLE", repr(receipt))
         self.assertFalse(self.out.exists())
 
-    def test_wrong_source_or_consent_rejected(self):
-        for kw in (dict(upstream_commit="a" * 40), dict(user_consented=False)):
-            with self.assertRaisesRegex(SignerHandoffError,
-                                        "^SIGNER_SOURCE_OR_CONSENT_DENIED$"):
-                self.inspect(**kw)
+    def test_no_consent_rejected(self):
+        with self.assertRaisesRegex(SignerHandoffError,
+                                    "^SIGNER_SOURCE_OR_CONSENT_DENIED$"):
+            self.inspect(user_consented=False)
+
+    def test_unqualified_source_closure_rejected(self):
+        with self.assertRaisesRegex(SignerHandoffError,
+                                    "^SIGNER_SOURCE_UNVERIFIED$"):
+            inspect_external_signer_request(
+                self.key, self.request, self.out,
+                source_root=self.dir, user_consented=True,
+            )
 
     def test_symlinks_permissive_keys_and_existing_output_denied(self):
         import sys
