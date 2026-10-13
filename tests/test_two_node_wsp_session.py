@@ -11,6 +11,7 @@ from wam_privacy_wallet.node.read_rpc import ExplicitRpcAuth
 
 class TwoNodeWspScopeTests(unittest.TestCase):
     def setUp(self):
+        self.absolute_unused = Path.cwd().resolve() / "unopened-test-only"
         self.a = LocalRegtestEndpoint("127.0.0.1", 29554)
         self.b = LocalRegtestEndpoint("127.0.0.1", 29556)
         self.autha = ExplicitRpcAuth("a_test", "test-only-a-password")
@@ -54,14 +55,14 @@ class TwoNodeWspScopeTests(unittest.TestCase):
         with patch.object(subject, "TwoNodeP2PReadOnlyAudit") as audit:
             for bad_root, bad_password in (
                 (Path("."), b"x" * 16),
-                (Path("/unused"), b"short"),
-                (Path("/unused"), "not-bytes"),
+                (self.absolute_unused, b"short"),
+                (self.absolute_unused, "not-bytes"),
             ):
                 with self.assertRaisesRegex(
                     subject.TwoNodeWspSessionError, "^TWO_NODE_WSP_SCOPE_DENIED$"
                 ):
                     subject.scan_two_existing_regtest_nodes(
-                        bad_root, Path("/unused"), bad_password, **self.args,
+                        bad_root, self.absolute_unused, bad_password, **self.args,
                     )
             for changed in variants:
                 with self.subTest(changed=changed):
@@ -71,7 +72,7 @@ class TwoNodeWspScopeTests(unittest.TestCase):
                         subject.TwoNodeWspSessionError, "^TWO_NODE_WSP_SCOPE_DENIED$"
                     ):
                         subject.scan_two_existing_regtest_nodes(
-                            Path("/unused"), Path("/unused"), b"x" * 16,
+                            self.absolute_unused, self.absolute_unused, b"x" * 16,
                             **kwargs,
                         )
             audit.assert_not_called()
@@ -109,7 +110,7 @@ class TwoNodeWspScopeTests(unittest.TestCase):
                 subject.TwoNodeWspSessionError, "^TWO_NODE_WSP_MOVED_DENIED$"
             ):
                 subject.scan_two_existing_regtest_nodes(
-                    Path("/unused"), Path("/unused"), b"x" * 16, **self.args,
+                    self.absolute_unused, self.absolute_unused, b"x" * 16, **self.args,
                 )
             self.assertEqual(topology.return_value.audit.call_count, 2)
             scanner.assert_called_once()
@@ -146,7 +147,7 @@ class TwoNodeWspScopeTests(unittest.TestCase):
                 subject.TwoNodeWspSessionError, "^TWO_NODE_WSP_RECEIPT_DENIED$"
             ):
                 subject.scan_two_existing_regtest_nodes(
-                    Path("/unused"), Path("/unused"), b"x" * 16, **self.args,
+                    self.absolute_unused, self.absolute_unused, b"x" * 16, **self.args,
                 )
 
     def test_no_signer_core_launcher_or_fake_peer_in_operator_contract(self):
