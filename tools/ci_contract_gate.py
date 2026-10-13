@@ -97,6 +97,7 @@ MINIMUM_CASES = {
     "test_retained_scan_session.py": 18,
     "test_encrypted_checkpoint_archive.py": 23,
     "test_private_checkpoint_directory.py": 12,
+    "test_macos_private_directory.py": 25,
     "test_checkpoint_recovery_workflow.py": 18,
     "test_versioned_checkpoint_journal.py": 15,
     "test_snapshot_lineage_preflight.py": 14,

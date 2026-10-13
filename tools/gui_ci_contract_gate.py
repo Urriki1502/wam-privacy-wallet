@@ -79,6 +79,13 @@ GUI_TEST_IDS = frozenset({
 })
 # Security-critical original non-GUI identities; additive to original suite floors.
 CRITICAL_NON_GUI_IDS = frozenset({
+    "test_macos_private_directory.MacosPrivateDirectoryTests.test_wrong_platform_denied_before_disk_or_library_load",
+    "test_macos_private_directory.MacosPrivateDirectoryTests.test_ancestor_symlink_refused_even_with_private_final_directory",
+    "test_macos_private_directory.MacosPrivateDirectoryTests.test_native_access_acl_refused_even_when_mode_remains_0700",
+    "test_macos_private_directory.MacosPrivateDirectoryTests.test_native_inherited_acl_refused_on_private_child",
+    "test_macos_private_directory.MacosPrivateDirectoryTests.test_ancestor_replacement_during_walk_stays_bound_to_held_inode",
+    "test_macos_private_directory.MacosPrivateDirectoryTests.test_metadata_change_during_acl_inspection_is_denied",
+    "test_macos_private_directory.MacosPrivateDirectoryTests.test_fstat_error_closes_all_acquired_descriptors_and_redacts",
     "test_regtest_gui.RegtestGuiTests.test_late_scan_receipt_after_cancel_or_mode_revision_is_denied",
     "test_regtest_gui.RegtestGuiTests.test_scan_review_requires_regtest_mode_and_explicit_consent",
     "test_regtest_gui.RegtestGuiTests.test_actual_shape_is_readonly_without_amounts_or_wallet_authority",
@@ -324,7 +331,8 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 1474
+# Add the 25 macOS directory custody cases without lowering any existing floor.
+FULL_MIN_CASES = 1499
 
 
 def _cases(suite: unittest.TestSuite):
