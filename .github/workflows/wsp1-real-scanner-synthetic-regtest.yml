@@ -94,6 +94,7 @@ jobs:
         env:
           PYTHONPATH: src
           PYTHONUNBUFFERED: '1'
+          QT_QPA_PLATFORM: offscreen
         run: python -B -m tools.ci_qualified_scan_session --source-root "$GITHUB_WORKSPACE/wsp-source"
 
       - name: Compile/test actual WSP-1 Scanner.sync against disposable loopback peer
