@@ -15,6 +15,10 @@ from pathlib import Path
 import re
 import stat
 import sys
+try:
+    import fcntl
+except ImportError:  # Windows persistence remains unqualified.
+    fcntl = None
 
 from wam_privacy_wallet.application.encrypted_checkpoint_archive import _well_formed
 
@@ -51,19 +55,44 @@ def _open_dir(base: Path) -> int:
             or not all(hasattr(os, k) for k in
                        ("O_DIRECTORY", "O_NOFOLLOW", "O_CLOEXEC"))):
         raise VersionedCheckpointError("SNAPSHOT_PLATFORM_DENIED")
+    if ".." in base.parts:
+        raise VersionedCheckpointError("SNAPSHOT_PRIVATE_DIRECTORY_DENIED")
+    fd = None
     try:
-        fd = os.open(base, os.O_RDONLY | os.O_DIRECTORY |
-                     os.O_NOFOLLOW | os.O_CLOEXEC)
+        # Resolve every ancestor through directory descriptors; O_NOFOLLOW on
+        # only the final component would still follow a symlinked parent.
+        flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+        fd = os.open(base.anchor, flags)
+        for part in base.parts[1:]:
+            child = os.open(part, flags, dir_fd=fd)
+            os.close(fd)
+            fd = child
         try:
             _private_dir(fd)
         except BaseException:
             os.close(fd)
+            fd = None
             raise
         return fd
     except VersionedCheckpointError:
         raise
     except Exception:
+        if fd is not None:
+            os.close(fd)
         raise VersionedCheckpointError("SNAPSHOT_PRIVATE_DIRECTORY_DENIED") from None
+
+
+def _lock(fd: int, *, exclusive: bool) -> None:
+    # Native inter-process, non-blocking directory lock; no mutable lockfile
+    # and no indefinite waiting. Same-UID malicious code can ignore advisory
+    # locks; they are concurrency control, never an independent trust anchor.
+    if fcntl is None:
+        raise VersionedCheckpointError("SNAPSHOT_PLATFORM_DENIED")
+    try:
+        fcntl.flock(fd, (fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
+                    | fcntl.LOCK_NB)
+    except OSError:
+        raise VersionedCheckpointError("SNAPSHOT_CONCURRENT_UPDATE_DENIED") from None
 
 
 def _child_dir(parent: int, name: str) -> int:
@@ -145,20 +174,35 @@ def write_unanchored_regtest_generation(
     No 'latest' selector or rollback authorization is provided. The caller
     must not treat this digest as a hardware-backed monotonic commitment.
     """
-    name = _name(generation)
+    manifest = _generation_manifest(
+        generation, envelope, scope_digest=scope_digest, tip_height=tip_height,
+        tip_hash=tip_hash, predecessor_digest=predecessor_digest,
+    )
+    return _persist_generation(directory, generation, envelope, manifest)
+
+
+def _generation_manifest(generation: int, envelope: bytes, *,
+                         scope_digest: str, tip_height: int, tip_hash: str,
+                         predecessor_digest: str) -> dict:
+    _name(generation)
     if (not _well_formed(envelope) or not _hex64(scope_digest)
             or not _hex64(tip_hash) or not _hex64(predecessor_digest)
             or type(tip_height) is not int or not 0 <= tip_height <= 2**31
             or (generation == 1 and predecessor_digest != _ZERO)
             or (generation > 1 and predecessor_digest == _ZERO)):
         raise VersionedCheckpointError("SNAPSHOT_INPUT_DENIED")
-    manifest = {
+    return {
         "schema": _SCHEMA, "generation": generation, "network": "regtest",
         "source_pin": _SOURCE_PIN, "scope_digest": scope_digest,
         "tip_height": tip_height, "tip_hash": tip_hash,
         "predecessor": predecessor_digest,
         "checkpoint_sha256": hashlib.sha256(envelope).hexdigest(),
     }
+
+
+def _persist_generation(directory: Path, generation: int, envelope: bytes,
+                        manifest: dict, metadata: bytes | None = None) -> str:
+    name = _name(generation)
     raw = _canonical(manifest)
     digest = hashlib.sha256(raw).hexdigest()
     root = None
@@ -166,6 +210,7 @@ def write_unanchored_regtest_generation(
     version = None
     try:
         root = _open_dir(directory)
+        _lock(root, exclusive=True)
         try:
             os.mkdir("versions", 0o700, dir_fd=root)
             os.fsync(root)
@@ -177,6 +222,8 @@ def write_unanchored_regtest_generation(
         version = _child_dir(versions, name)
         _file(version, "checkpoint.wsp.enc", envelope)
         _file(version, "manifest.json", raw)
+        if metadata is not None:
+            _file(version, "metadata.v2.json", metadata)
         os.fsync(version)
         # Completion marker is written ONLY after both files are durable.
         # Reader validates marker digest, file modes and ciphertext checksum.
@@ -207,23 +254,32 @@ def read_unanchored_regtest_generation(
     No auto-latest. The manifest/hash chain is NOT an authenticated
     anti-rollback trust anchor and never qualifies a live wallet.
     """
-    name = _name(generation)
     if allow_unanchored_synthetic is not True:
         raise VersionedCheckpointError("SNAPSHOT_TRUSTED_ANCHOR_REQUIRED")
+    manifest, envelope, _ = _load_generation(directory, generation)
+    return manifest, envelope
+
+
+def _load_generation(directory: Path, generation: int, *,
+                     authenticated: bool = False) -> tuple[dict, bytes, bytes | None]:
+    name = _name(generation)
     root = None
     versions = None
     version = None
     try:
         root = _open_dir(directory)
+        _lock(root, exclusive=False)
         versions = _child_dir(root, "versions")
         version = _child_dir(versions, name)
         commit = _read(version, "ready.sha256", 65)
         raw = _read(version, "manifest.json", 4096)
         envelope = _read(version, "checkpoint.wsp.enc", _MAX)
+        metadata = _read(version, "metadata.v2.json", 4096) if authenticated else None
         manifest = json.loads(raw)
         if (type(manifest) is not dict or frozenset(manifest) != _MANIFEST_KEYS
                 or _canonical(manifest) != raw
                 or hashlib.sha256(raw).hexdigest().encode("ascii") + b"\n" != commit
+                or type(manifest["schema"]) is not int
                 or manifest["schema"] != 1 or manifest["network"] != "regtest"
                 or manifest["source_pin"] != _SOURCE_PIN
                 or type(manifest["generation"]) is not int
@@ -240,7 +296,7 @@ def read_unanchored_regtest_generation(
                 or hashlib.sha256(envelope).hexdigest()
                     != manifest["checkpoint_sha256"]):
             raise ValueError("invalid snapshot")
-        return manifest, envelope
+        return manifest, envelope, metadata
     except VersionedCheckpointError:
         raise
     except Exception:
@@ -252,3 +308,52 @@ def read_unanchored_regtest_generation(
                     os.close(fd)
                 except OSError:
                     pass
+
+
+def write_authenticated_regtest_generation(
+    directory: Path, generation: int, envelope: bytes, *,
+    scope_digest: str, tip_height: int, tip_hash: str, predecessor_digest: str,
+    checkpoint_schema: int, key_epoch: int, metadata_key: bytes,
+) -> str:
+    """Persist MAC-bound metadata before ready marker, without freshness claim.
+
+    Metadata key must come from an independently random secret. No key or
+    password is written. Existing v1 callers stay explicitly unanchored.
+    """
+    from .checkpoint_metadata_auth import (
+        CheckpointExpectation, authenticate_checkpoint_metadata,
+    )
+    manifest = _generation_manifest(
+        generation, envelope, scope_digest=scope_digest, tip_height=tip_height,
+        tip_hash=tip_hash, predecessor_digest=predecessor_digest,
+    )
+    metadata = authenticate_checkpoint_metadata(
+        manifest, envelope, key=metadata_key,
+        expected=CheckpointExpectation(scope_digest, generation,
+                                       checkpoint_schema, key_epoch),
+    )
+    return _persist_generation(directory, generation, envelope, manifest, metadata)
+
+
+def read_authenticated_regtest_generation(
+    directory: Path, generation: int, *, scope_digest: str,
+    checkpoint_schema: int, key_epoch: int, metadata_key: bytes,
+    allow_unanchored_synthetic: bool = False,
+) -> tuple[dict, bytes]:
+    """Authenticate selected generation; trusted/protected restore still denies.
+
+    An entire older valid directory + matching old metadata key is replayable.
+    No automatic latest, downgrade, key search or trust-provider activation.
+    """
+    if allow_unanchored_synthetic is not True:
+        raise VersionedCheckpointError("SNAPSHOT_TRUSTED_ANCHOR_REQUIRED")
+    from .checkpoint_metadata_auth import CheckpointExpectation, verify_checkpoint_metadata
+    manifest, envelope, metadata = _load_generation(directory, generation, authenticated=True)
+    authenticated = verify_checkpoint_metadata(
+        metadata, envelope, key=metadata_key,
+        expected=CheckpointExpectation(scope_digest, generation,
+                                       checkpoint_schema, key_epoch),
+    )
+    if authenticated != manifest:
+        raise VersionedCheckpointError("SNAPSHOT_AUTHENTICATED_MANIFEST_DENIED")
+    return authenticated, envelope

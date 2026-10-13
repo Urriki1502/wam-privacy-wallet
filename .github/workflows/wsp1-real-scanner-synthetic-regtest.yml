@@ -27,6 +27,8 @@ on:
       - 'src/wam_privacy_wallet/application/encrypted_scan_backup.py'
       - 'src/wam_privacy_wallet/application/encrypted_checkpoint_archive.py'
       - 'src/wam_privacy_wallet/application/versioned_checkpoint_journal.py'
+      - 'src/wam_privacy_wallet/application/checkpoint_metadata_auth.py'
+      - 'tests/test_checkpoint_metadata_auth.py'
       - 'src/wam_privacy_wallet/application/snapshot_lineage_preflight.py'
       - 'tests/test_snapshot_lineage_preflight.py'
       - 'tests/test_versioned_checkpoint_journal.py'
