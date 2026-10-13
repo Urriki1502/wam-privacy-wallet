@@ -52,6 +52,17 @@ class TwoNodeWspScopeTests(unittest.TestCase):
             dict(save_checkpoint=True, restore_checkpoint=True),
         ]
         with patch.object(subject, "TwoNodeP2PReadOnlyAudit") as audit:
+            for bad_root, bad_password in (
+                (Path("."), b"x" * 16),
+                (Path("/unused"), b"short"),
+                (Path("/unused"), "not-bytes"),
+            ):
+                with self.assertRaisesRegex(
+                    subject.TwoNodeWspSessionError, "^TWO_NODE_WSP_SCOPE_DENIED$"
+                ):
+                    subject.scan_two_existing_regtest_nodes(
+                        bad_root, Path("/unused"), bad_password, **self.args,
+                    )
             for changed in variants:
                 with self.subTest(changed=changed):
                     kwargs = dict(self.args)

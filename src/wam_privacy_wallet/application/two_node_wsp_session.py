@@ -46,7 +46,12 @@ def scan_two_existing_regtest_nodes(
     reported chain and P2P topology. No returned evidence grants wallet
     authority, even when every observation agrees.
     """
-    if (user_consented is not True or acknowledge_unverified_binaries is not True
+    if (type(source_root) is not type(Path()) or not source_root.is_absolute()
+            or type(private_dir) is not type(Path()) or not private_dir.is_absolute()
+            or type(scan_password) is not bytes
+            or not 12 <= len(scan_password) <= 1024
+            or user_consented is not True
+            or acknowledge_unverified_binaries is not True
             or type(node_a) is not LocalRegtestEndpoint
             or type(node_b) is not LocalRegtestEndpoint
             or node_a == node_b
