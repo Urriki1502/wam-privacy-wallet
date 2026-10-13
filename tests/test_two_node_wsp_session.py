@@ -102,6 +102,7 @@ class TwoNodeWspScopeTests(unittest.TestCase):
             "broadcast_allowed": False,
             "mainnet_allowed": False,
             "chain_current": True, "tip_height": 42,
+            "real_two_node_regtest_qualified": False,
         }
         with patch.object(subject, "TwoNodeP2PReadOnlyAudit") as topology, \
              patch.object(subject, "LocalRegtestIdentityGateway") as gateways, \
