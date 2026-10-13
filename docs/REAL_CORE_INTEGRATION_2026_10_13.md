@@ -102,3 +102,60 @@ binary; compatibility cannot authorize that executable or clear #82/#86.
 
 No production signing, broadcasting, mainnet authority or independent
 anti-rollback acceptance is granted by this checkpoint.
+
+## GitHub checkpoint: first unit merged
+
+[PR #194](https://github.com/Urriki1502/wam-privacy-wallet/pull/194), exact head
+`6991896b93aa0b6c92236aadf3d52157f0853987`, merged as
+`15656f884976227a016d3572ab5aebeb2a5053b6` after all 17 applicable checks passed
+and the current main/base and clean mergeability were rechecked.
+
+- [Wallet CI](https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38386135404):
+  eight required jobs PASS, including 1466/1466 full discovery on Linux
+  (also passing full discovery on Windows/macOS).
+- [Pinned native WSP CI](https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38386135353):
+  five jobs PASS; actual frozen scanner, SQLite, encryption and Qt with a
+  **synthetic RPC peer**, not WAM Core execution.
+- [CodeQL](https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38386129890):
+  actions/python/rust and aggregate PASS.
+
+The local Work SIGBUS and `/proc` restriction were not bypassed; actual GitHub
+native regression evidence passed independently. Main now contains the change.
+
+## Completed unit: separate read-only index/filter integration
+
+- Reuse one bounded HTTP/JSON transport behind existing separate allowlists;
+  identity and scanner clients do not acquire diagnostic/write privileges.
+  Requests use timeouts, response limits and zero automatic retries.
+- `CoreRegtestReadinessRpc` checks strict WAM regtest/genesis, equal header/block
+  heights, and all three required synchronized indexes before/after reads.
+  It rejects stale, malformed, wrong-network or changing observations.
+- BIP-158 BASIC parser validates canonical CompactSize, incremental Golomb-Rice
+  values/range, zero padding, byte/element bounds, and BIP-157 header chaining.
+  Official CC0 Bitcoin BIP vectors verify serialization and header byte order;
+  they are not WAM chain or RPC qualification evidence.
+- `scan_public_scripts` exposes only consented, bounded `scanblocks start`
+  with 1–16 public raw scripts over at most 64 blocks. No key descriptors,
+  status/abort privilege, negative-result shortcut or automatic retry. Matched
+  block hashes are checked against live header/height observations.
+- `scan_existing_regtest` and its CLI gain `--require-synchronized-indexes`.
+  The optional readiness check runs before source/store access and after scan.
+  It is a reported peer-consistency check, not secure binary authentication.
+  Full WSP block scanning remains unchanged; filters cannot skip SP blocks.
+- 39 additive offline tests: 18 filter, 21 actual loopback readiness/timeout/
+  authentication/drift/scanblocks/application-denial cases. Mandatory suites
+  rise 85 → 87; full discovery floor 1415 → 1454.
+- Existing pinned native application CI gains two fresh-worker cases using the
+  real application entrypoint and frozen WSP scanner. Both reached PASS locally:
+  synchronized-index scan, and stale-index denial before scanner/database work.
+  The native suite now requires 21/21 identities; Work Qt still SIGBUS later.
+  Mandatory offline execution again has only the documented `/proc` suite
+  failure. Full native GitHub CI for this unit is pending until observed.
+
+Primary format references:
+[BIP-158](https://github.com/bitcoin/bips/blob/master/bip-0158.mediawiki),
+[BIP-157](https://github.com/bitcoin/bips/blob/master/bip-0157.mediawiki),
+[CC0 vectors](https://github.com/bitcoin/bips/blob/master/bip-0158/testnet-19.json),
+[Bitcoin RPC reference shape](https://github.com/bitcoin/bitcoin/blob/v28.1/src/rpc/blockchain.cpp).
+WAM-specific runtime compatibility remains the separately provided DEV evidence;
+private-host local acceptance has not run.

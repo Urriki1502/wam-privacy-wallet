@@ -34,6 +34,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--restore-checkpoint", action="store_true",
                         help="Restore WSP checkpoint to an EMPTY fresh scan-only DB")
     parser.add_argument("--acknowledge-unverified-binary", action="store_true")
+    parser.add_argument("--require-synchronized-indexes", action="store_true",
+                        help="Require tx/coinstats/basic-filter indexes and filter header consistency")
     args = parser.parse_args(argv)
     try:
         if not sys.stdin.isatty():
@@ -56,6 +58,7 @@ def main(argv: list[str] | None = None) -> int:
             restore_checkpoint=args.restore_checkpoint,
             receive_account_index=args.receive_account_index,
             show_observed_balance=args.show_observed_balance,
+            require_synchronized_indexes=args.require_synchronized_indexes,
         )
     except (ValueError, LiveRegtestScanError, EOFError, KeyboardInterrupt):
         print("LIVE_REGTEST_WSP_SCAN_DENIED", file=sys.stderr)

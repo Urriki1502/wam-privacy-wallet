@@ -16,6 +16,7 @@ from wam_privacy_wallet.integrations.wsp1_scanner_only_rpc import Wsp1ScannerOnl
 from wam_privacy_wallet.node.endpoint import LocalRegtestEndpoint
 from wam_privacy_wallet.node.read_rpc import ExplicitRpcAuth
 from wam_privacy_wallet.node.regtest_gateway import LocalRegtestIdentityGateway
+from wam_privacy_wallet.node.core_readiness_rpc import CoreRegtestReadinessRpc
 
 
 class LiveRegtestScanError(ValueError):
@@ -37,6 +38,7 @@ def scan_existing_regtest(
     restore_checkpoint: bool = False,
     receive_account_index: int | None = None,
     show_observed_balance: bool = False,
+    require_synchronized_indexes: bool = False,
     cancelled: Callable[[], bool] | None = None,
 ) -> dict[str, object]:
     """Execute genuine pinned WSP Scanner.sync against an existing RPC socket.
@@ -58,6 +60,7 @@ def scan_existing_regtest(
                 type(receive_account_index) is not int
                 or not 0 <= receive_account_index < 16))
             or type(show_observed_balance) is not bool
+            or type(require_synchronized_indexes) is not bool
             or (cancelled is not None and not callable(cancelled))):
         raise LiveRegtestScanError("LIVE_SCAN_CONSENT_OR_SCOPE_DENIED")
     if (type(source_root) is not type(Path()) or not source_root.is_absolute()
@@ -71,6 +74,13 @@ def scan_existing_regtest(
             raise LiveRegtestScanError("LIVE_SCAN_CANCELLED")
         gateway = LocalRegtestIdentityGateway(endpoint, rpc_auth, timeout=3)
         before = gateway.probe_core_profile()
+        readiness = (CoreRegtestReadinessRpc(endpoint, rpc_auth, timeout=3)
+                     if require_synchronized_indexes else None)
+        readiness_before = readiness.observe() if readiness is not None else None
+        if readiness_before is not None and (
+                readiness_before.height != before.identity.height
+                or readiness_before.block_hash != before.identity.best_block_hash):
+            raise LiveRegtestScanError("LIVE_SCAN_READINESS_MOVED_DENIED")
         runtime = SourceQualifiedScanRuntime(source_root, user_consented=True)
         session = (runtime.restore(private_dir, scan_password, user_consented=True)
                    if restore_checkpoint else
@@ -100,6 +110,8 @@ def scan_existing_regtest(
         # checkpoint operations: no private output from a drifting live chain.
         if gateway.probe_core_profile() != before:
             raise LiveRegtestScanError("LIVE_SCAN_PEER_MOVED_DENIED")
+        if readiness is not None and readiness.observe() != readiness_before:
+            raise LiveRegtestScanError("LIVE_SCAN_READINESS_MOVED_DENIED")
         if cancelled is not None and cancelled():
             raise LiveRegtestScanError("LIVE_SCAN_CANCELLED")
         if (snapshot.core_authenticated or snapshot.wallet_operational

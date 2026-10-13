@@ -22,6 +22,7 @@ class LiveRegtestContractTests(unittest.TestCase):
                             {"receive_account_index": True},
                             {"receive_account_index": 16},
                             {"show_observed_balance": 1},
+                            {"require_synchronized_indexes": 1},
                             {"save_checkpoint": True, "restore_checkpoint": True}):
                 with self.subTest(changed=changed):
                     values = dict(kwargs)
