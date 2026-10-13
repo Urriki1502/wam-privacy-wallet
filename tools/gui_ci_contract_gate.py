@@ -155,6 +155,9 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_basic_block_filter.BasicBlockFilterTests.test_official_bip158_genesis_vector_header_and_byte_order",
     "test_core_readiness_rpc.CoreReadinessRpcTests.test_live_application_index_denial_precedes_source_or_store_access",
     "test_core_readiness_rpc.CoreReadinessRpcTests.test_scanblocks_drift_or_stale_index_refuses_result",
+    "test_private_checkpoint_directory.PrivateCheckpointDirectoryTests.test_ancestor_symlink_refused_even_when_final_directory_is_private",
+    "test_private_checkpoint_directory.PrivateCheckpointDirectoryTests.test_held_descriptor_not_redirected_by_directory_replacement",
+    "test_encrypted_checkpoint_archive.CheckpointArchiveTests.test_symlink_in_ancestor_denies_read_of_existing_valid_archive",
     "test_app_scanner_session_workflow.AppScannerSessionTests.test_no_consent_means_no_rpc_constructor_or_observation",
     "test_app_scanner_session_workflow.AppScannerSessionTests.test_bounded_two_block_observation_has_only_scalar_output",
     "test_app_scanner_session_workflow.AppScannerSessionTests.test_cancellation_before_first_block_denied_without_block_rpc",
@@ -319,7 +322,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 1454
+FULL_MIN_CASES = 1470
 
 
 def _cases(suite: unittest.TestSuite):

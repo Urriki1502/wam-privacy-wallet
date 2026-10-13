@@ -159,3 +159,48 @@ Primary format references:
 [Bitcoin RPC reference shape](https://github.com/bitcoin/bitcoin/blob/v28.1/src/rpc/blockchain.cpp).
 WAM-specific runtime compatibility remains the separately provided DEV evidence;
 private-host local acceptance has not run.
+
+## GitHub checkpoint: index/filter unit merged
+
+[PR #195](https://github.com/Urriki1502/wam-privacy-wallet/pull/195), exact head
+`69c75007c42dcf5bc820df145e667d7d7f8efd81`, merged as
+`169c488ff7f844071dedc91bfe1b2376ca726df3` after all 17 applicable checks PASS
+and exact-head/current-base clean mergeability verification.
+
+- [Wallet CI](https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38388611672):
+  eight required jobs PASS; actual Linux full discovery 1505/1505, Windows
+  and macOS discovery also PASS.
+- [Native WSP CI](https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38388611875):
+  five jobs PASS, including all 21/21 retained application cases and both new
+  real-entrypoint/frozen-WSP cases against **synthetic** RPC.
+- [CodeQL](https://github.com/Urriki1502/wam-privacy-wallet/actions/runs/38388608444):
+  actions/python/rust and aggregate PASS.
+
+## Completed unit: checkpoint ancestor descriptor custody
+
+The journal already rejected ancestor symlinks, but the actual encrypted
+scan-backup and checkpoint-archive paths only applied O_NOFOLLOW to the final
+directory. A private final child inside a symlinked ancestor could redirect
+backup writes or recovery reads. All three now reuse the journal's complete
+directory-descriptor walk via `private_checkpoint_directory`.
+
+- Every component is opened relative to the preceding held descriptor with
+  O_DIRECTORY/O_NOFOLLOW/O_CLOEXEC. Final mode 0700 and UID checks remain;
+  archive/backup single-link-file checks and atomic create-once fsync/hardlink
+  publication remain intact. Descriptor cleanup also covers fstat failure.
+- Native tests show that renaming/replacing a pathname cannot redirect an
+  already-held directory descriptor. This does not authenticate a later
+  pathname-based SQLite operation or protect against same-UID/OS/mount attacks.
+- 16 additive offline tests: 12 shared native descriptor/path/capability/cleanup
+  tests and four actual encrypted-store ancestor read/write denial tests.
+  Windows/macOS execute explicit denial tests, without weakening platform HOLD.
+- Focused local checks PASS: 12 descriptor, 48 encrypted-store, 15 journal,
+  27 authenticated metadata and 34 CI-gate cases. Mandatory suites rise
+  87 → 88 and full floor 1454 → 1470. Existing torn-write, corruption, replay,
+  key-epoch, fsync and concurrent-writer tests remain mandatory.
+- #148 gains practical recovery-path hardening. No new encryption/key derivation
+  or key storage is introduced. #151 independent anti-rollback remains BLOCKED;
+  a fully valid older directory can still be replayed. No automatic latest,
+  old-key fallback or external-anchor approval is enabled.
+
+GitHub CI for this unit is pending until its exact-head checks are observed.

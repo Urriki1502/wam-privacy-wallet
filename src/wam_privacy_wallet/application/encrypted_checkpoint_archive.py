@@ -17,6 +17,8 @@ import secrets
 import stat
 import sys
 
+from .private_checkpoint_directory import open_private_checkpoint_directory
+
 # WSP upstream keystore.MAGIC under exact pinned source, not a crypto scheme.
 _MAGIC = b"WAMSP02\x00"
 _NAME = "wsp-checkpoint-v1.enc"
@@ -35,23 +37,24 @@ def _open_private_dir(directory: Path) -> int:
             or not all(hasattr(os, n) for n in
                        ("O_DIRECTORY", "O_NOFOLLOW", "O_CLOEXEC"))):
         raise EncryptedCheckpointArchiveError("CHECKPOINT_PLATFORM_OR_PATH_DENIED")
+    fd = None
     try:
-        fd = os.open(
-            directory,
-            os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
-        )
+        fd = open_private_checkpoint_directory(directory)
         st = os.fstat(fd)
         if (not stat.S_ISDIR(st.st_mode)
                 or stat.S_IMODE(st.st_mode) != 0o700
                 or st.st_uid != os.geteuid()
                 or st.st_nlink < 2):
-            os.close(fd)
             raise EncryptedCheckpointArchiveError("CHECKPOINT_DIRECTORY_DENIED")
-        return fd
+        result, fd = fd, None
+        return result
     except EncryptedCheckpointArchiveError:
         raise
     except Exception:
         raise EncryptedCheckpointArchiveError("CHECKPOINT_DIRECTORY_DENIED") from None
+    finally:
+        if fd is not None:
+            os.close(fd)
 
 
 def _well_formed(envelope: object) -> bool:

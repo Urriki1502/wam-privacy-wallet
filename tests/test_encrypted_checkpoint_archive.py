@@ -106,6 +106,31 @@ class CheckpointArchiveTests(unittest.TestCase):
             m.store_encrypted_checkpoint(link, _CONTENT)
 
     @require_linux_or_deny
+    def test_symlink_in_ancestor_denies_write_without_touching_target(self):
+        real = self.folder / 'real'
+        real.mkdir(mode=0o700)
+        private = real / 'private'
+        private.mkdir(mode=0o700)
+        alias = self.folder / 'alias'
+        alias.symlink_to(real, target_is_directory=True)
+        with self.assertRaises(m.EncryptedCheckpointArchiveError):
+            m.store_encrypted_checkpoint(alias / 'private', _CONTENT)
+        self.assertEqual(list(private.iterdir()), [])
+
+    @require_linux_or_deny
+    def test_symlink_in_ancestor_denies_read_of_existing_valid_archive(self):
+        real = self.folder / 'real'
+        real.mkdir(mode=0o700)
+        private = real / 'private'
+        private.mkdir(mode=0o700)
+        m.store_encrypted_checkpoint(private, _CONTENT)
+        alias = self.folder / 'alias'
+        alias.symlink_to(real, target_is_directory=True)
+        with self.assertRaises(m.EncryptedCheckpointArchiveError):
+            m.load_encrypted_checkpoint(alias / 'private')
+        self.assertEqual(m.load_encrypted_checkpoint(private), _CONTENT)
+
+    @require_linux_or_deny
     def test_canonical_file_symlink_denied_without_write(self):
         victim = self.folder / "untouched"
         victim.write_bytes(b"DO NOT TOUCH")
