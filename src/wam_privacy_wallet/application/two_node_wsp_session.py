@@ -109,15 +109,20 @@ def scan_two_existing_regtest_nodes(
                 or scan.get("broadcast_allowed") is not False
                 or scan.get("mainnet_allowed") is not False
                 or scan.get("real_two_node_regtest_qualified") is not False
-                or scan.get("chain_current") not in (True, False)
+                or type(scan.get("chain_current")) is not bool
                 or type(scan.get("tip_height")) is not int
+                or not 0 <= scan["tip_height"] <= 100_000_000
+                or (receive_account_index is None and
+                    "unqualified_receive_code" in scan)
+                or (not show_observed_balance and
+                    "unqualified_confirmed_atoms" in scan)
                 or (receive_account_index is not None and (
                     scan.get("chain_current") is not True
                     or type(scan.get("unqualified_receive_code")) is not str))
                 or (show_observed_balance and (
                     scan.get("chain_current") is not True
-                    or type(scan.get("unqualified_confirmed_atoms")) is not int))):
-
+                    or type(scan.get("unqualified_confirmed_atoms")) is not int
+                    or not 0 <= scan["unqualified_confirmed_atoms"] <= 2**63 - 1))):
             raise TwoNodeWspSessionError("TWO_NODE_WSP_RECEIPT_DENIED")
         second_a = gateway_a.probe_core_profile()
         second_b = gateway_b.probe_core_profile()
