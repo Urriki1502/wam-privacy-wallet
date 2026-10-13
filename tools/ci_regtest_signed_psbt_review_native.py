@@ -69,7 +69,7 @@ def run(source_root: Path) -> None:
     server.silent_payment = {
         "txid": PAYTX,
         "vin": [{"txid": PREV, "vout": 0,
-                 "prevout": {"scriptPubKey": {"hex": input_script.hex()}},
+                 "prevout": {"value": 0.003, "scriptPubKey": {"hex": input_script.hex()}},
                  "scriptSig": {"hex": ""}, "txinwitness": ["01"]}],
         "vout": [{"n": 0, "value": 0.002,
                   "scriptPubKey": {"hex": "5120" + derived.hex()}}],

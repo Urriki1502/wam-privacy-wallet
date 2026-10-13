@@ -148,6 +148,10 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_wsp1_scanner_only_rpc.WspScannerOnlyRpcTests.test_pinned_upstream_mempool_id_limit_denied_before_scanner",
     "test_wsp1_scanner_only_rpc.WspScannerOnlyRpcTests.test_pinned_upstream_verbose_transaction_input_cap_denied",
     "test_wsp1_scanner_only_rpc.WspScannerOnlyRpcTests.test_pinned_upstream_verbose_transaction_output_cap_denied",
+    "test_wsp1_scanner_only_rpc.WspScannerOnlyRpcTests.test_missing_confirmed_prevout_poisoned_before_scanner",
+    "test_wsp1_scanner_only_rpc.WspScannerOnlyRpcTests.test_ambiguous_json_transport_poisoned_and_response_redacted",
+    "test_wam_transaction_shape.WamTransactionShapeTests.test_dev_three_output_coinbase_without_spent_prevout",
+    "test_wam_transaction_shape.WamTransactionShapeTests.test_amount_validation_independent_of_ambient_decimal_precision",
     "test_app_scanner_session_workflow.AppScannerSessionTests.test_no_consent_means_no_rpc_constructor_or_observation",
     "test_app_scanner_session_workflow.AppScannerSessionTests.test_bounded_two_block_observation_has_only_scalar_output",
     "test_app_scanner_session_workflow.AppScannerSessionTests.test_cancellation_before_first_block_denied_without_block_rpc",
@@ -312,7 +316,7 @@ CRITICAL_NON_GUI_IDS = frozenset({
     "test_core_archive_inventory.CoreArchiveInventoryTests.test_no_extraction_file_creation_process_or_sockets",
 })
 # Full floor: original 284 + App 19 + Core 3 + Reply 14 + Window 18 + Recovery 18 + cross-module 20.
-FULL_MIN_CASES = 1387
+FULL_MIN_CASES = 1415
 
 
 def _cases(suite: unittest.TestSuite):

@@ -160,6 +160,21 @@ class LocalReadOnlyRpcTests(unittest.TestCase):
         with self.assertRaisesRegex(LocalRpcError, '^WAM_RPC_REMOTE_ERROR$'):
             self.rpc.call('getblockcount')
 
+    def test_duplicate_json_keys_at_any_depth_are_refused(self):
+        for payload in (b'{"id":1,"error":null,"result":0,"result":1}',
+                        b'{"id":1,"error":null,"result":{"chain":"main","chain":"regtest"}}'):
+            self.server.reply = payload
+            with self.assertRaisesRegex(LocalRpcError, '^WAM_RPC_INVALID_RESPONSE$'):
+                self.rpc.call('getblockchaininfo')
+
+    def test_nonfinite_json_numbers_and_non_utf8_are_refused(self):
+        for payload in (b'{"id":1,"error":null,"result":NaN}',
+                        b'{"id":1,"error":null,"result":1e999999}',
+                        '{"id":1,"error":null,"result":0}'.encode('utf-16')):
+            self.server.reply = payload
+            with self.assertRaisesRegex(LocalRpcError, '^WAM_RPC_INVALID_RESPONSE$'):
+                self.rpc.call('getblockcount')
+
     def test_reject_bad_timeout_values(self):
         for timeout in (True, None, '2', 0, -1, 11, float('inf'), float('nan')):
             with self.subTest(timeout=timeout):

@@ -71,6 +71,15 @@ PAYTX = "8" * 64
 COINBASE2 = "7" * 64
 
 
+def _wam_coinbase_outputs():
+    # DEV-confirmed WAM shape; disposable synthetic bytes, never Core evidence.
+    return [
+        {"n": 0, "value": 47.5, "scriptPubKey": {"hex": "51"}},
+        {"n": 1, "value": 2.5, "scriptPubKey": {"hex": "51"}},
+        {"n": 2, "value": 0, "scriptPubKey": {"hex": "6a24aa21a9ed" + "00" * 32}},
+    ]
+
+
 class LocalSyntheticCoreShape(BaseHTTPRequestHandler):
     def do_POST(self):
         body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
@@ -101,8 +110,7 @@ class LocalSyntheticCoreShape(BaseHTTPRequestHandler):
             if state.height == 2 and params == [state.tip, 3]:
                 txs = [{
                     "txid": COINBASE2, "vin": [{"coinbase": "0202"}],
-                    "vout": [{"n": 0, "value": 0.01,
-                              "scriptPubKey": {"hex": "51"}}],
+                    "vout": _wam_coinbase_outputs(),
                 }]
                 if not state.discard_payment:
                     txs.append(state.silent_payment)
@@ -114,8 +122,7 @@ class LocalSyntheticCoreShape(BaseHTTPRequestHandler):
                     "previousblockhash": WAM_REGTEST_GENESIS,
                     "tx": [{
                         "txid": COINBASE, "vin": [{"coinbase": "0101"}],
-                        "vout": [{"n": 0, "value": 0.01,
-                                  "scriptPubKey": {"hex": "51"}}],
+                        "vout": _wam_coinbase_outputs(),
                     }],
                 }
         elif method == "getrawmempool" and params == []:
@@ -132,8 +139,7 @@ class LocalSyntheticCoreShape(BaseHTTPRequestHandler):
             reply = {
                 "txid": MEMTX if state.bad_prevout else PREV,
                 "vin": [{"coinbase": "0101"}],
-                "vout": [{"n": 0, "value": 0.01,
-                          "scriptPubKey": {"hex": "51"}}],
+                "vout": _wam_coinbase_outputs(),
             }
         else:
             state.violations.append(method)
@@ -217,7 +223,7 @@ def _run(source_root: Path) -> None:
             "txid": PAYTX,
             "vin": [{
                 "txid": PREV, "vout": 0,
-                "prevout": {"scriptPubKey": {"hex": sender_script.hex()}},
+                "prevout": {"value": 0.003, "scriptPubKey": {"hex": sender_script.hex()}},
                 "scriptSig": {"hex": ""},
                 "txinwitness": ["01"],
             }],

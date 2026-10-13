@@ -6,6 +6,7 @@ scanner database, signer, mempool broadcast or live wallet are involved.
 from __future__ import annotations
 
 import json
+from decimal import Decimal
 import subprocess
 import sys
 import threading
@@ -24,6 +25,21 @@ TIP = "a" * 64
 OTHER = "b" * 64
 TX = "c" * 64
 PREV = "d" * 64
+
+
+def wam_coinbase(txid=TX):
+    # Sanitized DEV-confirmed structure, not a recorded real Core response.
+    return {"txid": txid, "vin": [{"coinbase": "0101"}], "vout": [
+        {"n": 0, "value": 47.5, "scriptPubKey": {"hex": "51"}},
+        {"n": 1, "value": 2.5, "scriptPubKey": {"hex": "51"}},
+        {"n": 2, "value": 0, "scriptPubKey": {"hex": "6a24aa21a9ed" + "00" * 32}},
+    ]}
+
+
+def ordinary_transaction():
+    return {"txid": OTHER, "vin": [{"txid": PREV, "vout": 0,
+            "prevout": {"value": 0.2, "scriptPubKey": {"hex": "51"}}}],
+            "vout": [{"n": 0, "value": 0.1, "scriptPubKey": {"hex": "51"}}]}
 
 
 class Fixture(BaseHTTPRequestHandler):
@@ -49,12 +65,15 @@ class Fixture(BaseHTTPRequestHandler):
                       "bestblockhash": state.tip, "pruned": state.pruned}
         elif method == "getblock":
             result = {"hash": state.tip, "height": 1,
-                      "previousblockhash": state.genesis, "tx": [{"txid": TX}]}
+                      "previousblockhash": state.genesis, "tx": [wam_coinbase()]}
         elif method == "getrawmempool":
             result = [TX]
         elif method == "getrawtransaction":
-            result = {"txid": params[0], "vin": [{"txid": PREV}],
-                      "vout": [{"value": 0.1}]}
+            result = wam_coinbase(PREV) if params[0] == PREV else ordinary_transaction()
+            result["txid"] = params[0]
+            # Actual upstream mempool fallback reads the parent RPC, not mocks.
+            if params[0] != PREV:
+                del result["vin"][0]["prevout"]
         else:
             result = None
         if method in state.overrides:
@@ -142,6 +161,46 @@ class WspScannerOnlyRpcTests(unittest.TestCase):
         self.assertIn("getblock", self._calls())
         self.assertEqual([r[2]["params"] for r in self.server.requests
                           if r[2]["method"] == "getblock"], [[TIP, 3]])
+
+    def test_dev_wam_coinbase_values_are_exact_and_have_no_normal_prevout(self):
+        self.rpc.attest()
+        tx = self.rpc.call("getblock", [TIP, 3])["tx"][0]
+        self.assertEqual([o["value"] for o in tx["vout"]],
+                         [Decimal("47.5"), Decimal("2.5"), 0])
+        self.assertNotIn("prevout", tx["vin"][0])
+
+    def test_missing_confirmed_prevout_poisoned_before_scanner(self):
+        tx = ordinary_transaction()
+        del tx["vin"][0]["prevout"]
+        self.server.overrides["getblock"] = {"hash": TIP, "height": 1,
+            "previousblockhash": WAM_REGTEST_GENESIS, "tx": [wam_coinbase(), tx]}
+        self.rpc.attest()
+        with self.assertRaisesRegex(WspScannerRpcError, "^WSP_SCAN_REPLY_DENIED$"):
+            self.rpc.call("getblock", [TIP, 3])
+        self.server.requests.clear()
+        with self.assertRaisesRegex(WspScannerRpcError, "^WSP_SCAN_ATTEST_REQUIRED$"):
+            self.rpc.call("getblockcount")
+        self.assertEqual(self.server.requests, [])
+
+    def test_malformed_supplied_mempool_prevout_never_falls_back(self):
+        tx = ordinary_transaction()
+        tx["vin"][0]["prevout"]["value"] = True
+        self.server.overrides["getrawtransaction"] = tx
+        self.mempool.attest()
+        with self.assertRaisesRegex(WspScannerRpcError, "^WSP_SCAN_REPLY_DENIED$"):
+            self.mempool.call("getrawtransaction", [OTHER, 2])
+        self.assertEqual([r[2]["params"] for r in self.server.requests
+                          if r[2]["method"] == "getrawtransaction"], [[OTHER, 2]])
+
+    def test_ambiguous_json_transport_poisoned_and_response_redacted(self):
+        for payload in (b'{"id":1,"error":null,"result":[],"result":[]}',
+                        b'{"id":1,"error":null,"result":[NaN]}'):
+            self.mempool.attest()
+            self.server.fail_method = "getrawmempool"
+            self.server.fail_payload = payload
+            with self.assertRaisesRegex(WspScannerRpcError, "^WSP_SCAN_TRANSPORT_DENIED$"):
+                self.mempool.call("getrawmempool")
+            self.server.fail_method = None
 
     def test_mempool_must_be_explicitly_selected_before_any_wire(self):
         self.rpc.attest()
