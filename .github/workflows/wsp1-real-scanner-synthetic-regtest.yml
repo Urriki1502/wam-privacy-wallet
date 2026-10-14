@@ -14,6 +14,7 @@ on:
       - 'tools/ci_macos_retained_wsp_native.py'
       - 'src/wam_privacy_wallet/application/macos_retained_scan_storage.py'
       - 'tests/test_macos_retained_scan_storage.py'
+      - 'tools/ci_macos_retained_scan_storage.py'
       - 'tests/test_macos_retained_wsp_native.py'
       - 'tests/test_macos_scan_backup_native.py'
       - 'tests/test_macos_encrypted_scan_backup.py'
@@ -232,7 +233,7 @@ jobs:
         if: runner.os == 'macOS'
         env:
           PYTHONPATH: src
-        run: python -B -m unittest discover -s tests -p test_macos_retained_scan_storage.py -v
+        run: python -B -m tools.ci_macos_retained_scan_storage
       - name: Actual macOS encrypted scan backup plus retained WSP SQLite, restart and reorg (SYNTHETIC RPC, NO Core)
         if: runner.os == 'macOS'
         env:
