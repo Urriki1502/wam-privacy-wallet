@@ -269,7 +269,7 @@ class RegtestGuiTests(unittest.TestCase):
         self.assertIn("NO VERIFIED CORE", self.window.node_probe_status.text())
         self.assertFalse(self.window.controller.lifecycle.state.wallet_operational)
         self.assertEqual(self.window.node_inputs["a_password"].text(), "")
-        self.assertEqual(self.window.node_inputs["b_password"].text())
+        self.assertEqual(self.window.node_inputs["b_password"].text(), "")
 
     def test_two_node_cancel_ignores_late_rpc_evidence(self):
         entered, release = Event(), Event()
