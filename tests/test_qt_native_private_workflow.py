@@ -108,6 +108,7 @@ class NativeQtPrivateWorkflowTests(unittest.TestCase):
                 opts = backend.call_args.kwargs
                 self.assertEqual(opts["history_limit"],
                                  20 if action == "history" else None)
+                self.assertIs(opts["require_synchronized_indexes"], True)
                 self.assertEqual(opts["save_checkpoint"], action == "checkpoint")
                 self.assertEqual(opts["restore_checkpoint"], action == "restore")
                 self.assertTrue(callable(opts["cancelled"]))

@@ -66,9 +66,10 @@ class NativeGuiScannerTests(unittest.TestCase):
             "transactions_processed": 3,
             "observed_utxos": 1,
         }
-        with patch.object(subject, "scan_two_existing_regtest_nodes", return_value=receipt):
+        with patch.object(subject, "scan_two_existing_regtest_nodes", return_value=receipt) as scanner:
             out = subject.run_existing_two_node_scan(**self.params)
             self.assertEqual(out.observed_utxos, 1)
+            self.assertIs(scanner.call_args.kwargs["require_synchronized_indexes"], True)
         receipt["unqualified_confirmed_atoms"] = 1000
         with patch.object(subject, "scan_two_existing_regtest_nodes", return_value=receipt):
             with self.assertRaisesRegex(subject.QtNativeScanError, "QT_NATIVE_WSP_RECEIPT_DENIED"):

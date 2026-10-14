@@ -82,7 +82,8 @@ def run_existing_two_node_scan(*, source_root: Path, private_dir: Path,
             node_a=a, auth_a=aa, node_b=b, auth_b=bb,
             node_a_p2p_port=p2p_a, node_b_p2p_port=p2p_b,
             user_consented=True, acknowledge_unverified_binaries=True,
-            max_blocks=16, cancelled=cancelled.is_set,
+            max_blocks=16, require_synchronized_indexes=True,
+            cancelled=cancelled.is_set,
         )
         if cancelled.is_set():
             raise QtNativeScanError("QT_NATIVE_WSP_CANCELLED")

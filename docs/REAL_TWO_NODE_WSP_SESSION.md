@@ -17,6 +17,13 @@ upstream WAM source defaults are REGTEST RPC=29554, P2P=29555. Choose
 noncolliding ports for node B (example below only). This application neither
 downloads nor launches any binary and cannot authenticate process identity.
 
+Optionally add `--require-synchronized-indexes` to the interactive command to
+require the live node's txindex, coinstatsindex and basic block-filter indexes
+and consistent filter-header observations before and after scanning. This
+uses the **existing actual RPC readiness path** on node A, not a synthetic
+provider; node B's P2P and chain-tip audits still enclose the scan. A reported
+ready index is not executable provenance or Core E2E acceptance.
+
 The WSP scan-only backup and pinned source checkout must already exist on
 the Linux x64 host and satisfy the source/crypto/storage gates.
 
