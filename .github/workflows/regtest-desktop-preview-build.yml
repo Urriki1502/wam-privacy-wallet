@@ -73,7 +73,10 @@ jobs:
           assert binary.is_file(), 'FROZEN_GUI_MISSING'
           check = subprocess.run([str(binary.resolve()), '--help'], text=True, capture_output=True, timeout=30)
           assert check.returncode == 0 and '--mode' in check.stdout and '--offline-review' in check.stdout, 'FROZEN_GUI_ENTRYPOINT_DENIED'
-          print('FROZEN_REGTEST_GUI_ENTRYPOINT_PASS_NO_CORE')
+          live = subprocess.run([str(binary.resolve()), '--mode', 'regtest', '--self-test-ui'],
+                                text=True, capture_output=True, timeout=45)
+          assert live.returncode == 0 and 'NATIVE_REGTEST_GUI_EVENT_LOOP_SMOKE_PASS_NO_CORE' in live.stdout, 'FROZEN_REGTEST_GUI_WINDOW_LOOP_DENIED'
+          print('FROZEN_REGTEST_GUI_ENTRYPOINT_AND_WINDOW_PASS_NO_CORE')
           subprocess.run([sys.executable, '-m', 'tools.inspect_regtest_package',
               '--package-dir', str(root), '--executable', str(binary),
               '--platform', os.environ['TARGET_PLATFORM'], '--commit', os.environ['SOURCE_SHA'],
@@ -103,6 +106,9 @@ jobs:
           check = subprocess.run([str(binary.resolve()), '--help'], text=True,
                                  capture_output=True, timeout=30)
           assert check.returncode == 0 and '--mode' in check.stdout and '--offline-review' in check.stdout
+          live = subprocess.run([str(binary.resolve()), '--mode', 'regtest', '--self-test-ui'],
+                                text=True, capture_output=True, timeout=45)
+          assert live.returncode == 0 and 'NATIVE_REGTEST_GUI_EVENT_LOOP_SMOKE_PASS_NO_CORE' in live.stdout, 'NATIVE_MACOS_APP_EVENT_LOOP_DENIED'
           stage = Path('dist/macos-dmg-staging')
           stage.mkdir()
           shutil.copytree(app, stage / app.name, symlinks=True)
