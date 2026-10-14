@@ -184,10 +184,12 @@ class RegtestWorkerController(QObject):
                       node_a_user: str, node_a_password: str,
                       node_b_rpc: int, node_b_p2p: int,
                       node_b_user: str, node_b_password: str,
-                      consent: bool, unverified_core_ack: bool):
+                      consent: bool, unverified_core_ack: bool,
+                      check_index_filters: bool = False):
         state = self.lifecycle.state
         if (self.busy or state.mode != "REGTEST" or state.phase == "CLOSED"
-                or consent is not True or unverified_core_ack is not True):
+                or consent is not True or unverified_core_ack is not True
+                or type(check_index_filters) is not bool):
             raise RegtestLifecycleError("APP_REGTEST_NODE_CONSENT_DENIED")
         try:
             kwargs = {
@@ -198,6 +200,7 @@ class RegtestWorkerController(QObject):
                 "p2p_a": node_a_p2p, "p2p_b": node_b_p2p,
                 "user_consented": True,
                 "acknowledged_unverified_core": True,
+                "check_index_filters": check_index_filters,
             }
             if len({node_a_rpc, node_a_p2p, node_b_rpc, node_b_p2p}) != 4:
                 raise ValueError

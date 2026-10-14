@@ -48,8 +48,16 @@ jobs:
           python -m pip check
           python -m compileall -q src tools/desktop_entry.py tools/inspect_regtest_package.py
           python -m unittest discover -s tests -p test_regtest_preview_package.py -v
-      - name: Freeze actual REGTEST desktop GUI
-        run: python -m PyInstaller --noconfirm --clean --onedir --name WAM-Privacy-Wallet-REGTEST --paths src tools/desktop_entry.py
+      - name: Freeze actual REGTEST desktop GUI and native macOS app
+        shell: python
+        run: |
+          import subprocess, sys
+          args = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean',
+                  '--onedir', '--name', 'WAM-Privacy-Wallet-REGTEST', '--paths', 'src']
+          if sys.platform == 'darwin':
+              args += ['--windowed', '--osx-bundle-identifier',
+                       'org.wam.experimental.regtest']
+          subprocess.run(args + ['tools/desktop_entry.py'], check=True)
       - name: Smoke-test frozen executable and create non-authorizing manifest
         env:
           QT_QPA_PLATFORM: offscreen
@@ -65,11 +73,70 @@ jobs:
           assert binary.is_file(), 'FROZEN_GUI_MISSING'
           check = subprocess.run([str(binary.resolve()), '--help'], text=True, capture_output=True, timeout=30)
           assert check.returncode == 0 and '--mode' in check.stdout and '--offline-review' in check.stdout, 'FROZEN_GUI_ENTRYPOINT_DENIED'
-          print('FROZEN_REGTEST_GUI_ENTRYPOINT_PASS_NO_CORE')
+          live = subprocess.run([str(binary.resolve()), '--mode', 'regtest', '--self-test-ui'],
+                                text=True, capture_output=True, timeout=45)
+          if live.returncode != 0 or 'NATIVE_REGTEST_GUI_EVENT_LOOP_SMOKE_PASS_NO_CORE' not in live.stdout:
+              print('FROZEN_GUI_SMOKE_RETURN_CODE:', live.returncode)
+              print('FROZEN_GUI_SMOKE_STDOUT:', live.stdout[-1000:])
+              print('FROZEN_GUI_SMOKE_STDERR:', live.stderr[-2000:])
+              raise AssertionError('FROZEN_REGTEST_GUI_WINDOW_LOOP_DENIED')
+          print('FROZEN_REGTEST_GUI_ENTRYPOINT_AND_WINDOW_PASS_NO_CORE')
           subprocess.run([sys.executable, '-m', 'tools.inspect_regtest_package',
               '--package-dir', str(root), '--executable', str(binary),
               '--platform', os.environ['TARGET_PLATFORM'], '--commit', os.environ['SOURCE_SHA'],
               '--output', 'dist/REGTEST_GUI_PREVIEW_MANIFEST.json'], check=True)
+      - name: Inspect native macOS app and create experimental disk image
+        if: runner.os == 'macOS'
+        env:
+          PYTHONPATH: .
+          TARGET_PLATFORM: ${{ matrix.platform }}
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          QT_QPA_PLATFORM: offscreen
+        shell: python
+        run: |
+          import hashlib, json, os, plistlib, shutil, subprocess
+          from pathlib import Path
+          from tools.inspect_regtest_package import inspect
+          original = Path('dist/WAM-Privacy-Wallet-REGTEST.app')
+          app = Path('dist/WAM-Privacy-Wallet-EXPERIMENTAL-REGTEST.app')
+          assert original.is_dir() and not original.is_symlink() and not app.exists()
+          original.rename(app)
+          with (app / 'Contents/Info.plist').open('rb') as source:
+              info = plistlib.load(source)
+          assert info['CFBundleIdentifier'] == 'org.wam.experimental.regtest'
+          assert info['CFBundleExecutable'] == 'WAM-Privacy-Wallet-REGTEST'
+          binary = app / 'Contents/MacOS/WAM-Privacy-Wallet-REGTEST'
+          receipt = inspect(app, binary, os.environ['TARGET_PLATFORM'], os.environ['SOURCE_SHA'])
+          check = subprocess.run([str(binary.resolve()), '--help'], text=True,
+                                 capture_output=True, timeout=30)
+          assert check.returncode == 0 and '--mode' in check.stdout and '--offline-review' in check.stdout
+          live = subprocess.run([str(binary.resolve()), '--mode', 'regtest', '--self-test-ui'],
+                                text=True, capture_output=True, timeout=45)
+          assert live.returncode == 0 and 'NATIVE_REGTEST_GUI_EVENT_LOOP_SMOKE_PASS_NO_CORE' in live.stdout, 'NATIVE_MACOS_APP_EVENT_LOOP_DENIED'
+          stage = Path('dist/macos-dmg-staging')
+          stage.mkdir()
+          shutil.copytree(app, stage / app.name, symlinks=True)
+          (stage / 'EXPERIMENTAL-REGTEST-ONLY.txt').write_text(
+              'EXPERIMENTAL / REGTEST ONLY. GUI preview, not an operational wallet.\n'
+              'No Core included. No real funds, seeds or production credentials.\n', encoding='utf-8')
+          stem = 'WAM-Privacy-Wallet-EXPERIMENTAL-REGTEST-' + os.environ['TARGET_PLATFORM']
+          image = Path('dist') / (stem + '.dmg')
+          archive = Path('dist') / (stem + '.app.tar.gz')
+          assert not image.exists() and not archive.exists()
+          subprocess.run(['/usr/bin/hdiutil', 'create', '-volname', 'WAM EXPERIMENTAL REGTEST',
+                          '-srcfolder', str(stage), '-format', 'UDZO', str(image)],
+                         check=True, timeout=300)
+          subprocess.run(['/usr/bin/hdiutil', 'verify', str(image)], check=True, timeout=120)
+          subprocess.run(['/usr/bin/tar', '-czf', str(archive), '-C', 'dist', app.name],
+                         check=True, timeout=120)
+          receipt['formats'] = ['macos-app', 'dmg', 'app-tar-gzip']
+          for key, file in (('disk_image_sha256', image), ('app_archive_sha256', archive)):
+              with file.open('rb') as source:
+                  receipt[key] = hashlib.file_digest(source, 'sha256').hexdigest()
+          with Path('dist/REGTEST_MACOS_BUNDLE_MANIFEST.json').open('x', encoding='utf-8') as output:
+              json.dump(receipt, output, sort_keys=True, indent=2)
+              output.write('\n')
+          print('NATIVE_MACOS_APP_AND_DMG_PASS_EXPERIMENTAL_REGTEST_ONLY_NO_CORE')
       - name: Upload unsigned native preview (CI artifact only)
         uses: actions/upload-artifact@v4
         with:
@@ -77,5 +144,8 @@ jobs:
           path: |
             dist/WAM-Privacy-Wallet-REGTEST/
             dist/REGTEST_GUI_PREVIEW_MANIFEST.json
+            dist/WAM-Privacy-Wallet-EXPERIMENTAL-REGTEST-*.dmg
+            dist/WAM-Privacy-Wallet-EXPERIMENTAL-REGTEST-*.app.tar.gz
+            dist/REGTEST_MACOS_BUNDLE_MANIFEST.json
           retention-days: 7
           if-no-files-found: error

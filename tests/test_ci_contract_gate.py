@@ -32,7 +32,7 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
         return patch.dict(MINIMUM_CASES, {self.pattern: 1})
 
     def test_manifest_preserves_original_eight_and_self_test(self):
-        self.assertEqual(len(MANDATORY_SUITES), 88)
+        self.assertEqual(len(MANDATORY_SUITES), 93)
         self.assertEqual(len(set(MANDATORY_SUITES)), len(MANDATORY_SUITES))
         self.assertIn("test_ci_contract_gate.py", MANDATORY_SUITES)
         self.assertIn("test_regtest_gateway.py", MANDATORY_SUITES)
@@ -140,6 +140,10 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
 
     def test_minimum_case_floors_pinned_for_all_mandatory_suites(self):
         expected = {
+            "test_macos_encrypted_scan_backup.py": 33,
+            "test_macos_scan_backup_native.py": 3,
+            "test_wsp1_scanner_process_lock.py": 8,
+            "test_engineering_run_lease.py": 20,
             "test_qualified_scan_session.py": 18,
             "test_regtest_lifecycle.py": 20,
             "test_two_node_readiness.py": 5,
@@ -222,6 +226,7 @@ class MandatoryOfflineContractGateTests(unittest.TestCase):
             "test_retained_scan_session.py": 18,
             "test_encrypted_checkpoint_archive.py": 23,
             "test_private_checkpoint_directory.py": 12,
+            "test_macos_private_directory.py": 25,
             "test_checkpoint_recovery_workflow.py": 18,
             "test_versioned_checkpoint_journal.py": 15,
             "test_snapshot_lineage_preflight.py": 14,

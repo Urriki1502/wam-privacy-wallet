@@ -27,6 +27,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--node-b-p2p-port", type=int, required=True)
     parser.add_argument("--node-b-rpc-user", required=True)
     parser.add_argument("--max-blocks", type=int, default=16)
+    parser.add_argument("--require-synchronized-indexes", action="store_true",
+                        help="Fail closed unless Core reports synchronized tx/coinstats/basic-filter indexes and consistent filters")
     parser.add_argument("--receive-account-index", type=int,
                         help="Opt in to show local receive code after both nodes agree")
     parser.add_argument("--show-observed-balance", action="store_true",
@@ -57,6 +59,7 @@ def main(argv: list[str] | None = None) -> int:
             node_b_p2p_port=opts.node_b_p2p_port,
             user_consented=True, acknowledge_unverified_binaries=True,
             max_blocks=opts.max_blocks, history_limit=opts.history_limit,
+            require_synchronized_indexes=opts.require_synchronized_indexes,
             save_checkpoint=opts.save_checkpoint,
             restore_checkpoint=opts.restore_checkpoint,
             receive_account_index=opts.receive_account_index,

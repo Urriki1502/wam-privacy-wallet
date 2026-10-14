@@ -39,6 +39,7 @@ def scan_two_existing_regtest_nodes(
     node_a_p2p_port: int, node_b_p2p_port: int,
     user_consented: bool, acknowledge_unverified_binaries: bool,
     max_blocks: int = 16, history_limit: int | None = None,
+    require_synchronized_indexes: bool = False,
     save_checkpoint: bool = False, restore_checkpoint: bool = False,
     receive_account_index: int | None = None,
     show_observed_balance: bool = False,
@@ -68,6 +69,7 @@ def scan_two_existing_regtest_nodes(
                     node_b_p2p_port}) != 4
             or node_a.host != "127.0.0.1" or node_b.host != "127.0.0.1"
             or type(max_blocks) is not int or not 1 <= max_blocks <= 16
+            or type(require_synchronized_indexes) is not bool
             or (history_limit is not None and
                 (type(history_limit) is not int or not 1 <= history_limit <= 100))
             or type(save_checkpoint) is not bool
@@ -103,6 +105,7 @@ def scan_two_existing_regtest_nodes(
             endpoint=node_a, rpc_auth=auth_a,
             user_consented=True, acknowledge_unverified_binary=True,
             max_blocks=max_blocks, history_limit=history_limit,
+            require_synchronized_indexes=require_synchronized_indexes,
             save_checkpoint=save_checkpoint,
             restore_checkpoint=restore_checkpoint,
             receive_account_index=receive_account_index,

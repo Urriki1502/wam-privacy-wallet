@@ -15,6 +15,10 @@ ROOT = Path(__file__).resolve().parents[1]
 # Baseline test-count floors measured on all four PR #26 CI platforms.
 # These protect against accidental shrinking of a named test module.
 MINIMUM_CASES = {
+    "test_macos_encrypted_scan_backup.py": 33,
+    "test_macos_scan_backup_native.py": 3,
+    "test_wsp1_scanner_process_lock.py": 8,
+    "test_engineering_run_lease.py": 20,
     "test_qualified_scan_session.py": 18,
     "test_regtest_lifecycle.py": 20,
     "test_two_node_readiness.py": 5,
@@ -97,6 +101,7 @@ MINIMUM_CASES = {
     "test_retained_scan_session.py": 18,
     "test_encrypted_checkpoint_archive.py": 23,
     "test_private_checkpoint_directory.py": 12,
+    "test_macos_private_directory.py": 25,
     "test_checkpoint_recovery_workflow.py": 18,
     "test_versioned_checkpoint_journal.py": 15,
     "test_snapshot_lineage_preflight.py": 14,
