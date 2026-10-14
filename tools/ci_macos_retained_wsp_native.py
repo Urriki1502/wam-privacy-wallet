@@ -183,6 +183,10 @@ def main(argv=None) -> int:
         print("MACOS_RETAINED_WSP_SYNTHETIC_ONLY_5_OF_5_PASS_NO_CORE")
         return 0
     except Exception as error:
+        # Preserve the exact fail-closed public output in optimized (-O) mode.
+        if not __debug__:
+            print("MACOS_RETAINED_WSP_NATIVE_DENIED", file=sys.stderr)
+            return 2
         # Diagnostic categories only; never print secrets, paths or RPC payloads.
         code = str(error)
         allowed = code if (type(error).__name__ in ("RuntimeError", "MacosRetainedScanStoreError") and
