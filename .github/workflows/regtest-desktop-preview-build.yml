@@ -75,7 +75,11 @@ jobs:
           assert check.returncode == 0 and '--mode' in check.stdout and '--offline-review' in check.stdout, 'FROZEN_GUI_ENTRYPOINT_DENIED'
           live = subprocess.run([str(binary.resolve()), '--mode', 'regtest', '--self-test-ui'],
                                 text=True, capture_output=True, timeout=45)
-          assert live.returncode == 0 and 'NATIVE_REGTEST_GUI_EVENT_LOOP_SMOKE_PASS_NO_CORE' in live.stdout, 'FROZEN_REGTEST_GUI_WINDOW_LOOP_DENIED'
+          if live.returncode != 0 or 'NATIVE_REGTEST_GUI_EVENT_LOOP_SMOKE_PASS_NO_CORE' not in live.stdout:
+              print('FROZEN_GUI_SMOKE_RETURN_CODE:', live.returncode)
+              print('FROZEN_GUI_SMOKE_STDOUT:', live.stdout[-1000:])
+              print('FROZEN_GUI_SMOKE_STDERR:', live.stderr[-2000:])
+              raise AssertionError('FROZEN_REGTEST_GUI_WINDOW_LOOP_DENIED')
           print('FROZEN_REGTEST_GUI_ENTRYPOINT_AND_WINDOW_PASS_NO_CORE')
           subprocess.run([sys.executable, '-m', 'tools.inspect_regtest_package',
               '--package-dir', str(root), '--executable', str(binary),
