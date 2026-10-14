@@ -58,7 +58,7 @@ class MacSignedIntakeTests(unittest.TestCase):
                     with patch.object(subject, "verify_official_release", return_value=invalid):
                         with self.assertRaisesRegex(subject.MacCoreIntakeError,
                                                     "^CORE_MAC_SIGNED_RECEIPT_DENIED$"):
-                            subject.review_macos_core_arm64(target, Path("/usr/bin/gpg"))
+                            subject.review_macos_core_arm64(target, Path.cwd().resolve() / "fake-gpg")
                 read.assert_not_called()
 
 
