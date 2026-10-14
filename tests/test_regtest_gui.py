@@ -138,6 +138,20 @@ class RegtestGuiTests(unittest.TestCase):
         self.assertIn("NO WALLET LOADED", self.window.authority_status.text())
         self.assertFalse(self.window.inspect_button.isEnabled())
 
+    def test_appearance_override_keeps_regtest_security_state(self):
+        self.assertEqual(self.window.appearance_choice.currentData(), "auto")
+        self.assertTrue(self.window.timezone_status.text())
+        initial = self.window.controller.lifecycle.state
+        self.window.appearance_choice.setCurrentIndex(2)
+        self.assertIn("DARK", self.window.timezone_status.text())
+        self.assertFalse(self.window.navigation.item(0).icon().isNull())
+        self.window.appearance_choice.setCurrentIndex(1)
+        self.assertIn("LIGHT", self.window.timezone_status.text())
+        self.assertEqual(self.window.controller.lifecycle.state, initial)
+        self.assertFalse(self.window.controller.lifecycle.state.wallet_operational)
+        self.assertIn("SIGNER / BROADCAST BLOCKED",
+                      self.window.authority_status.text())
+
     def test_mode_selection_and_explicit_consent_enable_only_local_inspection(self):
         self.window.mode_button.click()
         self.assertEqual(self.window.controller.lifecycle.state.mode, "REGTEST")
