@@ -12,6 +12,9 @@ on:
       - 'tools/ci_macos_scan_backup_native.py'
       - 'tools/ci_macos_scan_backup_process.py'
       - 'tools/ci_macos_retained_wsp_native.py'
+      - 'src/wam_privacy_wallet/application/macos_retained_scan_storage.py'
+      - 'tests/test_macos_retained_scan_storage.py'
+      - 'tools/ci_macos_retained_scan_storage.py'
       - 'tests/test_macos_retained_wsp_native.py'
       - 'tests/test_macos_scan_backup_native.py'
       - 'tests/test_macos_encrypted_scan_backup.py'
@@ -157,13 +160,16 @@ jobs:
           python -m tools.ci_wsp1_scanner_loopback --source-root "$GITHUB_WORKSPACE/wsp-source"
 
   native-public-scanner-only:
-    name: Actual pinned WSP-1 scanner-only / ${{ matrix.os }} / x64
+    name: Actual pinned WSP-1 scanner-only / ${{ matrix.os }} / ${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - {os: ubuntu-latest, arch: x64}
+          - {os: windows-latest, arch: x64}
+          - {os: macos-15, arch: arm64}
     env:
       PYTHONDONTWRITEBYTECODE: '1'
       QT_QPA_PLATFORM: offscreen
@@ -181,11 +187,11 @@ jobs:
           ref: ac55f13423620252bdbf848c7e8a280c3b84721e
           path: wsp-source
           persist-credentials: false
-      - name: Set up actual Python 3.12 x64
+      - name: Set up actual Python 3.12 on target architecture
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          architecture: x64
+          architecture: ${{ matrix.arch }}
       - name: Verify full package source closure before installation/import
         env:
           PYTHONPATH: src
@@ -214,6 +220,25 @@ jobs:
               raise AssertionError('unqualified retained persistence enabled')
           assert not any(name == 'wam_sp' or name.startswith('wam_sp.') for name in sys.modules)
           print('ACTUAL_NON_LINUX_RETAINED_SESSION_PLATFORM_DENIAL_ONLY')
+      - name: Require all 28 pinned BIP352 upstream vectors PASS on native Apple Silicon
+        if: runner.os == 'macOS'
+        env:
+          PYTHONPATH: src
+        shell: python
+        run: |
+          import json, unittest
+          from pathlib import Path
+          vectors = json.loads(Path("wsp-source/tests/vectors/bip352.json").read_text())
+          if len(vectors) != 28:
+              raise SystemExit("WSP1_NATIVE_MACOS_VECTOR_COUNT_DENIED")
+          suite = unittest.defaultTestLoader.discover(
+              "wsp-source/tests", pattern="test_vectors.py")
+          if suite.countTestCases() != 28:
+              raise SystemExit("WSP1_NATIVE_MACOS_VECTOR_TEST_COUNT_DENIED")
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          if not result.wasSuccessful() or result.skipped or result.testsRun != 28:
+              raise SystemExit("WSP1_NATIVE_MACOS_28_VECTORS_DENIED")
+          print("WSP1_PINNED_BIP352_28_OF_28_NATIVE_MACOS_ARM64_PASS_NO_CORE")
       - name: Actual public BIP352 scanner, SQLite, reorg and Qt proof (NO Core)
         run: python -B -m tools.ci_wsp1_scanner_native_only --source-root "${{ github.workspace }}/wsp-source"
       - name: Actual native scanner inter-process lease, exit recovery and fresh attestation (NO Core)
@@ -223,6 +248,11 @@ jobs:
         env:
           PYTHONPATH: src
         run: python -B -m tools.ci_macos_scan_backup_native --source-root "${{ github.workspace }}/wsp-source"
+      - name: Actual macOS ARM64 retained SQLite inode and dir-lease adversarial native tests
+        if: runner.os == 'macOS'
+        env:
+          PYTHONPATH: src
+        run: python -B -m tools.ci_macos_retained_scan_storage
       - name: Actual macOS encrypted scan backup plus retained WSP SQLite, restart and reorg (SYNTHETIC RPC, NO Core)
         if: runner.os == 'macOS'
         env:
