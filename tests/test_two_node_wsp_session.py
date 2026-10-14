@@ -53,6 +53,7 @@ class TwoNodeWspScopeTests(unittest.TestCase):
             dict(receive_account_index=True),
             dict(receive_account_index=16),
             dict(show_observed_balance=1),
+            dict(require_synchronized_indexes=1),
             dict(save_checkpoint=True, restore_checkpoint=True),
         ]
         with patch.object(subject, "TwoNodeP2PReadOnlyAudit") as audit:
@@ -164,3 +165,51 @@ class TwoNodeWspScopeTests(unittest.TestCase):
         self.assertIn("restore_checkpoint", params)
         self.assertIn("receive_account_index", params)
         self.assertIn("show_observed_balance", params)
+
+    def test_opt_in_indexes_gate_reaches_real_scanner_without_new_backend(self):
+        """Pure contract test: readiness must reach the existing live scanner."""
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+
+        tip = "a" * 64
+        profile_a = SimpleNamespace(identity=ChainIdentity(
+            self.a, WAM_REGTEST_GENESIS, 42, tip,
+        ))
+        profile_b = SimpleNamespace(identity=ChainIdentity(
+            self.b, WAM_REGTEST_GENESIS, 42, tip,
+        ))
+        for require_indexes in (False, True):
+            with self.subTest(require_indexes=require_indexes):
+                gateway_a = Mock()
+                gateway_b = Mock()
+                gateway_a.probe_core_profile.return_value = profile_a
+                gateway_b.probe_core_profile.return_value = profile_b
+                receipt = {
+                    "status": "REAL_LOOPBACK_WSP_SCAN_UNQUALIFIED_CORE",
+                    "core_binary_authenticated": False,
+                    "wallet_operational": False,
+                    "signer_enabled": False,
+                    "broadcast_allowed": False,
+                    "mainnet_allowed": False,
+                    "chain_current": True,
+                    "tip_height": 42,
+                    "real_two_node_regtest_qualified": False,
+                }
+                with patch.object(subject, "TwoNodeP2PReadOnlyAudit") as audit, \
+                     patch.object(subject, "LocalRegtestIdentityGateway") as gateways, \
+                     patch.object(subject, "scan_existing_regtest", return_value=receipt) as scanner:
+                    gateways.side_effect = lambda endpoint, auth, timeout: (
+                        gateway_a if endpoint == self.a else gateway_b
+                    )
+                    observed = subject.scan_two_existing_regtest_nodes(
+                        self.absolute_unused, self.absolute_unused,
+                        b"x" * 16, require_synchronized_indexes=require_indexes,
+                        **self.args,
+                    )
+                    self.assertEqual(
+                        scanner.call_args.kwargs["require_synchronized_indexes"],
+                        require_indexes,
+                    )
+                    self.assertTrue(observed["two_node_reported_chain_agrees"])
+                    self.assertFalse(observed["real_two_node_regtest_qualified"])
+                    self.assertEqual(audit.return_value.audit.call_count, 2)
