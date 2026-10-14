@@ -87,66 +87,75 @@ def run(root: Path) -> tuple[str, ...]:
 
         with tempfile.TemporaryDirectory(prefix="macos-retained-public-",
                                          dir="/private/tmp") as directory:
-            folder = Path(directory)
-            envelope = export_scan((account,), password)
-            provision_macos_encrypted_scan_backup(folder, envelope)
-            restored = import_scan(load_macos_encrypted_scan_backup(folder), password)
-            if restored != (account,):
-                raise RuntimeError("MACOS_RETAINED_WSP_IMPORT_DENIED")
-            cases.append("ACTUAL_NATIVE_ENCRYPTED_SCAN_ONLY_IMPORT")
-            store = MacosRetainedScanStore(folder)
-            db = store.path
-            store.verify()
-            scanner = Scanner(db, restored)
-            store.verify()
-            first = run_consented_wsp_scan(scanner, rpc(), user_consented=True, max_blocks=1)
-            store.verify()
-            if first.blocks_processed != 1 or scanner.coins():
-                raise RuntimeError("MACOS_RETAINED_WSP_FIRST_SYNC_DENIED")
-            cases.append("ACTUAL_NATIVE_SCANNER_SQLITE_SYNC")
-            server.height, server.tip = 2, PAYTIP
-            paid = run_consented_wsp_scan(scanner, rpc(), user_consented=True, max_blocks=1)
-            store.verify()
-            coins = scanner.coins()
-            if (paid.blocks_processed != 1 or len(coins) != 1
-                    or coins[0]["txid"] != PAYTX or coins[0]["atoms"] != 200000
-                    or any(getattr(paid, field) is not False for field in (
-                        "wallet_operational", "signer_enabled", "broadcast_allowed",
-                        "mainnet_allowed"))):
-                raise RuntimeError("MACOS_RETAINED_WSP_PAYMENT_DENIED")
-            cases.append("ACTUAL_NATIVE_BIP352_RECEIVE_MATCH")
-            scanner.close()
-            scanner = None
-            if stat.S_IMODE(db.stat().st_mode) != 0o600:
-                raise RuntimeError("MACOS_RETAINED_WSP_DB_PERMISSION_DENIED")
-            renewed = import_scan(load_macos_encrypted_scan_backup(folder), password)
-            store.verify()
-            scanner = Scanner(db, renewed)
-            store.verify()
-            if scanner.ready or scanner.mempool_ready:
-                raise RuntimeError("MACOS_RETAINED_WSP_STALE_STATE_DENIED")
-            replay = run_consented_wsp_scan(scanner, rpc(), user_consented=True, max_blocks=1)
-            store.verify()
-            if replay.blocks_processed != 0 or len(scanner.coins()) != 1:
-                raise RuntimeError("MACOS_RETAINED_WSP_REOPEN_DENIED")
-            cases.append("ACTUAL_NATIVE_RESTART_REATTEST_NO_REPLAY")
-            server.tip, server.discard_payment = PAYTIP_FORK, True
-            fork = run_consented_wsp_scan(scanner, rpc(), user_consented=True, max_blocks=1)
-            store.verify()
-            if fork.rollback_blocks != 1 or fork.blocks_processed != 1 or scanner.coins():
-                raise RuntimeError("MACOS_RETAINED_WSP_REORG_DENIED")
-            cases.append("ACTUAL_NATIVE_REORG_ROLLBACK")
-            if server.violations:
-                raise RuntimeError("MACOS_RETAINED_WSP_RPC_VIOLATION")
-            # Native inode and directory descriptors MUST be released while the
-            # temporary private pathname still exists. Otherwise temp cleanup
-            # unlinks SQLite before the final identity check and misreports
-            # a harmless disposal as a real scanner custody failure.
-            scanner.close()
-            scanner = None
-            store.verify()
-            store.close()
-            store = None
+            try:
+                folder = Path(directory)
+                envelope = export_scan((account,), password)
+                provision_macos_encrypted_scan_backup(folder, envelope)
+                restored = import_scan(load_macos_encrypted_scan_backup(folder), password)
+                if restored != (account,):
+                    raise RuntimeError("MACOS_RETAINED_WSP_IMPORT_DENIED")
+                cases.append("ACTUAL_NATIVE_ENCRYPTED_SCAN_ONLY_IMPORT")
+                store = MacosRetainedScanStore(folder)
+                db = store.path
+                store.verify()
+                scanner = Scanner(db, restored)
+                store.verify()
+                first = run_consented_wsp_scan(scanner, rpc(), user_consented=True, max_blocks=1)
+                store.verify()
+                if first.blocks_processed != 1 or scanner.coins():
+                    raise RuntimeError("MACOS_RETAINED_WSP_FIRST_SYNC_DENIED")
+                cases.append("ACTUAL_NATIVE_SCANNER_SQLITE_SYNC")
+                server.height, server.tip = 2, PAYTIP
+                paid = run_consented_wsp_scan(scanner, rpc(), user_consented=True, max_blocks=1)
+                store.verify()
+                coins = scanner.coins()
+                if (paid.blocks_processed != 1 or len(coins) != 1
+                        or coins[0]["txid"] != PAYTX or coins[0]["atoms"] != 200000
+                        or any(getattr(paid, field) is not False for field in (
+                            "wallet_operational", "signer_enabled", "broadcast_allowed",
+                            "mainnet_allowed"))):
+                    raise RuntimeError("MACOS_RETAINED_WSP_PAYMENT_DENIED")
+                cases.append("ACTUAL_NATIVE_BIP352_RECEIVE_MATCH")
+                scanner.close()
+                scanner = None
+                if stat.S_IMODE(db.stat().st_mode) != 0o600:
+                    raise RuntimeError("MACOS_RETAINED_WSP_DB_PERMISSION_DENIED")
+                renewed = import_scan(load_macos_encrypted_scan_backup(folder), password)
+                store.verify()
+                scanner = Scanner(db, renewed)
+                store.verify()
+                if scanner.ready or scanner.mempool_ready:
+                    raise RuntimeError("MACOS_RETAINED_WSP_STALE_STATE_DENIED")
+                replay = run_consented_wsp_scan(scanner, rpc(), user_consented=True, max_blocks=1)
+                store.verify()
+                if replay.blocks_processed != 0 or len(scanner.coins()) != 1:
+                    raise RuntimeError("MACOS_RETAINED_WSP_REOPEN_DENIED")
+                cases.append("ACTUAL_NATIVE_RESTART_REATTEST_NO_REPLAY")
+                server.tip, server.discard_payment = PAYTIP_FORK, True
+                fork = run_consented_wsp_scan(scanner, rpc(), user_consented=True, max_blocks=1)
+                store.verify()
+                if fork.rollback_blocks != 1 or fork.blocks_processed != 1 or scanner.coins():
+                    raise RuntimeError("MACOS_RETAINED_WSP_REORG_DENIED")
+                cases.append("ACTUAL_NATIVE_REORG_ROLLBACK")
+                if server.violations:
+                    raise RuntimeError("MACOS_RETAINED_WSP_RPC_VIOLATION")
+                # Native inode and directory descriptors MUST be released while the
+                # temporary private pathname still exists. Otherwise temp cleanup
+                # unlinks SQLite before the final identity check and misreports
+                # a harmless disposal as a real scanner custody failure.
+            finally:
+                # Never unlink disposable state while a scanner, SQLite or
+                # native directory descriptor is still live (success or fail).
+                try:
+                    if scanner is not None:
+                        scanner.close()
+                finally:
+                    scanner = None
+                    try:
+                        if store is not None:
+                            store.close()
+                    finally:
+                        store = None
         if len(cases) != 5:
             raise RuntimeError("MACOS_RETAINED_WSP_CASE_COUNT_DENIED")
         return tuple(cases)
