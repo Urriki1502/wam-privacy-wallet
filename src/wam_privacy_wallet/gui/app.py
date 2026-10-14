@@ -53,7 +53,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             if valid:
                 print("NATIVE_REGTEST_GUI_EVENT_LOOP_SMOKE_PASS_NO_CORE", flush=True)
-            window.close()
+            # Exit the event loop first; closing a Qt window from its timer
+            # callback can re-enter QObject teardown in frozen Linux/Win builds.
+            # Normal QApplication/window destruction occurs after exec returns.
             app.exit(0 if valid else 3)
 
         QTimer.singleShot(100, inspect_preview)
