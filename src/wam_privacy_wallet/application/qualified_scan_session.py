@@ -8,7 +8,9 @@ test password. Only scanner-owned scan roles persist in memory while open.
 
 Raw source checks and pinned dependency versions are review evidence, not a
 production import sandbox, publisher authentication or race-free runtime bind.
-The existing private Linux storage boundary is retained without broadening it.
+Linux defaults stay fail-closed. The optional ARM64 macOS native adapter is
+explicitly disposable REGTEST and holds one validated SQLite pathname inode.
+It is not a race-free FD-to-SQLite handoff or production wallet custody.
 WSP SQLite is unencrypted; same-UID tampering and trusted anti-rollback remain
 unqualified (#148/#151). No real user accounts, secrets or funds are permitted.
 """
@@ -183,12 +185,24 @@ class SourceQualifiedScanRuntime:
     imported API references. This is not a defense against hostile Python/OS.
     """
 
-    __slots__ = ("_root", "_scanner_class", "_import_scan", "_account_class", "_decode")
+    __slots__ = ("_root", "_scanner_class", "_import_scan", "_account_class", "_decode", "_macos_disposable")
 
     def __init__(self, source_root: Path, *, user_consented: bool,
-                 scope: str = _SCOPE) -> None:
+                 scope: str = _SCOPE, macos_disposable: bool = False) -> None:
         _scope(user_consented, scope)
-        _platform()
+        if type(macos_disposable) is not bool:
+            raise QualifiedScanError("APP_QUALIFIED_SCAN_MACOS_SCOPE_DENIED")
+        if macos_disposable:
+            # Native platform contract is independent of Linux. Never widen
+            # Linux/Windows/default application runtime by implicit fallback.
+            try:
+                from .macos_retained_scan_storage import _capability
+                _capability()
+            except Exception:
+                raise QualifiedScanError("APP_QUALIFIED_SCAN_MACOS_PLATFORM_DENIED") from None
+        else:
+            _platform()
+        self._macos_disposable = macos_disposable
         if (type(source_root) is not type(Path()) or not source_root.is_absolute()
                 or source_root.is_symlink()):
             raise QualifiedScanError("APP_QUALIFIED_SCAN_SOURCE_DENIED")
@@ -230,7 +244,14 @@ class SourceQualifiedScanRuntime:
              scope: str = _SCOPE,
              cancelled: Callable[[], bool] | None = None) -> QualifiedScanSession:
         _scope(user_consented, scope)
-        _platform()
+        if getattr(self, "_macos_disposable", False):
+            try:
+                from .macos_retained_scan_storage import _capability
+                _capability()
+            except Exception:
+                raise QualifiedScanError("APP_QUALIFIED_SCAN_MACOS_PLATFORM_DENIED") from None
+        else:
+            _platform()
         if (type(private_dir) is not type(Path()) or not private_dir.is_absolute()
                 or type(password) is not bytes or not 12 <= len(password) <= 1024
                 or (cancelled is not None and not callable(cancelled))):
@@ -239,27 +260,46 @@ class SourceQualifiedScanRuntime:
             raise QualifiedScanError("APP_QUALIFIED_SCAN_CANCELLED")
         self._verify()
         scanner = None
+        native_store = None
         try:
-            envelope = load_encrypted_scan_backup(private_dir)
+            if getattr(self, "_macos_disposable", False):
+                from .macos_retained_scan_storage import MacosRetainedScanStore
+                from .macos_encrypted_scan_backup import load_macos_encrypted_scan_backup
+                native_store = MacosRetainedScanStore(private_dir)
+                envelope = load_macos_encrypted_scan_backup(private_dir)
+            else:
+                envelope = load_encrypted_scan_backup(private_dir)
             accounts = self._import_scan(envelope, password)
             if (type(accounts) is not tuple or not 1 <= len(accounts) <= 16
                     or any(type(account) is not self._account_class for account in accounts)):
                 raise ValueError
             if _stop(cancelled):
                 raise QualifiedScanError("APP_QUALIFIED_SCAN_CANCELLED")
-            scanner = self._scanner_class(_check_existing_db(private_dir), accounts)
+            path = native_store.path if native_store is not None else _check_existing_db(private_dir)
+            scanner = self._scanner_class(path, accounts)
+            if native_store is not None:
+                native_store.verify()
             # Scanner owns scan-only roles. No duplicate decrypted tuple or
             # password is retained by the runtime or returned to a presenter.
             del accounts, envelope
             if _stop(cancelled):
                 raise QualifiedScanError("APP_QUALIFIED_SCAN_CANCELLED")
-            return QualifiedScanSession(scanner, self._decode, _token=_SESSION_TOKEN)
+            return QualifiedScanSession(
+                scanner, self._decode, _token=_SESSION_TOKEN,
+                _native_store=native_store,
+            )
         except Exception as error:
-            if scanner is not None:
-                try:
+            try:
+                if scanner is not None:
                     scanner.close()
-                except Exception:
-                    pass
+            except Exception:
+                pass
+            finally:
+                if native_store is not None:
+                    try:
+                        native_store.close()
+                    except Exception:
+                        pass
             if type(error) is QualifiedScanError:
                 raise error from None
             raise QualifiedScanError("APP_QUALIFIED_SCAN_OPEN_DENIED") from None
@@ -272,6 +312,9 @@ class SourceQualifiedScanRuntime:
         External trusted anti-rollback is NOT qualified (#148/#151).
         """
         _scope(user_consented, scope)
+        if getattr(self, "_macos_disposable", False):
+            # No native Darwin checkpoint/archive and trusted anti-rollback yet.
+            raise QualifiedScanError("APP_QUALIFIED_SCAN_MACOS_RESTORE_UNQUALIFIED")
         session = self.open(private_dir, password, user_consented=True, scope=scope)
         try:
             ciphertext = load_encrypted_checkpoint(private_dir)
@@ -294,9 +337,10 @@ _SESSION_TOKEN = object()
 class QualifiedScanSession:
     """Single-operation session; failure/cancellation closes and poisons it."""
 
-    __slots__ = ("_scanner", "_decode", "_lock", "_cancel", "_closed", "_scanned")
+    __slots__ = ("_scanner", "_decode", "_lock", "_cancel", "_closed", "_scanned", "_native_store")
 
-    def __init__(self, scanner: object, decoder: object, *, _token: object) -> None:
+    def __init__(self, scanner: object, decoder: object, *, _token: object,
+                 _native_store=None) -> None:
         if _token is not _SESSION_TOKEN:
             raise QualifiedScanError("APP_QUALIFIED_SCAN_ENGINE_DENIED")
         self._scanner = scanner
@@ -305,6 +349,7 @@ class QualifiedScanSession:
         self._cancel = threading.Event()
         self._closed = False
         self._scanned = False
+        self._native_store = _native_store
 
     @property
     def closed(self) -> bool:
@@ -321,16 +366,28 @@ class QualifiedScanSession:
         if self._closed or self._cancel.is_set():
             self._lock.release()
             raise QualifiedScanError("APP_QUALIFIED_SCAN_CLOSED")
+        if self._native_store is not None:
+            try:
+                self._native_store.verify()
+            except Exception:
+                self._lock.release()
+                self.cancel()
+                raise QualifiedScanError("APP_QUALIFIED_SCAN_MACOS_DB_CHANGED") from None
 
     def _close_owned(self) -> None:
         self._closed = True
         self._cancel.set()
         self._decode = None
-        if self._scanner is not None:
-            # Keep a poisoned private handle if close fails so explicit close
-            # can retry cleanup; it can never be used for another operation.
-            self._scanner.close()
-            self._scanner = None
+        try:
+            if self._scanner is not None:
+                # Keep poisoned scanner if close raises; never reuse it.
+                self._scanner.close()
+                self._scanner = None
+        finally:
+            if self._native_store is not None:
+                guard = self._native_store
+                self._native_store = None
+                guard.close()
 
     def close(self) -> None:
         self.cancel()
@@ -373,6 +430,8 @@ class QualifiedScanSession:
                     "SELECT COUNT(*),COALESCE(SUM(atoms),0) FROM mempool_coins"
                 ).fetchone()
                 pending_spends = db.execute("SELECT COUNT(*) FROM mempool_spends").fetchone()[0]
+            if self._native_store is not None:
+                self._native_store.verify()
             return ScanSnapshot(
                 height, count, amount, history, observed, pending_count,
                 pending_amount, pending_spends,
@@ -457,6 +516,8 @@ class QualifiedScanSession:
                 scanner.assert_current()
             if self._cancel.is_set():
                 self._failure("APP_QUALIFIED_SCAN_CANCELLED")
+            if self._native_store is not None:
+                self._native_store.verify()
             return page
         except QualifiedScanError as error:
             self._failure(str(error))
@@ -469,6 +530,8 @@ class QualifiedScanSession:
                         user_consented: bool) -> None:
         """Actual WSP-1 Store.export_checkpoint AES-GCM + create-once archive."""
         _scope(user_consented, _SCOPE)
+        if self._native_store is not None:
+            raise QualifiedScanError("APP_QUALIFIED_SCAN_MACOS_CHECKPOINT_UNQUALIFIED")
         if (type(private_dir) is not type(Path()) or not private_dir.is_absolute()
                 or type(password) is not bytes or not 12 <= len(password) <= 1024):
             raise QualifiedScanError("APP_QUALIFIED_SCAN_CHECKPOINT_INPUT_DENIED")
@@ -506,6 +569,8 @@ class QualifiedScanSession:
             self._decode(code, hrp="wamrtsp")
             if self._cancel.is_set():
                 self._failure("APP_QUALIFIED_SCAN_CANCELLED")
+            if self._native_store is not None:
+                self._native_store.verify()
             return result
         except Exception:
             self._failure("APP_QUALIFIED_SCAN_RECEIVE_DENIED")
