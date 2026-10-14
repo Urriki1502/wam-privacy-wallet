@@ -49,7 +49,7 @@ class MacSignedIntakeTests(unittest.TestCase):
             "mainnet_allowed": False, "real_wallet_allowed": False,
             "real_regtest_qualified": False,
         }
-        target = Path("/tmp") / subject._ASSET
+        target = Path.cwd().resolve() / subject._ASSET
         with patch.object(subject, "verify_official_release", return_value=valid):
             with patch.object(subject, "_hash_exact_member") as read:
                 for change in ("core_execution_allowed", "mainnet_allowed",
