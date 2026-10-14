@@ -6,7 +6,7 @@ import sys
 import argparse
 from collections.abc import Sequence
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QCoreApplication, QEvent, QTimer
 from PySide6.QtWidgets import QApplication
 
 from .main_window import MainWindow
@@ -53,8 +53,21 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             if valid:
                 print("NATIVE_REGTEST_GUI_EVENT_LOOP_SMOKE_PASS_NO_CORE", flush=True)
-            window.close()
+            # Exit the event loop first; closing a Qt window from its timer
+            # callback can re-enter QObject teardown in frozen Linux/Win builds.
+            # Normal QApplication/window destruction occurs after exec returns.
             app.exit(0 if valid else 3)
 
         QTimer.singleShot(100, inspect_preview)
-    return int(app.exec())
+    exit_code = int(app.exec())
+    if args.self_test_ui:
+        # Explicitly destroy widgets BEFORE QApplication. Frozen Qt/Windows
+        # and offscreen Linux builds are sensitive to interpreter shutdown
+        # with live native QWidget wrappers; never swallow a crash as success.
+        window.close()
+        window.deleteLater()
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        app.processEvents()
+        del window
+        del app
+    return exit_code
