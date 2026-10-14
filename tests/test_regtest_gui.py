@@ -255,6 +255,22 @@ class RegtestGuiTests(unittest.TestCase):
         self.assertFalse(self.window.controller.lifecycle.state.wallet_operational)
         self.assertFalse(self.window.node_probe_button.isEnabled())
 
+    def test_macos_native_core_index_option_reaches_qt_worker_readonly(self):
+        self.node_inputs_ready()
+        self.window.node_index_check.setChecked(True)
+        with patch("wam_privacy_wallet.gui.regtest_worker.inspect_existing_two_nodes",
+                   return_value=LiveNodeGuiEvidence(
+                       12, synchronized_indexes_observed=True)) as probe:
+            self.window.node_probe_button.click()
+            self.drain(lambda: not self.window.controller.busy)
+            self.assertIs(probe.call_args.kwargs["check_index_filters"], True)
+        self.assertIn("INDEX+FILTER REPORTED SYNCHRONIZED",
+                      self.window.node_probe_status.text())
+        self.assertIn("NO VERIFIED CORE", self.window.node_probe_status.text())
+        self.assertFalse(self.window.controller.lifecycle.state.wallet_operational)
+        self.assertEqual(self.window.node_inputs["a_password"].text(), "")
+        self.assertEqual(self.window.node_inputs["b_password"].text())
+
     def test_two_node_cancel_ignores_late_rpc_evidence(self):
         entered, release = Event(), Event()
         def slow_probe(**kwargs):
