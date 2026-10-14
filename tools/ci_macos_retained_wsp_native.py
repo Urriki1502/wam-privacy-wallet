@@ -139,10 +139,6 @@ def run(root: Path) -> tuple[str, ...]:
                 cases.append("ACTUAL_NATIVE_REORG_ROLLBACK")
                 if server.violations:
                     raise RuntimeError("MACOS_RETAINED_WSP_RPC_VIOLATION")
-                # Native inode and directory descriptors MUST be released while the
-                # temporary private pathname still exists. Otherwise temp cleanup
-                # unlinks SQLite before the final identity check and misreports
-                # a harmless disposal as a real scanner custody failure.
             finally:
                 # Never unlink disposable state while a scanner, SQLite or
                 # native directory descriptor is still live (success or fail).
