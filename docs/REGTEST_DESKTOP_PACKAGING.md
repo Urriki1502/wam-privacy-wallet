@@ -40,3 +40,26 @@ and independently reviewed distribution signing/notarization.
 
 No gate is considered passed because a packaging job is green.
 Adversarial synthetic fixtures remain in tests only; never a runtime fallback.
+
+## Native macOS app and disk image previews
+
+macOS uses PyInstaller's windowed onedir mode to produce a real `.app`, alongside
+the existing terminal executable. [PyInstaller 6.16 documents this native bundle
+mode](https://pyinstaller.org/en/v6.16.0/usage.html#building-macos-app-bundles).
+The app is named `WAM-Privacy-Wallet-EXPERIMENTAL-REGTEST.app` and has the
+`org.wam.experimental.regtest` bundle identifier. Its own executable is inspected
+for excluded Core/secret files and smoke-tested with `--help` before distribution.
+
+A fresh staging folder holds that app and an explicit experimental notice.
+Native macOS `hdiutil` creates and verifies a compressed `.dmg`; a `.app.tar.gz`
+preserves executable modes and framework symlinks for standalone extraction.
+The image/archive names include EXPERIMENTAL, REGTEST and the native architecture.
+A separate non-authorizing manifest records their SHA256 values and app inspection.
+The artifact upload includes these formats on native Apple Silicon/Intel runners;
+Windows/Linux keep their existing package forms. No cross-compilation claim is made.
+
+The app/disk image is a GUI preview only. PyInstaller's ad-hoc signing does not
+constitute publisher identity, Developer ID signing or notarization. A disk-image
+checksum/verification is container integrity, not operational acceptance. All
+existing Core, custody, recovery, signer, broadcast and mainnet holds remain.
+No release is published and no Core binary is bundled or executed.
