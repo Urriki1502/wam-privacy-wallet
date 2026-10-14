@@ -168,8 +168,13 @@ def main(argv=None) -> int:
             print("MACOS_RETAINED_WSP_" + item + "_PASS")
         print("MACOS_RETAINED_WSP_SYNTHETIC_ONLY_5_OF_5_PASS_NO_CORE")
         return 0
-    except Exception:
-        print("MACOS_RETAINED_WSP_NATIVE_DENIED", file=sys.stderr)
+    except Exception as error:
+        # Diagnostic categories only; never print secrets, paths or RPC payloads.
+        code = str(error)
+        allowed = code if (type(error) is RuntimeError and
+                           code.startswith("MACOS_RETAINED_WSP_") and
+                           len(code) <= 96 and code.replace("_", "").isalnum()) else type(error).__name__
+        print("MACOS_RETAINED_WSP_NATIVE_DENIED:" + allowed, file=sys.stderr)
         return 2
 
 
