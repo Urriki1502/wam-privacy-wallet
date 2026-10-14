@@ -46,8 +46,9 @@ boundary cases preserve denial on non-Darwin/32-bit and optimized interpreters.
 dependency versions, installed origin and absence of preloaded WSP before native
 imports. With a public disposable scan scalar and fixed public test password,
 it executes original WSP AES-GCM export/import through this storage boundary.
-Five exact identities verify native publication, scan-account roundtrip,
-wrong-password and tamper refusal, and create-once preservation. Signing APIs
+Seven exact identities verify native publication, scan-account roundtrip,
+wrong-password and tamper refusal, create-once preservation, actual interprocess
+publication and restart after terminating a flushed owner. Signing APIs
 remain denied. The native macOS CI step supplements the unchanged original
 scanner proof; synthetic filesystem bytes alone are not encryption evidence.
 
@@ -56,3 +57,12 @@ freshness anchor, whole-directory rollback defense, same-UID malware protection,
 OS/mount attestation, memory zeroization, real Core E2E or production custody
 qualification. Existing #9/#82/#86/#148/#151/#153 and WSP review holds remain.
 Any future retained SQLite/session or GUI integration needs its own native proof.
+
+The process recovery proof starts separately source-qualified publisher processes
+and admits exactly one create-once winner. A second case terminates a real owner
+after native F_FULLFSYNC but before publication: the canonical name must remain
+absent, its private encrypted stage remains authenticated, and a fresh publisher
+must regain the kernel lease and create an authenticated canonical envelope.
+The orphan stage is preserved unchanged; this provides no automatic recovery,
+stale-stage deletion, independent freshness or power-loss qualification. All
+accounts/passwords are public fixtures; no production custody is enabled.

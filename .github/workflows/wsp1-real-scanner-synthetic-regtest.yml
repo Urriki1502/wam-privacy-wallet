@@ -10,6 +10,7 @@ on:
       - 'tools/ci_wsp1_scanner_native_only.py'
       - 'tools/ci_wsp1_scanner_process_lock.py'
       - 'tools/ci_macos_scan_backup_native.py'
+      - 'tools/ci_macos_scan_backup_process.py'
       - 'tests/test_macos_scan_backup_native.py'
       - 'tests/test_macos_encrypted_scan_backup.py'
       - 'src/wam_privacy_wallet/application/macos_encrypted_scan_backup.py'

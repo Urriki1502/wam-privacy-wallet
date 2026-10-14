@@ -26,6 +26,8 @@ CASES = (
     "WRONG_PASSWORD_AUTHENTICATION_DENIED",
     "TAMPERED_CIPHERTEXT_AUTHENTICATION_DENIED",
     "CREATE_ONCE_PRESERVES_AUTHENTICATED_BYTES",
+    "ACTUAL_INTERPROCESS_CREATE_ONCE",
+    "ACTUAL_FLUSHED_OWNER_TERMINATION_RESTART",
 )
 
 
@@ -89,6 +91,10 @@ def run(root: Path) -> tuple[str, ...]:
             assert unchanged == loaded and import_scan(unchanged, password) == (account,)
             assert sorted(p.name for p in directory.iterdir()) == ["scan-only.wsp.enc", "tampered"]
             passed.append(CASES[4])
+            from tools.ci_macos_scan_backup_process import exercise_process_recovery
+            def authenticate(ciphertext):
+                assert import_scan(ciphertext, password) == (account,)
+            passed.extend(exercise_process_recovery(root, directory, authenticate))
         if tuple(passed) != CASES:
             raise RuntimeError("MACOS_SCAN_CRYPTO_CASE_COUNT_DENIED")
         return tuple(passed)
@@ -104,7 +110,7 @@ def main(argv=None) -> int:
         passed = run(Path(args.source_root))
         for name in passed:
             print("ACTUAL_PINNED_MACOS_SCAN_BACKUP_" + name + "_PASS")
-        print("ACTUAL_PINNED_MACOS_SCAN_BACKUP_OK 5/5; public fixtures; NO Core/retained custody/rollback/signing authority")
+        print("ACTUAL_PINNED_MACOS_SCAN_BACKUP_OK 7/7; public fixtures; NO Core/retained custody/rollback/signing authority")
     except Exception:
         print("MACOS_SCAN_CRYPTO_PROOF_DENIED", file=sys.stderr)
         return 2
