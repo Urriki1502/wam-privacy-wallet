@@ -220,6 +220,25 @@ jobs:
               raise AssertionError('unqualified retained persistence enabled')
           assert not any(name == 'wam_sp' or name.startswith('wam_sp.') for name in sys.modules)
           print('ACTUAL_NON_LINUX_RETAINED_SESSION_PLATFORM_DENIAL_ONLY')
+      - name: Require all 28 pinned BIP352 upstream vectors PASS on native Apple Silicon
+        if: runner.os == 'macOS'
+        env:
+          PYTHONPATH: src
+        shell: python
+        run: |
+          import json, unittest
+          from pathlib import Path
+          vectors = json.loads(Path("wsp-source/tests/vectors/bip352.json").read_text())
+          if len(vectors) != 28:
+              raise SystemExit("WSP1_NATIVE_MACOS_VECTOR_COUNT_DENIED")
+          suite = unittest.defaultTestLoader.discover(
+              "wsp-source/tests", pattern="test_vectors.py")
+          if suite.countTestCases() != 28:
+              raise SystemExit("WSP1_NATIVE_MACOS_VECTOR_TEST_COUNT_DENIED")
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          if not result.wasSuccessful() or result.skipped or result.testsRun != 28:
+              raise SystemExit("WSP1_NATIVE_MACOS_28_VECTORS_DENIED")
+          print("WSP1_PINNED_BIP352_28_OF_28_NATIVE_MACOS_ARM64_PASS_NO_CORE")
       - name: Actual public BIP352 scanner, SQLite, reorg and Qt proof (NO Core)
         run: python -B -m tools.ci_wsp1_scanner_native_only --source-root "${{ github.workspace }}/wsp-source"
       - name: Actual native scanner inter-process lease, exit recovery and fresh attestation (NO Core)
