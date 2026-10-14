@@ -81,6 +81,7 @@ jobs:
       - name: Inspect native macOS app and create experimental disk image
         if: runner.os == 'macOS'
         env:
+          PYTHONPATH: .
           TARGET_PLATFORM: ${{ matrix.platform }}
           SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           QT_QPA_PLATFORM: offscreen
