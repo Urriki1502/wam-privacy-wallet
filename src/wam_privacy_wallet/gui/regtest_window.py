@@ -114,6 +114,11 @@ class RegtestWindow(QMainWindow):
                 )
                 self.node_ack.toggled.connect(self._refresh_controls)
                 layout.addWidget(self.node_ack)
+                self.node_index_check = QCheckBox(
+                    "Also inspect synchronized tx/coinstats/basic-filter indexes on both nodes"
+                )
+                self.node_index_check.toggled.connect(self._refresh_controls)
+                layout.addWidget(self.node_index_check)
                 self.node_probe_button = QPushButton("Probe two existing REGTEST nodes")
                 self.node_probe_button.clicked.connect(self._probe_nodes)
                 layout.addWidget(self.node_probe_button)
@@ -257,6 +262,7 @@ class RegtestWindow(QMainWindow):
                 node_b_password=b_password,
                 consent=self.consent.isChecked(),
                 unverified_core_ack=self.node_ack.isChecked(),
+                check_index_filters=self.node_index_check.isChecked(),
             )
         except (ValueError, RegtestLifecycleError):
             self.node_probe_status.setText("APP_REGTEST_NODE_PROBE_DENIED")
@@ -523,7 +529,8 @@ class RegtestWindow(QMainWindow):
                     state.revision != revision or
                     type(receipt) is not LiveNodeGuiEvidence):
                 raise ValueError
-            checked = LiveNodeGuiEvidence(receipt.tip_height)
+            checked = LiveNodeGuiEvidence(receipt.tip_height,
+                synchronized_indexes_observed=receipt.synchronized_indexes_observed)
             if checked != receipt:
                 raise ValueError
         except Exception:
@@ -532,7 +539,9 @@ class RegtestWindow(QMainWindow):
         self.node_probe_status.setText(
             "UNTRUSTED TWO-NODE REGTEST · RPC/P2P localhost observed · "
             f"reported tip {receipt.tip_height} · 1 peer/node · "
-            "NO VERIFIED CORE · NO WALLET LOADED · NO SIGNER / BROADCAST"
+            + (" · INDEX+FILTER REPORTED SYNCHRONIZED (UNTRUSTED)"
+               if receipt.synchronized_indexes_observed else "")
+            + " · NO VERIFIED CORE · NO WALLET LOADED · NO SIGNER / BROADCAST"
         )
 
     def _node_failed(self, revision):
@@ -549,6 +558,7 @@ class RegtestWindow(QMainWindow):
         self.inspect_button.setEnabled(available and state.mode == "REGTEST" and self.consent.isChecked())
         self.cancel_button.setEnabled(self.controller.busy and not self._closing)
         ports = [v.value() for v in self.node_ports.values()]
+        self.node_index_check.setEnabled(available and state.mode == "REGTEST")
         self.node_probe_button.setEnabled(
             available and state.mode == "REGTEST"
             and self.consent.isChecked() and self.node_ack.isChecked()
