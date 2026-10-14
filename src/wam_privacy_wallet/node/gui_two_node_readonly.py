@@ -13,6 +13,7 @@ from wam_privacy_wallet.node.endpoint import LocalRegtestEndpoint
 from wam_privacy_wallet.node.read_rpc import ExplicitRpcAuth
 from wam_privacy_wallet.node.regtest_gateway import LocalRegtestIdentityGateway
 from wam_privacy_wallet.node.two_node_p2p_readonly import TwoNodeP2PReadOnlyAudit
+from wam_privacy_wallet.node.two_node_core_readiness import inspect_existing_core_readiness
 
 
 class LiveNodeGuiProbeError(ValueError):
@@ -25,6 +26,7 @@ class LiveNodeGuiEvidence:
     status: str = "TWO_NODE_REPORTED_CHAIN_ONLY_UNTRUSTED"
     two_peer_topology_observed: bool = True
     same_reported_chain: bool = True
+    synchronized_indexes_observed: bool = False
     core_authenticated: bool = False
     independent_processes_verified: bool = False
     wallet_operational: bool = False
@@ -38,6 +40,7 @@ class LiveNodeGuiEvidence:
                 self.status != "TWO_NODE_REPORTED_CHAIN_ONLY_UNTRUSTED" or
                 self.two_peer_topology_observed is not True or
                 self.same_reported_chain is not True or
+                type(self.synchronized_indexes_observed) is not bool or
                 any(getattr(self, field) is not False for field in (
                     "core_authenticated", "independent_processes_verified",
                     "wallet_operational", "signing_allowed",
@@ -50,6 +53,7 @@ def inspect_existing_two_nodes(
     b: LocalRegtestEndpoint, bb: ExplicitRpcAuth, *,
     p2p_a: int, p2p_b: int, user_consented: bool,
     acknowledged_unverified_core: bool, cancelled: Event,
+    check_index_filters: bool = False,
 ) -> LiveNodeGuiEvidence:
     """A blocking background-worker ONLY operation with genuine RPC I/O."""
     if (type(a) is not LocalRegtestEndpoint or
@@ -59,11 +63,33 @@ def inspect_existing_two_nodes(
             aa == bb or type(p2p_a) is not int or type(p2p_b) is not int or
             len({a.port, b.port, p2p_a, p2p_b}) != 4 or
             user_consented is not True or acknowledged_unverified_core is not True or
-            type(cancelled) is not Event):
+            type(check_index_filters) is not bool or type(cancelled) is not Event):
         raise LiveNodeGuiProbeError("LIVE_NODE_GUI_SCOPE_DENIED")
     if cancelled.is_set():
         raise LiveNodeGuiProbeError("LIVE_NODE_GUI_CANCELLED")
     try:
+        if check_index_filters:
+            # Reuse the opt-in true RPC/P2P/index audit from PR #208.
+            # A positive untrusted index report never grants wallet authority.
+            evidence = inspect_existing_core_readiness(
+                a=a, aa=aa, b=b, bb=bb, p2p_a=p2p_a, p2p_b=p2p_b,
+                consent=True, acknowledge_unverified_processes=True,
+            )
+            if cancelled.is_set():
+                raise LiveNodeGuiProbeError("LIVE_NODE_GUI_CANCELLED")
+            if (type(evidence) is not dict
+                    or evidence.get("status") != "OBSERVED_LIVE_TWO_NODE_REGTEST_RPC_AND_INDEXES_UNTRUSTED"
+                    or type(evidence.get("height")) is not int
+                    or evidence.get("synchronized_index_and_basic_filter_reports") is not True
+                    or evidence.get("two_node_loopback_p2p_observed") is not True
+                    or any(evidence.get(flag) is not False for flag in (
+                        "core_executable_authenticated", "independent_processes_verified",
+                        "real_core_e2e_accepted", "wsp_scanning_enabled",
+                        "wallet_operational", "signing_allowed", "broadcast_allowed",
+                        "mainnet_allowed"))):
+                raise LiveNodeGuiProbeError("LIVE_NODE_GUI_INDEX_RECEIPT_DENIED")
+            return LiveNodeGuiEvidence(evidence["height"],
+                synchronized_indexes_observed=True)
         gw_a = LocalRegtestIdentityGateway(a, aa, timeout=3)
         gw_b = LocalRegtestIdentityGateway(b, bb, timeout=3)
         first_a, first_b = gw_a.probe_core_profile(), gw_b.probe_core_profile()
