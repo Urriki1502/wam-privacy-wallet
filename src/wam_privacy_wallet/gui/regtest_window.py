@@ -7,10 +7,12 @@ Only mode selection, local policy inspection, cancel and close are actionable.
 from __future__ import annotations
 
 import sys
-from PySide6.QtCore import QTimer
+from datetime import datetime
+from PySide6.QtCore import QTimer, QSize, Qt
 from PySide6.QtWidgets import (
-    QCheckBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QListWidget,
-    QMainWindow, QPlainTextEdit, QPushButton, QSpinBox, QStackedWidget, QVBoxLayout, QWidget,
+    QCheckBox, QComboBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
+    QListWidget, QListWidgetItem, QMainWindow, QPlainTextEdit, QPushButton,
+    QSpinBox, QStackedWidget, QVBoxLayout, QWidget,
 )
 
 from wam_privacy_wallet.application.regtest_lifecycle import BLOCKERS, RegtestLifecycleError
@@ -27,6 +29,8 @@ from wam_privacy_wallet.application.qt_native_private_workflow import (
 )
 from wam_privacy_wallet.integrations.wsp1_source_review import PINNED_COMMIT
 from .regtest_worker import RegtestWorkerController
+from .appearance import resolved_appearance, appearance_colors, appearance_stylesheet
+from .navigation_icons import navigation_icon
 
 VIEWS = (
     ("Dashboard", "No wallet is loaded. Select REGTEST and inspect local gates."),
@@ -52,8 +56,44 @@ class RegtestWindow(QMainWindow):
         self.controller = RegtestWorkerController(self)
         self._closing = False
         root = QWidget(self)
+        root.setObjectName("WalletRoot")
         column = QVBoxLayout(root)
-        column.addWidget(QLabel("WAM Privacy Wallet · REGTEST ONLY · EXPERIMENTAL · NO REAL FUNDS"))
+        column.setContentsMargins(20, 18, 20, 18)
+        column.setSpacing(10)
+        header = QWidget(root)
+        header.setObjectName("WalletHeader")
+        h = QHBoxLayout(header)
+        h.setContentsMargins(16, 10, 16, 10)
+        logo = QLabel("W")
+        logo.setObjectName("WalletMark")
+        logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        h.addWidget(logo)
+        brand = QVBoxLayout()
+        title = QLabel("WAM Privacy Wallet")
+        title.setObjectName("WalletBrand")
+        subtitle = QLabel("macOS · REGTEST workspace")
+        subtitle.setObjectName("WalletSubtitle")
+        brand.addWidget(title)
+        brand.addWidget(subtitle)
+        h.addLayout(brand)
+        h.addStretch()
+        selector = QVBoxLayout()
+        self.appearance_choice = QComboBox(header)
+        self.appearance_choice.setAccessibleName("Appearance: auto local time, light, dark")
+        self.appearance_choice.addItem("Auto · local time", "auto")
+        self.appearance_choice.addItem("Light", "light")
+        self.appearance_choice.addItem("Dark", "dark")
+        self.timezone_status = QLabel("LOCAL TIME")
+        self.timezone_status.setObjectName("TimezoneLabel")
+        self.timezone_status.setAlignment(Qt.AlignmentFlag.AlignRight)
+        selector.addWidget(self.appearance_choice)
+        selector.addWidget(self.timezone_status)
+        h.addLayout(selector)
+        column.addWidget(header)
+        warning = QLabel("REGTEST ONLY · EXPERIMENTAL · NO REAL FUNDS · SIGNER / BROADCAST BLOCKED")
+        warning.setObjectName("WalletWarning")
+        warning.setWordWrap(True)
+        column.addWidget(warning)
         self.lifecycle_status = QLabel("MODE_REQUIRED")
         column.addWidget(self.lifecycle_status)
         self.authority_status = QLabel("NO WALLET LOADED · SIGNER / BROADCAST BLOCKED")
@@ -63,6 +103,7 @@ class RegtestWindow(QMainWindow):
         column.addWidget(self.scan_review_status)
         controls = QHBoxLayout()
         self.mode_button = QPushButton("Select REGTEST")
+        self.mode_button.setObjectName("ModeButton")
         self.consent = QCheckBox("I consent to local readiness inspection")
         self.inspect_button = QPushButton("Inspect local gates")
         self.cancel_button = QPushButton("Cancel")
@@ -71,12 +112,17 @@ class RegtestWindow(QMainWindow):
         column.addLayout(controls)
         body = QHBoxLayout()
         self.navigation = QListWidget()
-        self.navigation.addItems([name for name, _ in VIEWS])
+        self.navigation.setIconSize(QSize(22, 22))
+        for name, _ in VIEWS:
+            self.navigation.addItem(QListWidgetItem(name))
         self.pages = QStackedWidget()
         for name, message in VIEWS:
             page = QWidget()
             layout = QVBoxLayout(page)
-            layout.addWidget(QLabel(name))
+            layout.setContentsMargins(18, 16, 18, 12)
+            page_title = QLabel(name)
+            page_title.setObjectName("PageTitle")
+            layout.addWidget(page_title)
             description = QLabel(message)
             description.setWordWrap(True)
             layout.addWidget(description)
@@ -228,6 +274,25 @@ class RegtestWindow(QMainWindow):
         self.controller.private_completed.connect(self._private_completed)
         self.controller.private_failed.connect(self._private_failed)
         self._render(self.controller.lifecycle.state)
+        self.appearance_choice.currentIndexChanged.connect(self._apply_appearance)
+        self._appearance_timer = QTimer(self)
+        self._appearance_timer.setInterval(60_000)
+        self._appearance_timer.timeout.connect(self._apply_appearance)
+        self._appearance_timer.start()
+        self._apply_appearance()
+
+    def _apply_appearance(self, *_):
+        local = datetime.now().astimezone()
+        selected = resolved_appearance(self.appearance_choice.currentData(), local)
+        palette = appearance_colors(selected)
+        self.setStyleSheet(appearance_stylesheet(selected))
+        for index in range(self.navigation.count()):
+            self.navigation.item(index).setIcon(
+                navigation_icon(index, palette["accent"]))
+        self.timezone_status.setText(
+            f"{local.strftime('%H:%M')} · {local.tzname() or local.strftime('%z')} · "
+            f"{selected.upper()}"
+        )
 
     def _select(self):
         try:
@@ -663,6 +728,7 @@ class RegtestWindow(QMainWindow):
         )
 
     def closeEvent(self, event):
+        self._appearance_timer.stop()
         self._closing = True
         if not self.controller.shutdown(wait_ms=0):
             event.ignore()
