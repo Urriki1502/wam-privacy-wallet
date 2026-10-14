@@ -1,0 +1,85 @@
+# Authenticates the real WAM Core v0.1.11 macOS ARM64 release, no Core launch.
+name: WAM Core macOS ARM64 signed member intake (NO EXEC)
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/core-macos-arm64-signed-intake.yml'
+      - 'tools/ci_macos_arm64_core_intake.py'
+      - 'tests/test_macos_core_intake.py'
+      - 'src/wam_privacy_wallet/node/core_signed_release.py'
+      - 'src/wam_privacy_wallet/node/core_archive_inventory.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  official-macos-core:
+    name: Official WAM v0.1.11 arm64 signed Mach-O verification (NO EXEC)
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: 'arm64'
+      - name: Require native Apple Silicon runner and trusted GnuPG
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "arm64"
+          if ! command -v gpg >/dev/null 2>&1; then
+            brew install gnupg
+          fi
+          command -v gpg
+          gpg --version
+      - name: Fail-closed Mach-O and authority-negative tests
+        env:
+          PYTHONPATH: src:.
+        run: python -m unittest discover -s tests -p 'test_macos_core_intake.py' -v
+      - name: Verify official release GnuPG, complete archive, exact Mach-O ARM64 node
+        shell: bash
+        env:
+          PYTHONPATH: src:.
+        run: |
+          set -euo pipefail
+          umask 077
+          TEMP="$(mktemp -d)"
+          trap 'rm -rf -- "$TEMP"' EXIT
+          A='wam-coin-v0.1.11-arm64-apple-darwin.tar.gz'
+          curl --fail --silent --show-error --retry 0 --max-time 180 \
+            --max-filesize 536870912 --proto '=https' --tlsv1.2 \
+            --output "$TEMP/$A" "https://wamcoin.org/downloads/v0.1.11/$A"
+          python -m tools.ci_macos_arm64_core_intake \
+            --archive "$TEMP/$A" --gpg "$(command -v gpg)" \
+            > "$TEMP/receipt.json"
+          mkdir -p .macos-arm64-core-static-evidence
+          cp "$TEMP/receipt.json" .macos-arm64-core-static-evidence/review.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = json.loads(Path(".macos-arm64-core-static-evidence/review.json").read_text())
+          assert p["status"] == "SIGNED_WAM_V0_1_11_ARM64_MACHO_REVIEW_ONLY"
+          assert p["signer_fingerprint"] == "4BD4A8D3AFD43F5CBCB500E23798462FE00ADBA4"
+          assert p["macho_shape"] == "THIN_MACHO64_ARM64_EXECUTE"
+          assert len(p["archive_sha256"]) == len(p["node_sha256"]) == 64
+          for key in ("core_executed", "core_execution_allowed",
+                      "real_regtest_qualified", "process_loader_authenticated",
+                      "wallet_operational", "signing_allowed",
+                      "broadcast_allowed", "mainnet_allowed"):
+              assert p[key] is False
+          print("WAM_CORE_V0_1_11_NATIVE_MACOS_ARM64_SIGNED_MACHO_REVIEW_PASS_NO_EXEC")
+          print("CORE_ARM64_NODE_SHA256=" + p["node_sha256"])
+          print("CORE_ARM64_EXECUTION_ALLOWED=false")
+          PY
+      - name: Preserve redacted signed artifact receipt only
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-core-macos-arm64-static
+          path: .macos-arm64-core-static-evidence/review.json
+          if-no-files-found: error
+          retention-days: 14
