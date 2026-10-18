@@ -99,7 +99,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Python 3.12 x64
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
           architecture: x64
@@ -182,7 +182,7 @@ jobs:
           path: wsp-source
           persist-credentials: false
       - name: Set up actual Python 3.12 x64
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
           architecture: x64
@@ -239,7 +239,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up actual 32-bit Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
           architecture: x86

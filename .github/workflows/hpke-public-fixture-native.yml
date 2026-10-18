@@ -67,7 +67,7 @@ jobs:
         if: runner.os == 'macOS' && runner.arch == 'ARM64'
         run: sudo softwareupdate --install-rosetta --agree-to-license
       - name: Set up native Python 3.12 architecture
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
           architecture: ${{ matrix.arch }}
